@@ -38,6 +38,8 @@ publish.html
 .obsidian
 .novelaid
 
+*.code-workspace
+
 # Node / TypeScript
 node_modules/
 dist/
@@ -46,3 +48,7 @@ scratch/
 # Allow Node.js bin directory
 !bin/
 !bin/**
+
+# Rust / Tauri
+src-tauri/target/
+src-tauri/gen/
