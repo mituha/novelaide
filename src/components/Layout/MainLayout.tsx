@@ -2,14 +2,20 @@ import { useState } from "react";
 import { ActivityBar, PanelId } from "./ActivityBar";
 import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
+import { useProject } from "../../contexts/ProjectContext";
 import { invoke } from "@tauri-apps/api/core";
 import { Feather, FolderOpen, PlusCircle } from "lucide-react";
 import "./MainLayout.css";
 
-export const MainLayout: React.FC = () => {
+interface MainLayoutProps {
+  onOpenLauncher?: () => void;
+}
+
+export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   const [activePanel, setActivePanel] = useState<PanelId>("files");
   const [greetMsg, setGreetMsg] = useState("");
   const [name, setName] = useState("");
+  const { projectName, projectPath } = useProject();
 
   const handleGreet = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -37,6 +43,7 @@ export const MainLayout: React.FC = () => {
         <SidePane
           activePanel={activePanel}
           onClose={() => setActivePanel(null)}
+          onOpenLauncher={onOpenLauncher}
         />
 
         {/* メイン執筆領域 / ワークスペース */}
@@ -45,15 +52,27 @@ export const MainLayout: React.FC = () => {
             <div className="welcome-header">
               <Feather className="welcome-icon" size={44} />
               <h1 className="welcome-title">novelaide</h1>
-              <p className="welcome-subtitle">小説執筆用デスクトップエディター</p>
+              <p className="welcome-subtitle">
+                {projectName
+                  ? `作品「${projectName}」を開いています (${projectPath})`
+                  : "小説執筆用デスクトップエディター"}
+              </p>
             </div>
 
             <div className="quick-actions">
-              <button type="button" className="quick-action-btn">
+              <button
+                type="button"
+                className="quick-action-btn"
+                onClick={onOpenLauncher}
+              >
                 <FolderOpen size={18} />
                 <span>作品フォルダを開く</span>
               </button>
-              <button type="button" className="quick-action-btn">
+              <button
+                type="button"
+                className="quick-action-btn"
+                onClick={onOpenLauncher}
+              >
                 <PlusCircle size={18} />
                 <span>新規プロジェクトを作成</span>
               </button>
@@ -84,7 +103,7 @@ export const MainLayout: React.FC = () => {
       </div>
 
       {/* 最下部ステータスバー */}
-      <StatusBar />
+      <StatusBar onOpenLauncher={onOpenLauncher} />
     </div>
   );
 };

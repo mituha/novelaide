@@ -1,21 +1,23 @@
 import { GitBranch, FileText, Globe } from "lucide-react";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useProject } from "../../contexts/ProjectContext";
 import "./StatusBar.css";
 
 interface StatusBarProps {
   charCount?: number;
   manuscriptPages?: number;
   branchName?: string;
-  projectName?: string;
+  onOpenLauncher?: () => void;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
   charCount = 0,
   manuscriptPages = 0.0,
   branchName = "main",
-  projectName = "未選択",
+  onOpenLauncher,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const { projectName } = useProject();
 
   const getThemeLabel = () => {
     switch (theme) {
@@ -37,9 +39,13 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           <GitBranch size={13} />
           <span>{branchName}</span>
         </div>
-        <div className="status-item" title="現在の作品プロジェクト">
+        <div
+          className="status-item clickable"
+          onClick={onOpenLauncher}
+          title="クリックでプロジェクト選択画面を開く"
+        >
           <FileText size={13} />
-          <span>作品: {projectName}</span>
+          <span>作品: {projectName || "未選択（クリックで開く）"}</span>
         </div>
       </div>
 

@@ -6,9 +6,14 @@ import "./SidePane.css";
 interface SidePaneProps {
   activePanel: PanelId;
   onClose: () => void;
+  onOpenLauncher?: () => void;
 }
 
-export const SidePane: React.FC<SidePaneProps> = ({ activePanel, onClose }) => {
+export const SidePane: React.FC<SidePaneProps> = ({
+  activePanel,
+  onClose,
+  onOpenLauncher,
+}) => {
   const [width, setWidth] = useState(260);
   const isResizing = useRef(false);
   const startX = useRef(0);
@@ -93,7 +98,9 @@ export const SidePane: React.FC<SidePaneProps> = ({ activePanel, onClose }) => {
         return (
           <div className="pane-placeholder">
             <p className="placeholder-text">フォルダが開かれていません</p>
-            <button type="button" className="placeholder-btn">フォルダを開く</button>
+            <button type="button" className="placeholder-btn" onClick={onOpenLauncher}>
+              フォルダを開く
+            </button>
           </div>
         );
       case "search":
