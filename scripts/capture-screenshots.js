@@ -9,7 +9,6 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, "..");
 const distDir = path.resolve(rootDir, "dist");
 
-// 静的ファイルサーバー
 function createServer() {
   const mimeTypes = {
     ".html": "text/html",
@@ -47,9 +46,8 @@ async function capture() {
   await new Promise((resolve) => server.listen(port, resolve));
   console.log(`Preview server listening on http://localhost:${port}`);
 
-  // ディレクトリ作成
   const outDirs = [
-    path.join(rootDir, "making/notes/images/02"),
+    path.join(rootDir, "making/notes/images/03"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -58,7 +56,6 @@ async function capture() {
     fs.mkdirSync(dir, { recursive: true });
   }
 
-  // Chrome を起動
   const browser = await chromium.launch({
     channel: "chrome",
     headless: true,
@@ -66,43 +63,78 @@ async function capture() {
 
   const url = `http://localhost:${port}`;
 
-  // 1. ライトモード
+  // 1. ダークモード（デフォルト）
   {
     const context = await browser.newContext({
       viewport: { width: 1024, height: 768 },
-      colorScheme: "light",
       deviceScaleFactor: 2,
     });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle" });
 
-    const lightPath = path.join(rootDir, "making/notes/images/02/02_初期画面_ライトモード.png");
-    await page.screenshot({ path: lightPath });
-    console.log(`Saved: ${lightPath}`);
+    // テーマ設定
+    await page.evaluate(() => {
+      localStorage.setItem("novelaide-theme", "dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+    });
+    await page.reload({ waitUntil: "networkidle" });
 
-    // マニュアルと仕様書にもコピー
-    fs.copyFileSync(lightPath, path.join(rootDir, "docs/manual/images/02_初期画面_ライトモード.png"));
-    fs.copyFileSync(lightPath, path.join(rootDir, "docs/dev/images/02_初期画面_ライトモード.png"));
+    const darkPath = path.join(rootDir, "making/notes/images/03/03_基本レイアウト_ダークモード.png");
+    await page.screenshot({ path: darkPath });
+    console.log(`Saved: ${darkPath}`);
+
+    fs.copyFileSync(darkPath, path.join(rootDir, "docs/manual/images/03_基本レイアウト_ダークモード.png"));
+    fs.copyFileSync(darkPath, path.join(rootDir, "docs/dev/images/03_基本レイアウト_ダークモード.png"));
 
     await context.close();
   }
 
-  // 2. ダークモード
+  // 2. ライトモード
   {
     const context = await browser.newContext({
       viewport: { width: 1024, height: 768 },
-      colorScheme: "dark",
       deviceScaleFactor: 2,
     });
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle" });
 
-    const darkPath = path.join(rootDir, "making/notes/images/02/02_初期画面_ダークモード.png");
-    await page.screenshot({ path: darkPath });
-    console.log(`Saved: ${darkPath}`);
+    await page.evaluate(() => {
+      localStorage.setItem("novelaide-theme", "light");
+      document.documentElement.setAttribute("data-theme", "light");
+    });
+    await page.reload({ waitUntil: "networkidle" });
 
-    fs.copyFileSync(darkPath, path.join(rootDir, "docs/manual/images/02_初期画面_ダークモード.png"));
-    fs.copyFileSync(darkPath, path.join(rootDir, "docs/dev/images/02_初期画面_ダークモード.png"));
+    const lightPath = path.join(rootDir, "making/notes/images/03/03_基本レイアウト_ライトモード.png");
+    await page.screenshot({ path: lightPath });
+    console.log(`Saved: ${lightPath}`);
+
+    fs.copyFileSync(lightPath, path.join(rootDir, "docs/manual/images/03_基本レイアウト_ライトモード.png"));
+    fs.copyFileSync(lightPath, path.join(rootDir, "docs/dev/images/03_基本レイアウト_ライトモード.png"));
+
+    await context.close();
+  }
+
+  // 3. セピアモード（小説執筆特化）
+  {
+    const context = await browser.newContext({
+      viewport: { width: 1024, height: 768 },
+      deviceScaleFactor: 2,
+    });
+    const page = await context.newPage();
+    await page.goto(url, { waitUntil: "networkidle" });
+
+    await page.evaluate(() => {
+      localStorage.setItem("novelaide-theme", "sepia");
+      document.documentElement.setAttribute("data-theme", "sepia");
+    });
+    await page.reload({ waitUntil: "networkidle" });
+
+    const sepiaPath = path.join(rootDir, "making/notes/images/03/03_基本レイアウト_セピアモード.png");
+    await page.screenshot({ path: sepiaPath });
+    console.log(`Saved: ${sepiaPath}`);
+
+    fs.copyFileSync(sepiaPath, path.join(rootDir, "docs/manual/images/03_基本レイアウト_セピアモード.png"));
+    fs.copyFileSync(sepiaPath, path.join(rootDir, "docs/dev/images/03_基本レイアウト_セピアモード.png"));
 
     await context.close();
   }

@@ -1,0 +1,59 @@
+.activity-bar {
+  width: 48px;
+  background-color: var(--bg-activity-bar);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  user-select: none;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+  z-index: 10;
+}
+
+.activity-bar-top,
+.activity-bar-bottom {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.activity-button {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  padding: 0;
+}
+
+.activity-button:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.activity-button.active {
+  color: var(--text-primary);
+  background-color: var(--bg-active);
+}
+
+.activity-button.active::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 8px;
+  bottom: 8px;
+  width: 3px;
+  background-color: var(--accent-color);
+  border-radius: 0 2px 2px 0;
+}

@@ -1,0 +1,110 @@
+/* テーマ定義（CSS変数） */
+
+:root {
+  /* デフォルト: ダークテーマ */
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-activity-bar: #333333;
+  --bg-side-pane: #252526;
+  --bg-status-bar: #007acc;
+  --bg-status-bar-text: #ffffff;
+  --bg-card: #2d2d30;
+  --bg-hover: #2a2d2e;
+  --bg-active: #37373d;
+  --text-primary: #cccccc;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --border-color: #3e3e42;
+  --accent-color: #0e639c;
+  --accent-hover: #1177bb;
+  --input-bg: #3c3c3c;
+  --input-border: #555555;
+  --input-text: #cccccc;
+}
+
+:root[data-theme='light'] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f3f3f3;
+  --bg-activity-bar: #2c2c2c;
+  --bg-side-pane: #f8f9fa;
+  --bg-status-bar: #007acc;
+  --bg-status-bar-text: #ffffff;
+  --bg-card: #ffffff;
+  --bg-hover: #e8e8e8;
+  --bg-active: #d6ebff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #555555;
+  --text-muted: #888888;
+  --border-color: #e1e4e8;
+  --accent-color: #007acc;
+  --accent-hover: #005a9e;
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-text: #1a1a1a;
+}
+
+:root[data-theme='dark'] {
+  --bg-primary: #1e1e1e;
+  --bg-secondary: #252526;
+  --bg-activity-bar: #333333;
+  --bg-side-pane: #252526;
+  --bg-status-bar: #007acc;
+  --bg-status-bar-text: #ffffff;
+  --bg-card: #2d2d30;
+  --bg-hover: #2a2d2e;
+  --bg-active: #37373d;
+  --text-primary: #cccccc;
+  --text-secondary: #999999;
+  --text-muted: #666666;
+  --border-color: #3e3e42;
+  --accent-color: #0e639c;
+  --accent-hover: #1177bb;
+  --input-bg: #3c3c3c;
+  --input-border: #555555;
+  --input-text: #cccccc;
+}
+
+/* 小説執筆向けセピアテーマ（温かみのある原稿用紙風） */
+:root[data-theme='sepia'] {
+  --bg-primary: #fbf0d9;
+  --bg-secondary: #f4e5c2;
+  --bg-activity-bar: #4a3b32;
+  --bg-side-pane: #f4e5c2;
+  --bg-status-bar: #795548;
+  --bg-status-bar-text: #ffffff;
+  --bg-card: #fdf6e7;
+  --bg-hover: #ebd5a8;
+  --bg-active: #e2c892;
+  --text-primary: #433422;
+  --text-secondary: #6e5942;
+  --text-muted: #9c8369;
+  --border-color: #dfcaa0;
+  --accent-color: #8d5b2d;
+  --accent-hover: #a66d39;
+  --input-bg: #fdf6e7;
+  --input-border: #cbb48b;
+  --input-text: #433422;
+}
+
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']):not([data-theme='sepia']):not([data-theme='light']) {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f3f3f3;
+    --bg-activity-bar: #2c2c2c;
+    --bg-side-pane: #f8f9fa;
+    --bg-status-bar: #007acc;
+    --bg-status-bar-text: #ffffff;
+    --bg-card: #ffffff;
+    --bg-hover: #e8e8e8;
+    --bg-active: #d6ebff;
+    --text-primary: #1a1a1a;
+    --text-secondary: #555555;
+    --text-muted: #888888;
+    --border-color: #e1e4e8;
+    --accent-color: #007acc;
+    --accent-hover: #005a9e;
+    --input-bg: #ffffff;
+    --input-border: #cbd5e1;
+    --input-text: #1a1a1a;
+  }
+}

@@ -1,0 +1,37 @@
+.status-bar {
+  height: 24px;
+  background-color: var(--bg-status-bar);
+  color: var(--bg-status-bar-text);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0 10px;
+  font-size: 0.75rem;
+  user-select: none;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.status-bar-left,
+.status-bar-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.status-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px;
+  border-radius: 3px;
+  line-height: 1;
+}
+
+.status-item.clickable {
+  cursor: pointer;
+}
+
+.status-item.clickable:hover {
+  background-color: rgba(255, 255, 255, 0.2);
+}
