@@ -47,7 +47,7 @@ async function capture() {
   console.log(`Preview server listening on http://localhost:${port}`);
 
   const outDirs = [
-    path.join(rootDir, "making/notes/images/04"),
+    path.join(rootDir, "making/notes/images/05"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -63,15 +63,10 @@ async function capture() {
 
   const url = `http://localhost:${port}`;
 
-  const mockRecentProjects = [
-    { name: "猫と魔法使いの旅路", path: "D:\\Novels\\猫と魔法使いの旅路" },
-    { name: "雨降る街の喫茶店", path: "D:\\Novels\\雨降る街の喫茶店" },
-  ];
-
   const themes = [
-    { name: "ダークモード", id: "dark", file: "04_プロジェクト選択_ダークモード.png" },
-    { name: "ライトモード", id: "light", file: "04_プロジェクト選択_ライトモード.png" },
-    { name: "セピアモード", id: "sepia", file: "04_プロジェクト選択_セピアモード.png" },
+    { name: "ダークモード", id: "dark", file: "05_ファイルエクスプローラー_ダークモード.png" },
+    { name: "ライトモード", id: "light", file: "05_ファイルエクスプローラー_ライトモード.png" },
+    { name: "セピアモード", id: "sepia", file: "05_ファイルエクスプローラー_セピアモード.png" },
   ];
 
   for (const t of themes) {
@@ -82,17 +77,25 @@ async function capture() {
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle" });
 
-    // モックデータとテーマを注入
-    await page.evaluate(({ themeId, projects }) => {
+    // 作品を開いた状態（エディター画面表示）を設定
+    await page.evaluate(({ themeId }) => {
       localStorage.setItem("novelaide-theme", themeId);
-      localStorage.removeItem("novelaide-current-project"); // ランチャーを表示させるため
-      localStorage.setItem("novelaide-recent-projects", JSON.stringify(projects));
+      localStorage.setItem("novelaide-current-project", "D:\\Novels\\猫と魔法使いの旅路");
       document.documentElement.setAttribute("data-theme", themeId);
-    }, { themeId: t.id, projects: mockRecentProjects });
+    }, { themeId: t.id });
 
     await page.reload({ waitUntil: "networkidle" });
 
-    const outPath = path.join(rootDir, `making/notes/images/04/${t.file}`);
+    // フォルダ「characters」を展開する
+    try {
+      const folder = page.locator(".folder-row", { hasText: "characters" });
+      await folder.click();
+      await page.waitForTimeout(300);
+    } catch {
+      // 展開できなくても続行
+    }
+
+    const outPath = path.join(rootDir, `making/notes/images/05/${t.file}`);
     await page.screenshot({ path: outPath });
     console.log(`Saved: ${outPath}`);
 

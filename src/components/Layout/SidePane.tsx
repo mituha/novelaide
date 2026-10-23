@@ -1,23 +1,31 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { X, FolderPlus, FilePlus } from "lucide-react";
+import { X } from "lucide-react";
 import { PanelId } from "./ActivityBar";
+import { useProject } from "../../contexts/ProjectContext";
+import { FileExplorer } from "../FileExplorer/FileExplorer";
+import { DirEntry } from "../../types/document";
 import "./SidePane.css";
 
 interface SidePaneProps {
   activePanel: PanelId;
   onClose: () => void;
   onOpenLauncher?: () => void;
+  onSelectFile?: (file: DirEntry) => void;
+  selectedFilePath?: string | null;
 }
 
 export const SidePane: React.FC<SidePaneProps> = ({
   activePanel,
   onClose,
   onOpenLauncher,
+  onSelectFile,
+  selectedFilePath,
 }) => {
   const [width, setWidth] = useState(260);
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(260);
+  const { projectPath, projectName } = useProject();
 
   const startResize = useCallback((e: React.MouseEvent) => {
     isResizing.current = true;
@@ -57,7 +65,7 @@ export const SidePane: React.FC<SidePaneProps> = ({
     let title = "";
     switch (activePanel) {
       case "files":
-        title = "ファイルエクスプローラー";
+        title = projectName ? `作品: ${projectName}` : "エクスプローラー";
         break;
       case "search":
         title = "作品内検索";
@@ -74,17 +82,13 @@ export const SidePane: React.FC<SidePaneProps> = ({
       <div className="side-pane-header">
         <span className="side-pane-title">{title}</span>
         <div className="side-pane-actions">
-          {activePanel === "files" && (
-            <>
-              <button type="button" className="action-btn" title="新規ファイル作成" aria-label="新規ファイル作成">
-                <FilePlus size={16} />
-              </button>
-              <button type="button" className="action-btn" title="新規フォルダ作成" aria-label="新規フォルダ作成">
-                <FolderPlus size={16} />
-              </button>
-            </>
-          )}
-          <button type="button" className="action-btn close-btn" onClick={onClose} title="閉じる" aria-label="閉じる">
+          <button
+            type="button"
+            className="action-btn close-btn"
+            onClick={onClose}
+            title="サイドパネルを閉じる"
+            aria-label="サイドパネルを閉じる"
+          >
             <X size={16} />
           </button>
         </div>
@@ -95,11 +99,24 @@ export const SidePane: React.FC<SidePaneProps> = ({
   const renderContent = () => {
     switch (activePanel) {
       case "files":
+        if (projectPath) {
+          return (
+            <FileExplorer
+              projectPath={projectPath}
+              onSelectFile={onSelectFile}
+              selectedFilePath={selectedFilePath}
+            />
+          );
+        }
         return (
           <div className="pane-placeholder">
-            <p className="placeholder-text">フォルダが開かれていません</p>
-            <button type="button" className="placeholder-btn" onClick={onOpenLauncher}>
-              フォルダを開く
+            <p className="placeholder-text">作品フォルダが開かれていません</p>
+            <button
+              type="button"
+              className="placeholder-btn"
+              onClick={onOpenLauncher}
+            >
+              作品フォルダを開く
             </button>
           </div>
         );
@@ -130,7 +147,9 @@ export const SidePane: React.FC<SidePaneProps> = ({
   return (
     <div className="side-pane-container" style={{ width: `${width}px` }}>
       {renderHeader()}
-      <div className="side-pane-body">{renderContent()}</div>
+      <div className="side-pane-body" style={{ padding: activePanel === "files" && projectPath ? 0 : "12px" }}>
+        {renderContent()}
+      </div>
       <div className="resize-handle" onMouseDown={startResize} />
     </div>
   );
