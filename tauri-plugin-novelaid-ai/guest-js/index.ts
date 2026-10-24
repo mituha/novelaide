@@ -3,6 +3,7 @@
 export * from './types';
 export * from './domain/guidelines';
 export * from './domain/tools';
+export * from './extensions/novelaidExtension';
 export * from './contexts/AIContextContext';
 export * from './hooks/useAIContextContent';
 export * from './hooks/useAutoResize';

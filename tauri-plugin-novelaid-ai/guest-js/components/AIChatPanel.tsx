@@ -255,15 +255,11 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     ]);
 
     try {
-      // システムプロンプト
-      const personaObj = DEFAULT_PERSONAS.find((p) => p.id === currentPersona);
-      const systemPrompt = personaObj?.systemPrompt || '小説執筆を支援してください。';
-
-      // @earendil-works/pi-agent-core ベースの PiWritingAgentSession でプロンプト実行
+      // Pi Coding Agent SDK 標準準拠の PiWritingAgentSession でプロンプト実行
       const session = new PiWritingAgentSession({
         model: selectedModel,
-        systemPrompt,
-        enableTools: useTools,
+        persona: currentPersona,
+        contextContent,
         toolExecutor: useTools ? toolExecutor : undefined,
         onToken: (delta) => {
           setMessages((prev) =>

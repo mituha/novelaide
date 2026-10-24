@@ -95,6 +95,8 @@ sequenceDiagram
 
 - **`pi-agent-core` 規格への厳格準拠**:
   ツール定義を OpenAI 形式のラッパーから `pi-agent-core` 公式のフラット構造（`{ name, description, parameters }`）に統一。エージェント初期化時の `JSON.parse(undefined)` による構文エラー（`"undefined" is not valid JSON`）を完全に撲滅しました。
+- **上位独自実装の全廃と `InlineExtension` への移行**:
+  自前で手組みしていた SSE（Server-Sent Events）のストリームパーサー（`createLmStudioStreamFn`）や自前のツール呼び出しループを完全に撤去。`novelaid-cli` と全く同じ Pi SDK の `InlineExtension`（`api.registerProvider`、`api.registerTool`、`api.on("before_agent_start")`）および `createAgentSession` に一本化し、上位アプリ側の独自実装を無くして保守性と共通化を極限まで高めました。
 - **ワンクリックコピー & ドラッグ選択**:
   各メッセージヘッダーに配置されたコピーボタンにより、AIの回答やプロンプト全文をワンクリックでクリップボードに取得可能。さらに本文のテキスト選択（`user-select: text`）にも対応し、必要な段落だけをドラッグコピーして原稿へ貼り付けることができます。
 - **デバッグログのワンタップ収集**:

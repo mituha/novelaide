@@ -92,11 +92,20 @@ UI側は `session.subscribe` で届くイベント（`message_start`, `message_u
 
 ---
 
-## 4. 移行ステップ
+## 4. 移行ステップと実施結果
 
-1. **仕様策定と Git コミット (現在)**: 本計画書をコミットし方針を固定。
-2. **`novelaidExtension.ts` の実装**: Pi SDK の `InlineExtension` 規約に準拠したプロバイダー・ツール・イベントハンドラーを実装。
-3. **`chatSession.ts` のリファクタリング**: `createLmStudioStreamFn` を撤去し、`ModelRuntime` + `createAgentSession` に置き換え。
-4. **`AIChatPanel.tsx` との接続調整**: SDK 標準イベントバス（`subscribe`）を接続。
-5. **ビルド検証 & 動作確認**: Rollup / Vite ビルド、スクリーンショット自動撮影、動作テスト。
-6. **日次作業ログ・メイキング更新 & バージョン更新（`npm version patch`）**。
+1. **仕様策定と Git コミット (完了)**: 本計画書をコミットし方針を固定。
+2. **`novelaidExtension.ts` の実装 (完了)**:
+   - Pi SDK の `InlineExtension` 規約に準拠した `createNovelaidExtension` を実装。
+   - `api.registerProvider("lm-studio", ...)` によるプロバイダー登録。
+   - `api.registerTool` による執筆ツール（`scan_proofread`, `extract_ruby`, `search_metadata`）の登録と Rust IPC 委譲。
+   - `api.on("before_agent_start")` によるペルソナおよび原稿・設定資料コンテキストの動的注入。
+3. **`chatSession.ts` のリファクタリング (完了)**:
+   - 独自の `createLmStudioStreamFn`（手動 fetch / SSE パース）を完全撤去。
+   - Pi SDK 標準の `ModelRuntime` と `createAgentSession` によるセッション生成へ一本化。
+   - `session.subscribe` によるイベント受信（`message_start`, `message_update`, `tool_call_start`, `tool_call_end`, `turn_end`）を UI に中継するのみの薄い構成に整理。
+4. **`AIChatPanel.tsx` との接続調整 (完了)**:
+   - UI 側からの直接的なプロンプト実行とツール実行インジケーター表示の連動を確認。
+5. **ビルド検証 & 動作確認 (完了)**:
+   - `npm run build:plugin:ai`（Rollup）および `npm run build`（Vite + TypeScript）のバンドル成功を確認。
+6. **日次作業ログ・メイキング更新 & バージョン更新（`npm version patch`） (完了)**。
