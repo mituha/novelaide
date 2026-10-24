@@ -50,6 +50,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/05"),
     path.join(rootDir, "making/notes/images/07"),
     path.join(rootDir, "making/notes/images/08"),
+    path.join(rootDir, "making/notes/images/09"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -113,9 +114,26 @@ async function capture() {
       await page.screenshot({ path: statusOutPath });
       console.log(`Saved: ${statusOutPath}`);
 
-      if (t.id === "dark") {
-        fs.copyFileSync(statusOutPath, path.join(rootDir, "docs/dev/images/08_文字数カウント詳細分析_ダークモード.png"));
-        fs.copyFileSync(statusOutPath, path.join(rootDir, "docs/manual/images/08_文字数カウント詳細分析_ダークモード.png"));
+      // ポップアップを閉じるために背景をクリック
+      await page.mouse.click(300, 300);
+      await page.waitForTimeout(300);
+
+      // 3. プレビューボタンをクリックして左右スプリットビューを展開 (09)
+      const previewBtn = page.locator(".editor-tab-action-btn");
+      if (await previewBtn.isVisible()) {
+        await previewBtn.click();
+        // プレビューコンテナまたはスプリットペインの出現を待機
+        await page.waitForSelector(".editor-split-container", { timeout: 5000 });
+        await page.waitForTimeout(1000);
+
+        const splitOutPath = path.join(rootDir, `making/notes/images/09/09_スプリットビュー縦書きプレビュー_${t.name}.png`);
+        await page.screenshot({ path: splitOutPath });
+        console.log(`Saved: ${splitOutPath}`);
+
+        if (t.id === "dark") {
+          fs.copyFileSync(splitOutPath, path.join(rootDir, "docs/dev/images/09_スプリットビュー縦書きプレビュー_ダークモード.png"));
+          fs.copyFileSync(splitOutPath, path.join(rootDir, "docs/manual/images/09_スプリットビュー縦書きプレビュー_ダークモード.png"));
+        }
       }
     } catch (e) {
       console.warn("撮影スキップ:", e);

@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ActivityBar, PanelId } from "./ActivityBar";
 import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
@@ -6,7 +6,7 @@ import { useProject } from "../../contexts/ProjectContext";
 import { useDocument } from "../../contexts/DocumentContext";
 import { useCharacterCount } from "../../hooks/useCharacterCount";
 import { EditorTabs } from "../Editor/EditorTabs";
-import { CodeEditor } from "../Editor/CodeEditor";
+import { DocumentPane } from "../DocumentPane/DocumentPane";
 import { Feather, FolderOpen, PlusCircle } from "lucide-react";
 import "./MainLayout.css";
 
@@ -17,8 +17,19 @@ interface MainLayoutProps {
 export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   const [activePanel, setActivePanel] = useState<PanelId>("files");
   const [selectedText, setSelectedText] = useState("");
+  const [splitRatio, setSplitRatio] = useState<number>(0.5); // 左右分割比率 (0.2 ~ 0.8)
+  const [isDragging, setIsDragging] = useState<boolean>(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
   const { projectName, projectPath } = useProject();
-  const { openDocuments, activePath, activeDocument, openDocument, updateContent } = useDocument();
+  const {
+    openDocuments,
+    activePath,
+    activeDocument,
+    isSplitActive,
+    openDocument,
+    updateContent,
+  } = useDocument();
 
   // 選択テキスト変更イベントの受信
   useEffect(() => {
@@ -38,6 +49,37 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
     selectedText,
     150
   );
+
+  // スプリッターのドラッグ開始
+  const handleMouseDownSplitter = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  }, []);
+
+  // スプリッターのドラッグ中および終了処理
+  useEffect(() => {
+    if (!isDragging) return;
+
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!containerRef.current) return;
+      const rect = containerRef.current.getBoundingClientRect();
+      const newRatio = (e.clientX - rect.left) / rect.width;
+      // 20% 〜 80% の範囲に制限
+      setSplitRatio(Math.max(0.2, Math.min(0.8, newRatio)));
+    };
+
+    const handleMouseUp = () => {
+      setIsDragging(false);
+    };
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+    };
+  }, [isDragging]);
 
   return (
     <div className="main-layout-root">
@@ -67,13 +109,58 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
           {openDocuments.length > 0 && activeDocument ? (
             <div className="editor-workspace-view">
               <EditorTabs />
-              <div className="editor-pane-body">
-                <CodeEditor
-                  path={activeDocument.path}
-                  value={activeDocument.content}
-                  language={activeDocument.documentType === "novel" ? "novel" : "markdown"}
-                  onChange={(val) => updateContent(activeDocument.path, val || "")}
-                />
+              <div className="editor-pane-body" ref={containerRef}>
+                {isSplitActive ? (
+                  /* 左右スプリット表示 */
+                  <div className="editor-split-container">
+                    {/* 左ペイン */}
+                    <div
+                      className="editor-split-pane pane-left"
+                      style={{ width: `${splitRatio * 100}%` }}
+                    >
+                      <DocumentPane
+                        document={activeDocument}
+                        viewMode={activeDocument.leftViewMode}
+                        paneSide="left"
+                        onChangeContent={(val) =>
+                          updateContent(activeDocument.path, val)
+                        }
+                      />
+                    </div>
+
+                    {/* スプリッター (リサイズハンドル) */}
+                    <div
+                      className={`editor-splitter ${isDragging ? "dragging" : ""}`}
+                      onMouseDown={handleMouseDownSplitter}
+                      title="ドラッグして画面分割比率を調整"
+                    />
+
+                    {/* 右ペイン */}
+                    <div
+                      className="editor-split-pane pane-right"
+                      style={{ width: `${(1 - splitRatio) * 100}%` }}
+                    >
+                      <DocumentPane
+                        document={activeDocument}
+                        viewMode={activeDocument.rightViewMode}
+                        paneSide="right"
+                        onChangeContent={(val) =>
+                          updateContent(activeDocument.path, val)
+                        }
+                      />
+                    </div>
+                  </div>
+                ) : (
+                  /* 単一ペイン表示 (左ペインのみ) */
+                  <DocumentPane
+                    document={activeDocument}
+                    viewMode={activeDocument.leftViewMode}
+                    paneSide="left"
+                    onChangeContent={(val) =>
+                      updateContent(activeDocument.path, val)
+                    }
+                  />
+                )}
               </div>
             </div>
           ) : (
@@ -103,27 +190,24 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
                   onClick={onOpenLauncher}
                 >
                   <PlusCircle size={18} />
-                  <span>新規プロジェクトを作成</span>
+                  <span>新規作品を作成</span>
                 </button>
               </div>
 
-              <p className="welcome-hint">
-                左側のファイルエクスプローラーから原稿ファイルを選択すると、エディターが開きます。
-              </p>
+              <div className="welcome-hint">
+                <p>左側のエクスプローラーからファイルを選択して執筆を開始してください。</p>
+              </div>
             </div>
           )}
         </main>
       </div>
 
-      {/* 下部ステータスバー */}
+      {/* 最下部ステータスバー */}
       <StatusBar
         detailedMetrics={detailedMetrics}
         selectedMetrics={selectedMetrics}
-        activePath={activePath}
+        activePath={activeDocument?.path}
         documentType={activeDocument?.documentType}
-        onOpenLauncher={onOpenLauncher}
-        onToggleSidePane={() => setActivePanel(activePanel ? null : "files")}
-        isSidePaneVisible={activePanel !== null}
       />
     </div>
   );

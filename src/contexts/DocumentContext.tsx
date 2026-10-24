@@ -1,26 +1,24 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 import { fileService } from '../services/fileService';
-import { NovelaidDocumentType } from 'tauri-plugin-novelaid-fs-api';
+import { DocumentState, DocumentViewMode } from '../types/document';
+import { getInitialViewMode } from '../utils/documentSupport';
 
-export interface DocumentState {
-  path: string;
-  baseName: string;
-  fileTitle: string;
-  content: string;
-  metadata: Record<string, any>;
-  documentType: NovelaidDocumentType;
-  isDirty: boolean;
-}
+export type { DocumentState };
 
 interface DocumentContextType {
   openDocuments: DocumentState[];
   activePath: string | null;
   activeDocument: DocumentState | null;
+  isSplitActive: boolean;
   openDocument: (path: string) => Promise<void>;
   closeDocument: (path: string) => void;
   setActivePath: (path: string) => void;
   updateContent: (path: string, content: string) => void;
   saveDocument: (path?: string) => Promise<void>;
+  changeViewMode: (path: string, viewMode: DocumentViewMode, side?: 'left' | 'right') => void;
+  openPreview: (path: string, mode?: 'preview' | 'reader') => void;
+  closeRightPane: (path: string) => void;
+  toggleSplitPreview: (path?: string) => void;
 }
 
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
@@ -34,9 +32,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return openDocuments.find((doc) => doc.path === activePath) || null;
   }, [openDocuments, activePath]);
 
+  // スプリット（右ペイン）が表示中かどうか
+  const isSplitActive = useMemo(() => {
+    return !!activeDocument && activeDocument.rightViewMode !== 'none';
+  }, [activeDocument]);
+
   // ファイルを開く
   const openDocument = useCallback(async (path: string) => {
-    // すでに開いている場合はアクティブにするのみ
     const existing = openDocuments.find((doc) => doc.path === path);
     if (existing) {
       setActivePath(path);
@@ -45,6 +47,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     try {
       const fileData = await fileService.readFile(path);
+      const initialMode = getInitialViewMode(fileData.documentType);
+
       const newDoc: DocumentState = {
         path: fileData.path,
         baseName: fileData.baseName,
@@ -53,6 +57,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         metadata: fileData.metadata || {},
         documentType: fileData.documentType,
         isDirty: false,
+        leftViewMode: initialMode,
+        rightViewMode: 'none',
       };
 
       setOpenDocuments((prev) => [...prev, newDoc]);
@@ -67,7 +73,6 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setOpenDocuments((prev) => {
       const filtered = prev.filter((doc) => doc.path !== path);
       if (activePath === path) {
-        // 閉じたファイルがアクティブだった場合、別のタブをアクティブにする
         const nextActive = filtered.length > 0 ? filtered[filtered.length - 1].path : null;
         setActivePath(nextActive);
       }
@@ -117,17 +122,76 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [activePath, openDocuments]);
 
+  // ビューモードの変更
+  const changeViewMode = useCallback(
+    (path: string, viewMode: DocumentViewMode, side: 'left' | 'right' = 'left') => {
+      setOpenDocuments((prev) =>
+        prev.map((doc) => {
+          if (doc.path === path) {
+            return {
+              ...doc,
+              [side === 'left' ? 'leftViewMode' : 'rightViewMode']: viewMode,
+            };
+          }
+          return doc;
+        })
+      );
+    },
+    []
+  );
+
+  // 右ペインでプレビューを開く（スプリット展開）
+  const openPreview = useCallback(
+    (path: string, mode: 'preview' | 'reader' = 'preview') => {
+      changeViewMode(path, mode, 'right');
+    },
+    [changeViewMode]
+  );
+
+  // 右ペインを閉じる（スプリット解除）
+  const closeRightPane = useCallback(
+    (path: string) => {
+      changeViewMode(path, 'none', 'right');
+    },
+    [changeViewMode]
+  );
+
+  // スプリットプレビューのトグル
+  const toggleSplitPreview = useCallback(
+    (path?: string) => {
+      const targetPath = path || activePath;
+      if (!targetPath) return;
+
+      const doc = openDocuments.find((d) => d.path === targetPath);
+      if (!doc) return;
+
+      if (doc.rightViewMode === 'none') {
+        // 小説なら縦書きリーダーまたはプレビュー、Markdownならプレビュー
+        const defaultMode = doc.documentType === 'novel' ? 'reader' : 'preview';
+        changeViewMode(targetPath, defaultMode, 'right');
+      } else {
+        changeViewMode(targetPath, 'none', 'right');
+      }
+    },
+    [activePath, openDocuments, changeViewMode]
+  );
+
   return (
     <DocumentContext.Provider
       value={{
         openDocuments,
         activePath,
         activeDocument,
+        isSplitActive,
         openDocument,
         closeDocument,
         setActivePath,
         updateContent,
         saveDocument,
+        changeViewMode,
+        openPreview,
+        closeRightPane,
+        toggleSplitPreview,
       }}
     >
       {children}

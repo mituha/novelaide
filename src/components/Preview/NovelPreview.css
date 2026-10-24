@@ -1,0 +1,134 @@
+/* 小説組版プレビュー (文庫本風) */
+
+.novel-preview-wrapper {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  background-color: var(--color-bg-base);
+  overflow: hidden;
+}
+
+/* プレビュー上部ツールバー */
+.novel-preview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 16px;
+  background-color: var(--color-bg-surface);
+  border-bottom: 1px solid var(--color-border);
+  font-size: 12px;
+  user-select: none;
+}
+
+.novel-preview-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.novel-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--color-border);
+  background-color: var(--color-bg-elevated);
+  color: var(--color-text-base);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.novel-preview-btn:hover {
+  background-color: var(--color-bg-hover);
+  border-color: var(--color-primary);
+}
+
+.novel-preview-btn.active {
+  background-color: var(--color-primary);
+  color: #ffffff;
+  border-color: var(--color-primary);
+}
+
+/* プレビュースクロール域 */
+.novel-preview-scroll-container {
+  flex: 1;
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+}
+
+/* 縦書きモード時のスクロールコンテナ */
+.novel-preview-scroll-container.is-vertical {
+  justify-content: flex-end;
+  /* 縦書きは右から左へ流れるため右揃え */
+}
+
+/* 本文用紙 (文庫本エフェクト) */
+.novel-paper {
+  background-color: var(--color-bg-surface);
+  color: var(--color-text-base);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+  border: 1px solid var(--color-border);
+  border-radius: 4px;
+  padding: 40px 48px;
+  min-height: 100%;
+  box-sizing: border-box;
+  font-family: "Yu Mincho", "Hiragino Mincho ProN", "MS PMincho", serif;
+  line-height: 2.2;
+  letter-spacing: 0.05em;
+  word-break: break-all;
+  white-space: pre-wrap;
+}
+
+/* 縦書きモード */
+.novel-paper.is-vertical {
+  writing-mode: vertical-rl;
+  -webkit-writing-mode: vertical-rl;
+  text-orientation: upright;
+  height: calc(100% - 16px);
+  min-width: 600px;
+  max-height: 900px;
+  overflow-x: auto;
+  padding: 48px 40px;
+}
+
+/* 横書きモード */
+.novel-paper.is-horizontal {
+  writing-mode: horizontal-tb;
+  width: 100%;
+  max-width: 760px;
+}
+
+/* ルビ組版 */
+.novel-paper ruby {
+  ruby-align: center;
+}
+
+.novel-paper rt {
+  font-size: 0.55em;
+  font-weight: normal;
+  letter-spacing: 0;
+  user-select: none;
+  opacity: 0.9;
+}
+
+/* 傍点（ごま点・強調） */
+.novel-paper .bouten {
+  text-emphasis: filled sesame;
+  -webkit-text-emphasis: filled sesame;
+  text-emphasis-position: over right;
+  -webkit-text-emphasis-position: over right;
+}
+
+/* セピアテーマ時の用紙テクスチャ調整 */
+[data-theme='sepia'] .novel-paper {
+  background-color: #fbf0d9;
+  color: #433422;
+  box-shadow: 0 4px 14px rgba(67, 52, 34, 0.12);
+  border-color: #e4d2b5;
+}

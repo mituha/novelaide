@@ -1,25 +1,30 @@
 .editor-tabs-bar {
   display: flex;
+  justify-content: space-between;
+  align-items: center;
   height: 36px;
   background-color: var(--bg-secondary);
   border-bottom: 1px solid var(--border-color);
-  overflow-x: auto;
-  overflow-y: hidden;
   user-select: none;
-}
-
-.editor-tabs-bar::-webkit-scrollbar {
-  height: 3px;
-}
-
-.editor-tabs-bar::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 2px;
+  box-sizing: border-box;
 }
 
 .editor-tabs-list {
   display: flex;
   align-items: stretch;
+  height: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex: 1;
+}
+
+.editor-tabs-list::-webkit-scrollbar {
+  height: 3px;
+}
+
+.editor-tabs-list::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
 }
 
 .editor-tab-item {
@@ -67,17 +72,50 @@
   justify-content: center;
   width: 18px;
   height: 18px;
-  border-radius: 4px;
+  margin-left: 4px;
   border: none;
   background: transparent;
-  color: var(--text-secondary);
+  color: var(--text-muted);
+  border-radius: 3px;
   cursor: pointer;
-  opacity: 0.7;
-  transition: all 0.15s ease;
 }
 
 .tab-close-btn:hover {
-  opacity: 1;
   background-color: var(--hover-color);
   color: var(--text-primary);
+}
+
+/* タブバー右端のアクションエリア */
+.editor-tabs-actions {
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  gap: 6px;
+  height: 100%;
+}
+
+.editor-tab-action-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background-color: var(--bg-primary);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.editor-tab-action-btn:hover {
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+  border-color: var(--accent-color);
+}
+
+.editor-tab-action-btn.active {
+  background-color: var(--accent-color);
+  color: #ffffff;
+  border-color: var(--accent-color);
 }

@@ -39,6 +39,46 @@
   height: calc(100% - 36px);
   position: relative;
   overflow: hidden;
+  display: flex;
+}
+
+/* 左右スプリットビュー */
+.editor-split-container {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.editor-split-pane {
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.editor-split-pane.pane-left {
+  border-right: 1px solid var(--border-color);
+}
+
+.editor-split-pane.pane-right {
+  border-left: 1px solid var(--border-color);
+}
+
+/* 境界スプリッター (リサイズバー) */
+.editor-splitter {
+  width: 6px;
+  margin: 0 -3px;
+  height: 100%;
+  background-color: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  transition: background-color 0.15s ease;
+}
+
+.editor-splitter:hover,
+.editor-splitter.dragging {
+  background-color: var(--accent-color);
 }
 
 .welcome-container {

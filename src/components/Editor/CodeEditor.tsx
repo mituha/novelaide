@@ -3,26 +3,36 @@ import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDocument } from '../../contexts/DocumentContext';
 import { EditorSupport } from './EditorSupport';
+import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';
 
-interface CodeEditorProps {
-  value: string;
-  path: string;
+interface CodeEditorProps extends Partial<DocumentViewProps> {
+  value?: string;
   language?: string;
-  onChange: (value: string | undefined) => void;
+  onChange?: (value: string | undefined) => void;
 }
 
 export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
-  path,
-  language = 'novel',
+  content,
+  path = '',
+  language,
+  documentType = 'novel',
+  isReadOnly = false,
   onChange,
+  onChangeContent,
 }) => {
   const { effectiveTheme } = useTheme();
   const { saveDocument } = useDocument();
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const saveDocumentRef = useRef(saveDocument);
+
+  // 表示するテキスト（content または value）
+  const textValue = content !== undefined ? content : (value ?? '');
+
+  // 言語の解決
+  const effectiveLanguage = language || (documentType === 'markdown' ? 'markdown' : 'novel');
 
   useEffect(() => {
     saveDocumentRef.current = saveDocument;
@@ -81,6 +91,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     });
   };
 
+  // テキスト変更時のハンドラ
+  const handleChange = (val: string | undefined) => {
+    if (onChange) {
+      onChange(val);
+    }
+    if (onChangeContent && val !== undefined) {
+      onChangeContent(val);
+    }
+  };
+
   // テーマの解決（ダーク・ライト・セピア）
   const getTheme = () => {
     if (effectiveTheme === 'sepia') return 'novel-sepia';
@@ -93,13 +113,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       <MonacoEditor
         key={path}
         height="100%"
-        language={language}
-        value={value}
-        onChange={onChange}
+        language={effectiveLanguage}
+        value={textValue}
+        onChange={handleChange}
         beforeMount={handleBeforeMount}
         onMount={handleEditorMount}
         theme={getTheme()}
         options={{
+          readOnly: isReadOnly,
           wordWrap: 'on',
           minimap: { enabled: false }, // 小説執筆時はミニマップをオフにしてすっきり表示
           fontSize: 16,
