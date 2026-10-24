@@ -5,6 +5,7 @@ import { GitPanelPlugin } from '../../plugins/panels/GitPanelPlugin';
 import { MetadataListPanelPlugin } from '../../plugins/panels/MetadataListPanelPlugin';
 import { OutlinePanelPlugin } from '../../plugins/panels/OutlinePanelPlugin';
 import { MetadataPanelPlugin } from '../../plugins/panels/MetadataPanelPlugin';
+import { AiPanelPlugin } from '../../plugins/panels/AiPanelPlugin';
 
 export const panelRegistry = new PanelRegistry();
 
@@ -15,5 +16,6 @@ panelRegistry.register(GitPanelPlugin);
 panelRegistry.register(MetadataListPanelPlugin);
 panelRegistry.register(OutlinePanelPlugin);
 panelRegistry.register(MetadataPanelPlugin);
+panelRegistry.register(AiPanelPlugin);
 
 export { PanelRegistry };

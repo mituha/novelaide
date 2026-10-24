@@ -6,6 +6,7 @@ import "./core/settingsRegistry";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
+import { AiProvider } from "./contexts/AiContext";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
 import "./styles/theme.css";
@@ -43,8 +44,10 @@ function SettingsBoundApp() {
       <ProjectProvider>
         <GitProvider>
           <DocumentProvider>
-            <AppContent />
-            <SettingsModal />
+            <AiProvider>
+              <AppContent />
+              <SettingsModal />
+            </AiProvider>
           </DocumentProvider>
         </GitProvider>
       </ProjectProvider>

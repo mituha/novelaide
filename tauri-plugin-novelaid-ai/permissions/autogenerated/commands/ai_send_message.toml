@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-ai-send-message"
+description = "Enables the ai_send_message command without any pre-configured scope."
+commands.allow = ["ai_send_message"]
+
+[[permission]]
+identifier = "deny-ai-send-message"
+description = "Denies the ai_send_message command without any pre-configured scope."
+commands.deny = ["ai_send_message"]

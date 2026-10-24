@@ -1,0 +1,8 @@
+[default]
+description = "Default permissions for the novelaid-ai plugin"
+permissions = [
+    "allow-ai-is-available",
+    "allow-ai-get-models",
+    "allow-ai-send-message",
+    "allow-ai-run-tool",
+]

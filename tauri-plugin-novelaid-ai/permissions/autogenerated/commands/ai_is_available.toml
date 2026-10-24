@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-ai-is-available"
+description = "Enables the ai_is_available command without any pre-configured scope."
+commands.allow = ["ai_is_available"]
+
+[[permission]]
+identifier = "deny-ai-is-available"
+description = "Denies the ai_is_available command without any pre-configured scope."
+commands.deny = ["ai_is_available"]

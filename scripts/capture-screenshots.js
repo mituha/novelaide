@@ -58,6 +58,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/14"),
     path.join(rootDir, "making/notes/images/15"),
     path.join(rootDir, "making/notes/images/16"),
+    path.join(rootDir, "making/notes/images/17"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -186,7 +187,31 @@ async function capture() {
         }
       }
 
-      // 4. 左アクティビティバー最下部の環境設定（歯車アイコン）をクリックして SettingsModal を開く
+      // 4. 右アクティビティバーの「AI執筆パートナー」をクリックして ChatPanel を展開
+      const aiNavBtn = page.locator('.activity-bar.side-right .activity-button[title="AI執筆パートナー"]');
+      if (await aiNavBtn.isVisible()) {
+        await aiNavBtn.click();
+        await page.waitForSelector(".ai-chat-panel", { timeout: 5000 });
+        await page.waitForTimeout(600);
+
+        // 「担当編集者」ペルソナを選択
+        const editorPersonaBtn = page.locator('.ai-persona-chip:has-text("担当編集者")');
+        if (await editorPersonaBtn.isVisible()) {
+          await editorPersonaBtn.click();
+          await page.waitForTimeout(300);
+        }
+
+        const aiOutPath = path.join(rootDir, `making/notes/images/17/17_AI執筆パートナー_${t.name}.png`);
+        await page.screenshot({ path: aiOutPath });
+        console.log(`Saved: ${aiOutPath}`);
+
+        if (t.id === "dark") {
+          fs.copyFileSync(aiOutPath, path.join(rootDir, "docs/dev/images/17_AI執筆パートナー_ダークモード.png"));
+          fs.copyFileSync(aiOutPath, path.join(rootDir, "docs/manual/images/17_AI執筆パートナー_ダークモード.png"));
+        }
+      }
+
+      // 5. 左アクティビティバー最下部の環境設定（歯車アイコン）をクリックして SettingsModal を開く
       const settingsNavBtn = page.locator('.activity-bar.side-left .activity-button[title="環境設定"]');
       if (await settingsNavBtn.isVisible()) {
         await settingsNavBtn.click();

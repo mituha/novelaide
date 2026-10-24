@@ -1,7 +1,7 @@
 {
   "name": "novelaide",
   "private": true,
-  "version": "0.16.0",
+  "version": "0.17.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -28,6 +28,7 @@
     "restar-app": "^0.2.2",
     "restar-app-git": "file:tauri-plugin-restar-git",
     "restar-app-settings": "file:tauri-plugin-restar-settings",
+    "tauri-plugin-novelaid-ai-api": "file:tauri-plugin-novelaid-ai",
     "tauri-plugin-novelaid-fs-api": "file:tauri-plugin-novelaid-fs"
   },
   "devDependencies": {

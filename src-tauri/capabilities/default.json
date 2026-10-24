@@ -9,6 +9,7 @@
     "dialog:default",
     "novelaid-fs:default",
     "restar-settings:default",
-    "restar-git:default"
+    "restar-git:default",
+    "novelaid-ai:default"
   ]
 }
