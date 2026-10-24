@@ -54,6 +54,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/10"),
     path.join(rootDir, "making/notes/images/11"),
     path.join(rootDir, "making/notes/images/12"),
+    path.join(rootDir, "making/notes/images/13"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -98,27 +99,40 @@ async function capture() {
       await novelFile.click();
 
       await page.waitForSelector(".monaco-editor", { timeout: 10000 });
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(400);
 
       // プレビューボタンをクリックして縦書きスプリットビューを展開
       const previewBtn = page.locator(".editor-tab-action-btn");
       if (await previewBtn.isVisible()) {
         await previewBtn.click();
         await page.waitForSelector(".editor-split-container", { timeout: 5000 });
-        await page.waitForTimeout(600);
+        await page.waitForTimeout(500);
       }
 
-      // 2. 左ペインの ExplorerPanel（アコーディオン）全体を撮影 (12)
-      await page.waitForSelector(".explorer-panel-container", { timeout: 5000 });
-      await page.waitForTimeout(600);
+      // 2. 左アクティビティバーの検索アイコンをクリックして SearchPanel を開く
+      const searchNavBtn = page.locator('.activity-bar.side-left .activity-button[title*="検索"]');
+      if (await searchNavBtn.isVisible()) {
+        await searchNavBtn.click();
+        await page.waitForSelector(".search-panel-container", { timeout: 5000 });
 
-      const explorerOutPath = path.join(rootDir, `making/notes/images/12/12_汎用エクスプローラーアコーディオン_${t.name}.png`);
-      await page.screenshot({ path: explorerOutPath });
-      console.log(`Saved: ${explorerOutPath}`);
+        // 検索ワード「神代玲央」を入力して検索を実行
+        const searchInput = page.locator(".search-input");
+        await searchInput.fill("神代玲央");
+        const submitBtn = page.locator(".search-submit-btn");
+        await submitBtn.click();
 
-      if (t.id === "dark") {
-        fs.copyFileSync(explorerOutPath, path.join(rootDir, "docs/dev/images/12_汎用エクスプローラーアコーディオン_ダークモード.png"));
-        fs.copyFileSync(explorerOutPath, path.join(rootDir, "docs/manual/images/12_汎用エクスプローラーアコーディオン_ダークモード.png"));
+        // 検索結果の表示を待機
+        await page.waitForSelector(".search-file-group", { timeout: 5000 });
+        await page.waitForTimeout(600);
+
+        const searchOutPath = path.join(rootDir, `making/notes/images/13/13_汎用検索パネル結果ツリー_${t.name}.png`);
+        await page.screenshot({ path: searchOutPath });
+        console.log(`Saved: ${searchOutPath}`);
+
+        if (t.id === "dark") {
+          fs.copyFileSync(searchOutPath, path.join(rootDir, "docs/dev/images/13_汎用検索パネル結果ツリー_ダークモード.png"));
+          fs.copyFileSync(searchOutPath, path.join(rootDir, "docs/manual/images/13_汎用検索パネル結果ツリー_ダークモード.png"));
+        }
       }
     } catch (e) {
       console.warn("撮影スキップ:", e);
