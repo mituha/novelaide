@@ -2,6 +2,18 @@
 <html lang="ja">
   <head>
     <meta charset="UTF-8" />
+    <script>
+      // Node.js globals polyfill for browser compatibility
+      window.global = window;
+      window.process = {
+        env: { NODE_ENV: 'production' },
+        platform: 'win32',
+        version: '',
+        versions: {},
+        cwd: () => '/',
+        nextTick: (fn, ...args) => queueMicrotask(() => fn(...args)),
+      };
+    </script>
     <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>novelaide</title>

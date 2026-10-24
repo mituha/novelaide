@@ -7,6 +7,10 @@ const host = process.env.TAURI_DEV_HOST;
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [react()],
+  define: {
+    "process.env": {},
+    "process.platform": JSON.stringify("win32"),
+  },
   resolve: {
     dedupe: ["react", "react-dom"],
   },
