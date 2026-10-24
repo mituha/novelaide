@@ -9,6 +9,9 @@ import {
   Search,
   Database,
   Wrench,
+  Copy,
+  Check,
+  Terminal,
 } from 'lucide-react';
 import { ChatMessage, AiModelInfo, AiPersonaType, AiPersona } from '../types';
 import { fetchLmStudioModels, getFallbackModels } from '../client/modelManager';
@@ -73,6 +76,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
   const [useTools, setUseTools] = useState<boolean>(true);
   const [useReasoning, setUseReasoning] = useState<boolean>(false);
   const [activeToolStatus, setActiveToolStatus] = useState<string | null>(null);
+  const [copiedMsgId, setCopiedMsgId] = useState<string | null>(null);
+  const [lastDebugLog, setLastDebugLog] = useState<string>('');
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -112,6 +117,49 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
+  };
+
+  // メッセージのクリップボードコピー
+  const handleCopyMessage = async (id: string, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopiedMsgId(id);
+      setTimeout(() => setCopiedMsgId(null), 2000);
+    } catch (err) {
+      console.error('[AIChatPanel] メッセージコピー失敗:', err);
+    }
+  };
+
+  // 調査用デバッグログのコンソール出力およびクリップボードコピー
+  const handleExportDebugLog = async () => {
+    const debugInfo = {
+      timestamp: new Date().toISOString(),
+      currentPersona,
+      selectedModel,
+      availableModels: models.map((m) => m.id),
+      useTools,
+      useReasoning,
+      activeLeftItem: activeLeftItem?.path || null,
+      activeRightItem: activeRightItem?.path || null,
+      openDocumentsCount: openDocuments.length,
+      messageCount: messages.length,
+      lastMessages: messages.slice(-3).map((m) => ({
+        role: m.role,
+        persona: m.persona,
+        contentPreview: m.content.slice(0, 100),
+      })),
+      lastError: lastDebugLog || null,
+    };
+
+    const formattedLog = `=== Novelaid AI Debug Log ===\n${JSON.stringify(debugInfo, null, 2)}`;
+    console.log('[Novelaid AI Debug Info]', debugInfo);
+
+    try {
+      await navigator.clipboard.writeText(formattedLog);
+      alert('調査用デバッグ情報をコンソールに出力し、クリップボードにコピーしました。');
+    } catch {
+      alert('調査用デバッグ情報をコンソール（F12）に出力しました。');
+    }
   };
 
   // pi-coding-agent 互換ツールエグゼキューター（Rustネイティブツール ＆ インメモリフォールバック）
@@ -243,6 +291,9 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
 
       await session.prompt(userText, contextContent);
     } catch (err: any) {
+      const errDetails = `${err.message || '通信失敗'}\nStack: ${err.stack || 'No stack trace'}`;
+      console.error('[AIChatPanel] チャット送信エラー詳細:', err, err.stack);
+      setLastDebugLog(errDetails);
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === assistantMsgId
@@ -400,13 +451,23 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
             ))}
           </select>
 
-          <button
-            className="ai-action-btn"
-            onClick={handleClearHistory}
-            title="対話履歴をクリア"
-          >
-            <Trash2 size={13} />
-          </button>
+          <div className="ai-header-actions">
+            <button
+              className="ai-action-btn"
+              onClick={handleExportDebugLog}
+              title="調査用デバッグログをコピー・出力"
+            >
+              <Terminal size={13} />
+            </button>
+
+            <button
+              className="ai-action-btn"
+              onClick={handleClearHistory}
+              title="対話履歴をクリア"
+            >
+              <Trash2 size={13} />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -415,14 +476,27 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         {messages.map((msg) => (
           <div key={msg.id} className={`ai-message ${msg.role}`}>
             <div className="ai-message-header">
-              {msg.role === 'assistant' && msg.persona && (
-                <>
-                  {getPersonaIcon(msg.persona)}
-                  <span>{DEFAULT_PERSONAS.find((p) => p.id === msg.persona)?.name}</span>
-                </>
-              )}
-              {msg.role === 'user' && <span>作家</span>}
-              <span className="timestamp">{msg.timestamp}</span>
+              <div className="ai-message-sender">
+                {msg.role === 'assistant' && msg.persona && (
+                  <>
+                    {getPersonaIcon(msg.persona)}
+                    <span>{DEFAULT_PERSONAS.find((p) => p.id === msg.persona)?.name}</span>
+                  </>
+                )}
+                {msg.role === 'user' && <span>作家</span>}
+                <span className="timestamp">{msg.timestamp}</span>
+              </div>
+              <button
+                className="ai-copy-btn"
+                onClick={() => handleCopyMessage(msg.id, msg.content)}
+                title={copiedMsgId === msg.id ? 'コピーしました！' : '内容をコピー'}
+              >
+                {copiedMsgId === msg.id ? (
+                  <Check size={11} className="copied" />
+                ) : (
+                  <Copy size={11} />
+                )}
+              </button>
             </div>
             <div className="ai-message-bubble">{msg.content}</div>
           </div>

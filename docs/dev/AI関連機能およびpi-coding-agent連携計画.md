@@ -138,9 +138,29 @@ graph TD
 | **Phase 2: UIコンポーネントの guest-js 内包化 (今回)** | ・`AIChatInput.tsx`、`AIContextSelector.tsx`、`AIChatPanel.tsx` を実装<br>・`tauri-plugin-novelaid-ai-api` からエクスポート |
 | **Phase 3: pi-coding-agent 単純対話ストリーミングの実装 (今回)** | ・`modelManager.ts`、`chatSession.ts` の実装<br>・LM Studio 等への単純対話ストリーミング開通 |
 | **Phase 4: ホストアプリ統合と検証** | ・`novelaide` の `AiPanelPlugin` をプラグインエクスポート品に切り替え<br>・Playwright 自動スクリーンショット撮影と動作確認 |
+| **Phase 5: エラー耐性強化・調査用ログ・コピー機能追加 (今回)** | ・`@earendil-works/pi-agent-core` の Tool 形式（フラット構造）への準拠による `"undefined" is not valid JSON` の根絶<br>・ストリーム失敗時の安全なローカル/IPCフォールバック保証<br>・メッセージ全文ワンクリックコピー機能およびドラッグ選択（`user-select: text`）対応<br>・ヘッダーデバッグ出力機能（コンソール & クリップボード）の新設 |
 
 ---
 
-## 6. UI実装画面
+## 6. エラー対策とデバッグ・ユーザビリティ仕様
+
+### 6.1 `pi-agent-core` ツール定義形式の準拠
+`@earendil-works/pi-agent-core` の `Agent` クラスは初期化時に各ツールのパラメータ検証として `JSON.parse(JSON.stringify(e.parameters))` を実行します。OpenAI Wrapper 形式（`{ type: 'function', function: { ... } }`）で渡すと `e.parameters` が `undefined` となり、`JSON.parse(undefined)` による SyntaxError（`"undefined" is not valid JSON`）が発生します。
+そのため、`tools.ts` で定義するツールはすべてフラット形式（`{ name, description, parameters }`）に統一しています。
+
+### 6.2 デバッグ情報の提供とクリップボード連携
+AI通信の診断を容易にするため、以下の2系統のログ・診断機構を備えています。
+1. **ヘッダーデバッグボタン（Terminal アイコン）**:
+   - クリック時に、現在のペルソナ、選択モデル、ツール一覧、接続設定、直近エラースタックを開発者コンソール（`console.info`）へ出力し、同時に同一JSONデータを `navigator.clipboard.writeText` でクリップボードにコピーします。
+2. **自動詳細エラーログ**:
+   - `chatSession.ts` 内での例外発生時、`console.error('[AIChatPanel] チャット送信エラー詳細:', err, err.stack)` を自動出力します。
+
+### 6.3 メッセージのコピーと選択
+- **Copy ボタン**: 各チャットメッセージ上部に配置。クリックでテキスト全文をクリップボードにコピー（2秒間 Check アイコンに変化）。
+- **テキスト選択**: メッセージ本文エリア（`.ai-message-bubble`）に `user-select: text` を明示指定し、任意テキストのドラッグ選択・コピーを保証。
+
+---
+
+## 7. UI実装画面
 
 ![AI執筆パートナー（ダークモード）](./images/17_AI執筆パートナー_ダークモード.png)

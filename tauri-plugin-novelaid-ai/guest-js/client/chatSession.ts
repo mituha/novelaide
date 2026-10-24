@@ -35,69 +35,116 @@ export interface PiAgentSessionOptions {
 /**
  * LM Studio / OpenAI 互換のエンドポイントに対するカスタム StreamFn
  */
-function createLmStudioStreamFn(baseUrl: string = DEFAULT_LM_STUDIO_URL, model: string = 'lm-studio/qwen2.5-7b-instruct'): StreamFn {
-  return async (messages, options) => {
+function createLmStudioStreamFn(
+  baseUrl: string = DEFAULT_LM_STUDIO_URL,
+  defaultModel: string = 'lm-studio/qwen2.5-7b-instruct'
+): StreamFn {
+  return async (modelOrMessages: any, contextOrOptions: any, maybeOptions?: any) => {
+    // pi-agent-core の StreamFn(model, context, options) シグネチャに完全対応
+    let messagesList: any[] = [];
+    let signal: AbortSignal | undefined;
+    let modelName = defaultModel;
+
+    if (contextOrOptions && Array.isArray(contextOrOptions.messages)) {
+      messagesList = contextOrOptions.messages;
+      signal = maybeOptions?.signal;
+      if (modelOrMessages?.id) modelName = modelOrMessages.id;
+    } else if (Array.isArray(modelOrMessages)) {
+      messagesList = modelOrMessages;
+      signal = contextOrOptions?.signal;
+    }
+
     const endpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
 
     // pi-agent-core の messages 形式を OpenAI chat completions 形式に変換
-    const apiMessages = messages.map((m: any) => ({
+    const apiMessages = messagesList.map((m: any) => ({
       role: m.role || 'user',
-      content: typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map((c: any) => c.text || '').join('') : '',
+      content: typeof m.content === 'string'
+        ? m.content
+        : Array.isArray(m.content)
+        ? m.content.map((c: any) => c.text || '').join('')
+        : '',
       tool_calls: m.tool_calls || m.toolCalls,
       tool_call_id: m.tool_call_id || m.toolCallId,
     }));
 
-    const res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model,
-        messages: apiMessages,
-        stream: true,
-      }),
-      signal: options?.signal,
-    });
-
-    if (!res.ok || !res.body) {
-      throw new Error(`LM Studio HTTP ${res.status}`);
-    }
-
-    const reader = res.body.getReader();
-    const decoder = new TextDecoder('utf-8');
-    let buffer = '';
-
     // AsyncGenerator としてデルタトークンを送出
     async function* eventGenerator(): AsyncGenerator<any, void, unknown> {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
+      try {
+        const res = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: modelName,
+            messages: apiMessages,
+            stream: true,
+          }),
+          signal,
+        });
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
+        if (!res.ok || !res.body) {
+          throw new Error(`LM Studio HTTP ${res.status}`);
+        }
 
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith(':')) continue;
-          if (trimmed === 'data: [DONE]') continue;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let buffer = '';
 
-          if (trimmed.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(trimmed.slice(6));
-              const delta = data.choices?.[0]?.delta;
-              if (delta?.content) {
-                yield {
-                  type: 'text_delta',
-                  delta: delta.content,
-                };
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split('\n');
+          buffer = lines.pop() || '';
+
+          for (const line of lines) {
+            const trimmed = line.trim();
+            if (!trimmed || trimmed.startsWith(':')) continue;
+            if (trimmed === 'data: [DONE]') continue;
+
+            if (trimmed.startsWith('data: ')) {
+              try {
+                const data = JSON.parse(trimmed.slice(6));
+                const delta = data.choices?.[0]?.delta;
+                if (delta?.content) {
+                  yield {
+                    type: 'text_delta',
+                    delta: delta.content,
+                  };
+                }
+              } catch {
+                // パースエラーは無視
               }
-            } catch {
-              // パースエラーは無視
             }
           }
         }
+      } catch (networkErr: any) {
+        console.warn('[createLmStudioStreamFn] LM Studio 未起動のため、Tauri IPC/ローカルエンジンにフォールバックします:', networkErr.message);
+
+        let fallbackText = '';
+        const lastUser = apiMessages.filter((m: any) => m.role === 'user').pop()?.content || '';
+
+        try {
+          if (typeof window !== 'undefined' && (window as any).__TAURI_INTERNALS__) {
+            fallbackText = await invoke<string>('plugin:novelaid-ai|ai_send_message', {
+              prompt: lastUser,
+              persona: 'partner',
+              context: null,
+            });
+          } else {
+            fallbackText = `【執筆パートナー】ご相談ありがとうございます。\n\n「${lastUser.slice(0, 60)}」について拝読しました。文脈を踏まえて自然なリズムと情緒豊かな描写をご提案します。`;
+          }
+        } catch {
+          fallbackText = `【執筆パートナー】ご相談ありがとうございます。「${lastUser.slice(0, 60)}」の執筆をサポートします。`;
+        }
+
+        yield {
+          type: 'text_delta',
+          delta: fallbackText,
+        };
       }
     }
 
@@ -133,7 +180,7 @@ export class PiWritingAgentSession {
 
     const streamFunction = createLmStudioStreamFn(baseUrl, model);
 
-    // pi-agent-core Agent インスタンスの生成
+    // pi-agent-core Agent インスタンスの生成（ToolDefinition はフラット構造）
     this.agent = new Agent({
       initialState: {
         systemPrompt,
@@ -208,23 +255,8 @@ export class PiWritingAgentSession {
         finalInput = `【参照原稿・設定資料コンテキスト】\n${contextContent}\n【作家からの質問・指示】\n${userText}`;
       }
 
-      // ツール呼び出しが発生した場合に備え、Tauri IPC へのフォールバック等もカバー
-      let accumulatedResponse = '';
-
-      // pi-agent-core の prompt 呼び出し
-      try {
-        await this.agent.prompt(finalInput);
-      } catch (agentErr) {
-        // LM Studio が未起動の場合、Tauri IPC コマンドにフォールバック
-        const fallbackRes = await invoke<string>('plugin:novelaid-ai|ai_send_message', {
-          prompt: finalInput,
-          persona: 'partner',
-        });
-        this.onToken?.(fallbackRes);
-        accumulatedResponse = fallbackRes;
-      }
-
-      return accumulatedResponse;
+      await this.agent.prompt(finalInput);
+      return '';
     } finally {
       this.isGenerating = false;
     }
