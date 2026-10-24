@@ -8,10 +8,12 @@ import {
   BookmarkPlus,
   Search,
   Database,
+  Wrench,
 } from 'lucide-react';
 import { ChatMessage, AiModelInfo, AiPersonaType, AiPersona } from '../types';
 import { fetchLmStudioModels, getFallbackModels } from '../client/modelManager';
-import { streamChat } from '../client/chatSession';
+import { runAgentTurn, ToolExecutor } from '../client/chatSession';
+import { getPersonaGuideline } from '../domain/guidelines';
 import { useAIContextContent, ContextDocumentItem } from '../hooks/useAIContextContent';
 import { AIChatInput } from './AIChatInput';
 import { invoke } from '@tauri-apps/api/core';
@@ -22,28 +24,28 @@ export const DEFAULT_PERSONAS: AiPersona[] = [
     name: '執筆パートナー',
     role: '共創・アイデア出し',
     description: '物語の展開やキャラクター設定、描写の言い換えを一緒に考えます。',
-    systemPrompt: 'あなたは小説作家の執筆パートナーです。作品の世界観を尊重し、魅力的なプロットや情景描写、キャラクター造形のアイデアを一緒に広げてください。',
+    systemPrompt: `あなたは小説作家の執筆パートナーです。作品の世界観を尊重し、魅力的なプロットや情景描写、キャラクター造形のアイデアを一緒に広げてください。\n\n${getPersonaGuideline('novel')}`,
   },
   {
     id: 'editor',
     name: '担当編集者',
     role: '講評・プロット構成',
     description: '読者視点で作品のテンポや伏線、ストーリー構成に率直な意見を出します。',
-    systemPrompt: 'あなたは経験豊富な小説の担当編集者です。読者視点に立って、物語の導入、テンポ、伏線の張り方、キャラクターの魅力について建設的で率直なフィードバックを提供してください。',
+    systemPrompt: `あなたは経験豊富な小説の担当編集者です。読者視点に立って、物語の導入、テンポ、伏線の張り方、キャラクターの魅力について建設的で率直なフィードバックを提供してください。\n\n${getPersonaGuideline('plot')}`,
   },
   {
     id: 'proofreader',
     name: '校正係',
     role: '文体・ルビ・誤字脱字',
     description: '助詞の重なり、文末の連続、ルビ書式、表記ゆれを厳格にチェックします。',
-    systemPrompt: 'あなたは厳格な出版社の文芸校正係です。文章のリズム、助詞の重複、文末の単調な連続、ルビ記法、誤字脱字、表記ゆれを精緻にチェックし、改善案を提示してください。',
+    systemPrompt: `あなたは厳格な出版社の文芸校正係です。文章のリズム、助詞の重複、文末の単調な連続、ルビ記法、誤字脱字、表記ゆれを精緻にチェックし、改善案を提示してください。\n\n${getPersonaGuideline('novel')}`,
   },
   {
     id: 'character',
     name: '作中人物',
     role: 'キャラクター対話',
     description: '登場人物になりきって対話し、台詞の口調や感情の反応を検証します。',
-    systemPrompt: 'あなたは小説の登場人物です。設定や口調に忠実になりきって、作家からの問いかけに対話し、セリフや行動の自然さを作家と一緒に検証してください。',
+    systemPrompt: `あなたは小説の登場人物です。設定や口調に忠実になりきって、作家からの問いかけに対話し、セリフや行動の自然さを作家と一緒に検証してください。\n\n${getPersonaGuideline('chat')}`,
   },
 ];
 
@@ -70,6 +72,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [useTools, setUseTools] = useState<boolean>(true);
   const [useReasoning, setUseReasoning] = useState<boolean>(false);
+  const [activeToolStatus, setActiveToolStatus] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<ChatMessage[]>([
     {
@@ -85,7 +88,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isStreaming]);
+  }, [messages, isStreaming, activeToolStatus]);
 
   // モデル一覧の初期読み込み
   useEffect(() => {
@@ -99,17 +102,73 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     loadModels();
   }, []);
 
-  const handleClear = () => {
-    setMessages([]);
+  const handleClearHistory = () => {
+    setMessages([
+      {
+        id: `welcome-${Date.now()}`,
+        role: 'assistant',
+        persona: currentPersona,
+        content: '履歴をクリアしました。新しい対話を始めましょう。',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
   };
 
-  const handleSend = async () => {
+  // pi-coding-agent 互換ツールエグゼキューター（Rustネイティブツール ＆ インメモリフォールバック）
+  const toolExecutor: ToolExecutor = async (toolName: string, args: Record<string, any>) => {
+    const activeDoc = activeLeftItem || activeRightItem;
+    const content = args.content || activeDoc?.content || '';
+
+    if (toolName === 'scan_proofread' || toolName === 'proofread_scan') {
+      return await invoke<any>('plugin:novelaid-ai|ai_run_tool', {
+        toolName: 'proofread_scan',
+        targetFile: args.fileName || activeDoc?.path || '',
+        params: { content },
+      });
+    }
+
+    if (toolName === 'extract_ruby' || toolName === 'ruby_suggest') {
+      return await invoke<any>('plugin:novelaid-ai|ai_run_tool', {
+        toolName: 'ruby_suggest',
+        targetFile: activeDoc?.path || '',
+        params: { content },
+      });
+    }
+
+    if (toolName === 'search_metadata') {
+      const query = (args.query || '').toLowerCase();
+      if (getMetadataCacheFn) {
+        try {
+          const cache = await getMetadataCacheFn();
+          const results: any[] = [];
+          for (const [key, val] of Object.entries(cache)) {
+            const strVal = JSON.stringify(val).toLowerCase();
+            if (key.toLowerCase().includes(query) || strVal.includes(query)) {
+              results.push({ key, title: (val as any).title || key, snippet: strVal.slice(0, 150) });
+            }
+          }
+          return { query, results: results.slice(0, 5) };
+        } catch {
+          // フォールバック
+        }
+      }
+      return await invoke<any>('plugin:novelaid-ai|ai_run_tool', {
+        toolName: 'search_metadata',
+        targetFile: '',
+        params: { query: args.query },
+      });
+    }
+
+    return { error: `未対応のツールです: ${toolName}` };
+  };
+
+  const handleSendMessage = async () => {
     if (!input.trim() || isStreaming) return;
 
-    const userText = input;
+    const userText = input.trim();
     setInput('');
 
-    // コンテキストの自動合成（novelaid-editor互換 [File: ...] 形式）
+    // 現在のコンテキスト文字列を合成
     const contextContent = await getContextText(
       activeLeftItem || null,
       activeRightItem || null,
@@ -117,36 +176,47 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
       readFileDiskFn
     );
 
-    const userMsg: ChatMessage = {
-      id: `user-${Date.now()}`,
-      role: 'user',
-      content: userText,
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+    const userMsgId = `user-${Date.now()}`;
+    const userTimestamp = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
-    const assistantMsgId = `assistant-${Date.now()}`;
-    const initialAssistantMsg: ChatMessage = {
-      id: assistantMsgId,
-      role: 'assistant',
-      persona: currentPersona,
-      content: '',
-      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    };
+    // ユーザー発言を履歴に追加
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsgId,
+        role: 'user',
+        content: userText,
+        timestamp: userTimestamp,
+      },
+    ]);
 
-    setMessages((prev) => [...prev, userMsg, initialAssistantMsg]);
     setIsStreaming(true);
+    setActiveToolStatus(null);
+    const assistantMsgId = `asst-${Date.now()}`;
+
+    // アシスタント初期枠を作成
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantMsgId,
+        role: 'assistant',
+        persona: currentPersona,
+        content: '',
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ]);
 
     try {
-      const personaObj = DEFAULT_PERSONAS.find((p) => p.id === currentPersona) || DEFAULT_PERSONAS[0];
-      const systemPrompt = personaObj.systemPrompt || '';
+      // システムプロンプト
+      const personaObj = DEFAULT_PERSONAS.find((p) => p.id === currentPersona);
+      const systemPrompt = personaObj?.systemPrompt || '小説執筆を支援してください。';
 
-      // プロンプトメッセージ列の構築
-      const apiMessages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+      // 送信用メッセージ履歴の構築
+      const apiMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }> = [
         { role: 'system', content: systemPrompt },
       ];
 
-      // 過去メッセージ履歴（最新数件）
-      messages.slice(-6).forEach((m) => {
+      messages.forEach((m) => {
         if (m.id !== 'welcome') {
           apiMessages.push({
             role: m.role,
@@ -162,15 +232,32 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
       }
       apiMessages.push({ role: 'user', content: finalUserContent });
 
-      // ストリーミング対話の実行
-      await streamChat(apiMessages, {
+      // pi-coding-agent 自律ツール実行ループによる対話
+      await runAgentTurn(apiMessages, {
         model: selectedModel,
+        enableTools: useTools,
+        toolExecutor: useTools ? toolExecutor : undefined,
         onToken: (delta) => {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId ? { ...msg, content: msg.content + delta } : msg
             )
           );
+        },
+        onEvent: (event) => {
+          if (event.type === 'tool_call_start') {
+            const toolLabel =
+              event.toolName === 'scan_proofread' || event.toolName === 'proofread_scan'
+                ? '校正解析エンジン'
+                : event.toolName === 'extract_ruby' || event.toolName === 'ruby_suggest'
+                ? 'ルビ候補抽出'
+                : event.toolName === 'search_metadata'
+                ? '設定資料検索'
+                : event.toolName;
+            setActiveToolStatus(`ツール実行中: ${toolLabel}...`);
+          } else if (event.type === 'tool_call_end') {
+            setActiveToolStatus(null);
+          }
         },
       });
     } catch (err: any) {
@@ -183,10 +270,11 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
       );
     } finally {
       setIsStreaming(false);
+      setActiveToolStatus(null);
     }
   };
 
-  // Rustネイティブツールのクイック実行
+  // クイックツールバーからの手動実行
   const runProofread = async () => {
     const targetDoc = activeLeftItem || activeRightItem;
     if (!targetDoc) return;
@@ -259,30 +347,23 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     }
   };
 
-  const searchMetadata = async () => {
+  const searchProjectMetadata = async () => {
     if (!getMetadataCacheFn) return;
     try {
       const cache = await getMetadataCacheFn();
-      let summary = `【作品設定資料キャッシュ参照（Rust連携）】\n`;
-      const entries = Object.entries(cache);
-      if (entries.length > 0) {
-        summary += `作品から ${entries.length} 件の設定資料を検出しました:\n`;
-        entries.slice(0, 5).forEach(([filePath, meta]: [string, any]) => {
-          const fileName = filePath.split(/[/\\]/).pop() || filePath;
-          const title = meta.title || meta.name || fileName;
-          const role = meta.role ? ` (${meta.role})` : '';
-          summary += `・${title}${role}: ${meta.summary || '設定メモあり'}\n`;
-        });
-      } else {
-        summary += '設定資料が見つかりませんでした。';
-      }
+      const keys = Object.keys(cache);
+      let summary = `【プロジェクト設定資料一覧（${keys.length}件）】\n`;
+      keys.forEach((k) => {
+        const item = cache[k];
+        summary += `・${item.title || k} (${item.type || 'meta'}): ${item.summary || item.role || ''}\n`;
+      });
 
       setMessages((prev) => [
         ...prev,
         {
-          id: `meta-${Date.now()}`,
+          id: `tool-${Date.now()}`,
           role: 'assistant',
-          persona: 'partner',
+          persona: 'editor',
           content: summary,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
@@ -292,8 +373,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     }
   };
 
-  const getPersonaIcon = (id: AiPersonaType) => {
-    switch (id) {
+  const getPersonaIcon = (type: AiPersonaType) => {
+    switch (type) {
       case 'partner':
         return <Sparkles size={13} />;
       case 'editor':
@@ -302,30 +383,25 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         return <CheckCheck size={13} />;
       case 'character':
         return <Bot size={13} />;
-      default:
-        return <Sparkles size={13} />;
     }
   };
 
   return (
     <div className="ai-chat-panel">
-      {/* 上部ヘッダー：ペルソナ＆モデル */}
+      {/* ヘッダー: ペルソナ切替 & モデル選択 */}
       <div className="ai-chat-header">
         <div className="ai-persona-selector">
-          {DEFAULT_PERSONAS.map((p) => {
-            const isActive = currentPersona === p.id;
-            return (
-              <button
-                key={p.id}
-                className={`ai-persona-chip ${isActive ? 'active' : ''}`}
-                onClick={() => setCurrentPersona(p.id)}
-                title={`${p.role}: ${p.description}`}
-              >
-                {getPersonaIcon(p.id)}
-                <span>{p.name}</span>
-              </button>
-            );
-          })}
+          {DEFAULT_PERSONAS.map((p) => (
+            <button
+              key={p.id}
+              className={`ai-persona-chip ${currentPersona === p.id ? 'active' : ''}`}
+              onClick={() => setCurrentPersona(p.id)}
+              title={p.description}
+            >
+              {getPersonaIcon(p.id)}
+              <span>{p.name}</span>
+            </button>
+          ))}
         </div>
 
         <div className="ai-meta-bar">
@@ -333,6 +409,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
             className="ai-model-select"
             value={selectedModel}
             onChange={(e) => setSelectedModel(e.target.value)}
+            title="利用するLLMモデル"
           >
             {models.map((m) => (
               <option key={m.id} value={m.id}>
@@ -341,37 +418,46 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
             ))}
           </select>
 
-          <button className="ai-action-btn" onClick={handleClear} title="会話履歴をクリア">
+          <button
+            className="ai-action-btn"
+            onClick={handleClearHistory}
+            title="対話履歴をクリア"
+          >
             <Trash2 size={13} />
           </button>
         </div>
       </div>
 
-      {/* メッセージタイムライン */}
+      {/* メッセージ履歴 */}
       <div className="ai-messages-container">
-        {messages.map((msg) => {
-          const isUser = msg.role === 'user';
-          return (
-            <div key={msg.id} className={`ai-message ${isUser ? 'user' : 'assistant'}`}>
-              <div className="ai-message-header">
-                {!isUser && msg.persona && (
-                  <>
-                    {getPersonaIcon(msg.persona)}
-                    <span>{DEFAULT_PERSONAS.find((p) => p.id === msg.persona)?.name || 'AI'}</span>
-                  </>
-                )}
-                {isUser && <span>あなた</span>}
-                <span>{msg.timestamp}</span>
-              </div>
-              <div className="ai-message-bubble">{msg.content}</div>
+        {messages.map((msg) => (
+          <div key={msg.id} className={`ai-message ${msg.role}`}>
+            <div className="ai-message-header">
+              {msg.role === 'assistant' && msg.persona && (
+                <>
+                  {getPersonaIcon(msg.persona)}
+                  <span>{DEFAULT_PERSONAS.find((p) => p.id === msg.persona)?.name}</span>
+                </>
+              )}
+              {msg.role === 'user' && <span>作家</span>}
+              <span className="timestamp">{msg.timestamp}</span>
             </div>
-          );
-        })}
+            <div className="ai-message-bubble">{msg.content}</div>
+          </div>
+        ))}
 
-        {isStreaming && (
+        {/* ツール実行中インジケーター */}
+        {activeToolStatus && (
+          <div className="ai-tool-running-indicator">
+            <Wrench size={12} className="spin" />
+            <span>{activeToolStatus}</span>
+          </div>
+        )}
+
+        {isStreaming && !activeToolStatus && (
           <div className="ai-streaming-indicator">
-            <Sparkles size={12} className="spinning" />
-            <span>AIが応答を生成中...</span>
+            <Bot size={13} className="spin" />
+            <span>AIが思考・執筆中...</span>
           </div>
         )}
         <div ref={messagesEndRef} />
@@ -382,46 +468,44 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         <button
           className="ai-tool-btn"
           onClick={runRubySuggest}
-          disabled={isStreaming}
-          title="未ルビの固有名詞や難読漢字を抽出"
+          disabled={!activeLeftItem && !activeRightItem}
+          title="本文内の未ルビ漢字・固有名詞を自動抽出"
         >
-          <BookmarkPlus size={13} />
+          <BookmarkPlus size={12} />
           <span>ルビ抽出</span>
         </button>
         <button
           className="ai-tool-btn"
           onClick={runProofread}
-          disabled={isStreaming}
-          title="文末連続・ら抜き言葉スキャン"
+          disabled={!activeLeftItem && !activeRightItem}
+          title="文末連続・ら抜き言葉・冗長表現を高速スキャン"
         >
-          <Search size={13} />
+          <Search size={12} />
           <span>校正スキャン</span>
         </button>
-        {getMetadataCacheFn && (
-          <button
-            className="ai-tool-btn"
-            onClick={searchMetadata}
-            disabled={isStreaming}
-            title="作品設定資料キャッシュ参照"
-          >
-            <Database size={13} />
-            <span>設定参照</span>
-          </button>
-        )}
+        <button
+          className="ai-tool-btn"
+          onClick={searchProjectMetadata}
+          disabled={!getMetadataCacheFn}
+          title="キャラクターや世界観設定を一覧参照"
+        >
+          <Database size={12} />
+          <span>設定参照</span>
+        </button>
       </div>
 
-      {/* 入力欄 & コンテキストセレクター */}
+      {/* コンテキストセレクター & 自動リサイズ入力欄 */}
       <AIChatInput
         value={input}
         onChange={setInput}
-        onSend={handleSend}
+        onSend={handleSendMessage}
         isStreaming={isStreaming}
         useTools={useTools}
         onUseToolsChange={setUseTools}
         useReasoning={useReasoning}
         onUseReasoningChange={setUseReasoning}
-        activeLeftItem={activeLeftItem}
-        activeRightItem={activeRightItem}
+        activeLeftItem={activeLeftItem || null}
+        activeRightItem={activeRightItem || null}
         openDocuments={openDocuments}
       />
     </div>

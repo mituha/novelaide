@@ -1,6 +1,8 @@
 // エクスポート一覧 (tauri-plugin-novelaid-ai-api)
 
 export * from './types';
+export * from './domain/guidelines';
+export * from './domain/tools';
 export * from './contexts/AIContextContext';
 export * from './hooks/useAIContextContent';
 export * from './hooks/useAutoResize';
