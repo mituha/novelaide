@@ -75,16 +75,17 @@ export interface NovelaidExtensionContext {
 
 ---
 
-## 4. 段階的実装計画
+## 4. 段階的実装計画と実施結果
 
-1. **仕様計画書の策定と先行コミット (現在)**: 本ドキュメントを作成し Git コミット。
-2. **`novelaidExtension.ts` のリファクタリング**:
-   - `api.registerTool` によるツール登録規約の完全適用。
-   - `api.registerCommand` による共通コマンド（`/ruby`, `/proofread`, `/info`, `/help`）の登録。
-   - Tool 実行関数を環境（IPC プロキシ vs ローカル実装）に応じて差し替えられるインターフェース設計。
-3. **`chatSession.ts` の Pi SDK Extension 統合**:
-   - Extension から収集したツール一覧を `Agent` に提供。
-   - コマンド実行（ディスパッチ）インターフェースの公開。
-4. **`AIChatPanel.tsx` でのスラッシュコマンドインターセプト**:
-   - `/` コマンドの事前検知と即時実行。
-5. **検証 & スクリーンショット更新 & バージョン更新（`npm version patch`）**。
+1. **仕様計画書の策定と先行コミット (完了)**: 本ドキュメントを作成し Git コミット (`cc58c85`)。
+2. **`novelaidExtension.ts` のリファクタリング (完了)**:
+   - `api.registerTool` によるツール登録規約（`scan_proofread`, `extract_ruby`, `search_metadata`）の完全適用。
+   - `api.registerCommand` による共通スラッシュコマンド（`/ruby`, `/proofread`, `/check`, `/info`, `/help`）の登録。
+   - `NovelaidToolProxy` インターフェースにより、ツール実行実体を環境（フロントエンドIPCプロキシ vs CLI直接実行）に応じて柔軟に注入可能な構造を実現。
+3. **`chatSession.ts` の Pi SDK Extension 統合 (完了)**:
+   - 静的ツール配列の直渡しを撤廃し、Extension の `registerTool` から収集したツール一覧を `Agent` に提供。
+   - コマンドディスパッチメソッド `executeCommand` を実装し、`/` から始まる入力時に即時インターセプト実行。
+4. **`AIChatPanel.tsx` でのスラッシュコマンドインターセプト (完了)**:
+   - チャット入力欄で `/help`, `/ruby`, `/proofread` 等の入力時に、LLM 通信を介さず即時にローカルコマンドを実行し結果を表示。
+   - クイックツールバー（ルビ抽出・校正スキャン）も Extension コマンド経由での呼び出しに一元化。
+5. **検証 & スクリーンショット更新 & バージョン更新（`npm version patch`） (完了)**。

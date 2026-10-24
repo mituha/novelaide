@@ -305,74 +305,66 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     }
   };
 
-  // クイックツールバーからの手動実行
+  // クイックツールバーからの手動実行（Extension のスラッシュコマンド経由で一元実行）
   const runProofread = async () => {
-    const targetDoc = activeLeftItem || activeRightItem;
-    if (!targetDoc) return;
-
     try {
-      const res = await invoke<any>('plugin:novelaid-ai|ai_run_tool', {
-        toolName: 'proofread_scan',
-        targetFile: targetDoc.path,
-        params: { content: targetDoc.content },
+      const contextContent = await getContextText(
+        activeLeftItem || null,
+        activeRightItem || null,
+        openDocuments,
+        readFileDiskFn
+      );
+      const session = new PiWritingAgentSession({
+        model: selectedModel,
+        persona: currentPersona,
+        contextContent,
+        toolExecutor: useTools ? toolExecutor : undefined,
       });
-
-      let summary = `【高速校正スキャン結果: ${targetDoc.baseName || '原稿'}】\n`;
-      if (res.issues && res.issues.length > 0) {
-        summary += `推敲ポイントが ${res.issues.length} 件見つかりました:\n`;
-        res.issues.forEach((issue: any) => {
-          summary += `・L${issue.line}: ${issue.message}\n`;
-        });
-      } else {
-        summary += '・文末の連続: 正常（3文以上の重複なし）\n・ら抜き言葉・冗長表現: 検出されませんでした。\n良好なリズムで書かれています！';
+      const res = await session.executeCommand('/proofread');
+      if (res.output) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `cmd-${Date.now()}`,
+            role: 'assistant',
+            persona: 'proofreader',
+            content: res.output!,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `tool-${Date.now()}`,
-          role: 'assistant',
-          persona: 'proofreader',
-          content: summary,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
     } catch (e) {
       console.error(e);
     }
   };
 
   const runRubySuggest = async () => {
-    const targetDoc = activeLeftItem || activeRightItem;
-    if (!targetDoc) return;
-
     try {
-      const res = await invoke<any>('plugin:novelaid-ai|ai_run_tool', {
-        toolName: 'ruby_suggest',
-        targetFile: targetDoc.path,
-        params: { content: targetDoc.content },
+      const contextContent = await getContextText(
+        activeLeftItem || null,
+        activeRightItem || null,
+        openDocuments,
+        readFileDiskFn
+      );
+      const session = new PiWritingAgentSession({
+        model: selectedModel,
+        persona: currentPersona,
+        contextContent,
+        toolExecutor: useTools ? toolExecutor : undefined,
       });
-
-      let summary = `【ルビ候補抽出: ${targetDoc.baseName || '原稿'}】\n`;
-      if (res.suggestions && res.suggestions.length > 0) {
-        summary += `未ルビの固有名詞・難読語を検出しました（${res.suggestions.length}件）:\n`;
-        res.suggestions.forEach((sug: any) => {
-          summary += `・L${sug.line || '?'}: |${sug.word}《${sug.ruby}》\n`;
-        });
-      } else {
-        summary += '現在本文に含まれる主要な固有名詞・難読語はすべてルビ設定済みです。';
+      const res = await session.executeCommand('/ruby');
+      if (res.output) {
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `cmd-${Date.now()}`,
+            role: 'assistant',
+            persona: 'proofreader',
+            content: res.output!,
+            timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          },
+        ]);
       }
-
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `tool-${Date.now()}`,
-          role: 'assistant',
-          persona: 'proofreader',
-          content: summary,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
     } catch (e) {
       console.error(e);
     }
@@ -554,6 +546,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         onChange={setInput}
         onSend={handleSendMessage}
         isStreaming={isStreaming}
+        placeholder="メッセージを入力、または /help, /ruby, /proofread (Enterで送信)..."
         useTools={useTools}
         onUseToolsChange={setUseTools}
         useReasoning={useReasoning}
