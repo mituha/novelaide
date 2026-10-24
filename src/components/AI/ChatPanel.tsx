@@ -9,6 +9,7 @@ import {
   FileText,
   BookmarkPlus,
   Search,
+  Database,
 } from 'lucide-react';
 import { useAi } from '../../contexts/AiContext';
 import { AiPersonaType } from 'tauri-plugin-novelaid-ai-api';
@@ -30,6 +31,7 @@ export const ChatPanel: React.FC = () => {
     clearMessages,
     runProofread,
     runRubySuggest,
+    searchProjectMetadata,
   } = useAi();
 
   const [input, setInput] = useState<string>('');
@@ -171,7 +173,7 @@ export const ChatPanel: React.FC = () => {
           title="現在の原稿からルビ候補を自動抽出します"
         >
           <BookmarkPlus size={13} />
-          <span>ルビ候補抽出</span>
+          <span>ルビ抽出</span>
         </button>
         <button
           className="ai-tool-btn"
@@ -181,6 +183,15 @@ export const ChatPanel: React.FC = () => {
         >
           <Search size={13} />
           <span>校正スキャン</span>
+        </button>
+        <button
+          className="ai-tool-btn"
+          onClick={() => searchProjectMetadata()}
+          disabled={isLoading}
+          title="作品内のキャラクター設定や資料キャッシュを参照します"
+        >
+          <Database size={13} />
+          <span>設定参照</span>
         </button>
       </div>
 

@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tauri::command;
+use crate::tools;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -85,24 +86,42 @@ pub(crate) async fn ai_send_message(
 pub(crate) async fn ai_run_tool(
     tool_name: String,
     target_file: Option<String>,
-    _params: Value,
+    params: Value,
 ) -> Result<Value, String> {
+    let content = params
+        .get("content")
+        .and_then(|v| v.as_str())
+        .unwrap_or_default();
+
     match tool_name.as_str() {
-        "ruby_suggest" => Ok(serde_json::json!({
-            "success": true,
-            "target": target_file.unwrap_or_default(),
-            "suggestions": [
-                { "word": "漆黒", "ruby": "しっこく", "line": 4 },
-                { "word": "神代玲央", "ruby": "かみしろれお", "line": 6 }
-            ]
-        })),
-        "proofread_scan" => Ok(serde_json::json!({
-            "success": true,
-            "target": target_file.unwrap_or_default(),
-            "issues": [
-                { "type": "ending_repeat", "message": "過去形「〜た。」が3文連続しています", "line": 8 }
-            ]
-        })),
+        "ruby_suggest" => {
+            let suggestions = tools::extract_ruby_candidates(content);
+            Ok(serde_json::json!({
+                "success": true,
+                "target": target_file.unwrap_or_default(),
+                "suggestions": suggestions,
+            }))
+        }
+        "proofread_scan" => {
+            let issues = tools::scan_proofread(content);
+            Ok(serde_json::json!({
+                "success": true,
+                "target": target_file.unwrap_or_default(),
+                "issues": issues,
+            }))
+        }
+        "search_metadata" => {
+            let query = params
+                .get("query")
+                .and_then(|v| v.as_str())
+                .unwrap_or_default();
+            Ok(serde_json::json!({
+                "success": true,
+                "target": target_file.unwrap_or_default(),
+                "query": query,
+                "message": "メタデータキャッシュ検索完了",
+            }))
+        }
         _ => Err(format!("Unknown tool: {}", tool_name)),
     }
 }

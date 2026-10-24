@@ -8,6 +8,7 @@ import {
   type AiToolResult,
 } from 'tauri-plugin-novelaid-ai-api';
 import { useDocument } from './DocumentContext';
+import { fileService } from '../services/fileService';
 
 export const AI_PERSONAS: AiPersona[] = [
   {
@@ -52,6 +53,7 @@ interface AiContextType {
   clearMessages: () => void;
   runProofread: () => Promise<AiToolResult | null>;
   runRubySuggest: () => Promise<AiToolResult | null>;
+  searchProjectMetadata: (query?: string) => Promise<void>;
 }
 
 const AiContext = createContext<AiContextType | undefined>(undefined);
@@ -144,16 +146,26 @@ export const AiProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const runProofread = async (): Promise<AiToolResult | null> => {
     setIsLoading(true);
     try {
-      const targetPath = activeDocument?.path || 'current_draft.md';
-      const result = await aiClient.runTool('proofread_scan', targetPath, {
+      const targetPath = activeDocument?.fileTitle || activeDocument?.baseName || '未保存の原稿';
+      const result = await aiClient.runTool('proofread_scan', activeDocument?.path, {
         content: activeDocument?.content || '',
       });
+
+      let contentSummary = `【校正スキャン完了: ${targetPath}】\n`;
+      if (result.issues && result.issues.length > 0) {
+        contentSummary += `以下の推敲・校正ポイントが見つかりました（${result.issues.length}件）:\n`;
+        result.issues.forEach((issue: any) => {
+          contentSummary += `・L${issue.line}: ${issue.message}\n`;
+        });
+      } else {
+        contentSummary += '・文末の連続: 正常（3文以上の重複なし）\n・ら抜き言葉・冗長表現: 検出されませんでした\n良好なリズムで執筆されています！';
+      }
 
       const toolMsg: AiChatMessage = {
         id: `msg-${Date.now()}-tool`,
         role: 'assistant',
         persona: 'proofreader',
-        content: `【校正スキャン完了】\n${targetPath} のチェックを行いました。\n・文末の連続: 問題なし\n・表記ゆれ/ルビ書式: 正常\n・検出された改善提案: 0件`,
+        content: contentSummary,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         toolCalls: [
           {
@@ -176,16 +188,26 @@ export const AiProvider: React.FC<{ children: React.ReactNode }> = ({ children }
   const runRubySuggest = async (): Promise<AiToolResult | null> => {
     setIsLoading(true);
     try {
-      const targetPath = activeDocument?.path || 'current_draft.md';
-      const result = await aiClient.runTool('ruby_suggest', targetPath, {
+      const targetPath = activeDocument?.fileTitle || activeDocument?.baseName || '未保存の原稿';
+      const result = await aiClient.runTool('ruby_suggest', activeDocument?.path, {
         content: activeDocument?.content || '',
       });
+
+      let contentSummary = `【ルビ候補抽出: ${targetPath}】\n`;
+      if (result.suggestions && result.suggestions.length > 0) {
+        contentSummary += `本文から未ルビの固有名詞・難読語を検出しました（${result.suggestions.length}件）:\n`;
+        result.suggestions.forEach((sug: any) => {
+          contentSummary += `・L${sug.line || '?'}: |${sug.word}《${sug.ruby}》\n`;
+        });
+      } else {
+        contentSummary += '現在本文に含まれる主要な固有名詞・難読語はすべてルビ設定済みです。';
+      }
 
       const toolMsg: AiChatMessage = {
         id: `msg-${Date.now()}-tool`,
         role: 'assistant',
         persona: 'proofreader',
-        content: `【ルビ候補抽出】\n以下の漢字・固有名詞にルビ候補が見つかりました。\n・漆黒 → 《しっこく》\n・神代玲央 → 《かみしろれお》`,
+        content: contentSummary,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         toolCalls: [
           {
@@ -200,6 +222,47 @@ export const AiProvider: React.FC<{ children: React.ReactNode }> = ({ children }
     } catch (err) {
       console.error('runRubySuggest error:', err);
       return null;
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const searchProjectMetadata = async (query?: string): Promise<void> => {
+    setIsLoading(true);
+    try {
+      const cache = await fileService.getMetadataCache();
+      let summary = `【作品設定資料キャッシュ参照（Rust連携）】\n`;
+      const entries = Object.entries(cache);
+
+      if (entries.length > 0) {
+        summary += `プロジェクトから ${entries.length} 件の設定資料を検出しました:\n`;
+        entries.slice(0, 5).forEach(([filePath, meta]: [string, any]) => {
+          const fileName = filePath.split(/[/\\]/).pop() || filePath;
+          const title = meta.title || meta.name || fileName;
+          const role = meta.role ? ` (${meta.role})` : '';
+          summary += `・${title}${role}: ${meta.summary || '設定メモあり'}\n`;
+        });
+      } else {
+        summary += '作品内にFrontmatter設定資料がまだ作成されていません。';
+      }
+
+      const toolMsg: AiChatMessage = {
+        id: `msg-${Date.now()}-meta`,
+        role: 'assistant',
+        persona: 'partner',
+        content: summary,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        toolCalls: [
+          {
+            name: 'search_metadata',
+            params: { query },
+            result: cache,
+          },
+        ],
+      };
+      setMessages((prev) => [...prev, toolMsg]);
+    } catch (err) {
+      console.error('searchProjectMetadata error:', err);
     } finally {
       setIsLoading(false);
     }
@@ -223,6 +286,7 @@ export const AiProvider: React.FC<{ children: React.ReactNode }> = ({ children }
         clearMessages,
         runProofread,
         runRubySuggest,
+        searchProjectMetadata,
       }}
     >
       {children}

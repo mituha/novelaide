@@ -5,6 +5,7 @@ use tauri::{
 
 mod commands;
 mod error;
+pub mod tools;
 
 pub use error::Error;
 

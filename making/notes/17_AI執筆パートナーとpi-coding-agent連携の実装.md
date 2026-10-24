@@ -16,14 +16,17 @@
 
 そこで、今回以下の設計方針を決定しました。
 
-1. **AI通信・ツール実行の画一化**:
-   - AIモデルアクセスや Function Calling の仕組みを独自実装せず、`pi-coding-agent` に委ねる。
-2. **独立プラグイン `tauri-plugin-novelaid-ai` の新設**:
-   - Tauriのプラグインアーキテクチャに則り、AI連携ロジックをホストアプリ本体から完全に切り離す。
-3. **作家のための専用UI（ペルソナ＆ツール連携）**:
+1. **AI通信・ツール規格の画一化**:
+   - AIモデルアクセスや Function Calling の仕組みを独自実装せず、`pi-coding-agent` のツール規格に準拠。
+2. **プロセス内蔵方式から「内部責務分割 ＆ Rust高速処理」への転換**:
+   - `novelaid-cli` プロセスをそのまま丸ごと内蔵する方法は、メタデータ走査の重複やエディター未保存バッファとの同期ズレが生じるため採用しません。
+   - 重いデータ処理（作品メタデータキャッシュ参照、大容量原稿の校正スキャン、ルビ抽出）は Rust レイヤ（`tauri-plugin-novelaid-fs` / `tauri-plugin-novelaid-ai`）が担当し、ミリ秒単位で超高速処理します。
+3. **コード・仕様レベルでの共通化**:
+   - `novelaid-cli` との共有は共通パッケージ（`novelaid-ruby`, `novelaid-markdown`、校正ルール定義等）で行い、CLI はシンプルな独立版（簡易版）として保守性を高めます。
+4. **作家のための専用UI（ペルソナ＆ツール連携）**:
    - 「執筆パートナー」「担当編集者」「校正係」「作中人物」の4ペルソナを瞬時に切り替えられるUI。
    - 現在開いている原稿テキストを自動的にプロンプトへ注入するコンテキスト連携。
-   - ルビ候補抽出や校正スキャンをワンクリックで呼び出せるクイックアクション。
+   - ルビ抽出、校正スキャン、設定参照をワンクリックで呼び出せるクイックアクション。
 
 ---
 
@@ -38,18 +41,21 @@ sequenceDiagram
     participant UI as ChatPanel (React)
     participant Ctx as AiContext & DocumentContext
     participant Plugin as tauri-plugin-novelaid-ai (Rust)
-    participant Agent as pi-coding-agent / novelaid-cli
+    participant FS as tauri-plugin-novelaid-fs (Rust)
     participant Model as LLM (LM Studio / Gemini)
 
     Writer->>UI: 「第1話の導入について意見をください」
-    UI->>Ctx: メッセージ送信 + 原稿テキスト抽出
+    UI->>Ctx: メッセージ送信 + 未保存バッファ自動抽出
     Ctx->>Plugin: ai_send_message(prompt, persona, context)
-    Plugin->>Agent: AgentRunner / Tool Execution
-    Agent->>Model: プロンプト + ツール定義の送信
-    Model-->>Agent: ストリーミング応答 / ツール呼び出し指示
-    Agent-->>Plugin: 応答テキスト / ツール実行結果
+    Plugin->>Model: プロンプト送信 (pi-coding-agent規格)
+    Model-->>Plugin: 応答テキスト返却
     Plugin-->>Ctx: 結果をフロントエンドへ返却
     Ctx-->>UI: タイムラインにチャット吹き出しを表示
+
+    Note over Writer,FS: クイックアクション（設定参照 / 校正 / ルビ）
+    Writer->>UI: 「設定参照」ボタン押下
+    UI->>FS: getMetadataCache() (ミリ秒単位のRust高速参照)
+    FS-->>UI: 登場人物・地名・プロット設定をAI文脈に注入
 ```
 
 ---
