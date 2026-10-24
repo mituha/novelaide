@@ -1,7 +1,7 @@
 {
   "name": "novelaide",
   "private": true,
-  "version": "0.18.0",
+  "version": "0.18.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -15,6 +15,9 @@
     "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin"
   },
   "dependencies": {
+    "@earendil-works/pi-agent-core": "^1.4.0",
+    "@earendil-works/pi-ai": "^1.4.0",
+    "@earendil-works/pi-coding-agent": "^1.4.0",
     "@gitgraph/js": "^1.4.0",
     "@gitgraph/react": "^1.6.0",
     "@monaco-editor/react": "^4.7.0",

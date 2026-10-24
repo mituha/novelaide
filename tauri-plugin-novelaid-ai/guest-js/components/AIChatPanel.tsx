@@ -12,7 +12,7 @@ import {
 } from 'lucide-react';
 import { ChatMessage, AiModelInfo, AiPersonaType, AiPersona } from '../types';
 import { fetchLmStudioModels, getFallbackModels } from '../client/modelManager';
-import { runAgentTurn, ToolExecutor } from '../client/chatSession';
+import { PiWritingAgentSession, ToolExecutor } from '../client/chatSession';
 import { getPersonaGuideline } from '../domain/guidelines';
 import { useAIContextContent, ContextDocumentItem } from '../hooks/useAIContextContent';
 import { AIChatInput } from './AIChatInput';
@@ -211,30 +211,10 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
       const personaObj = DEFAULT_PERSONAS.find((p) => p.id === currentPersona);
       const systemPrompt = personaObj?.systemPrompt || '小説執筆を支援してください。';
 
-      // 送信用メッセージ履歴の構築
-      const apiMessages: Array<{ role: 'system' | 'user' | 'assistant' | 'tool'; content: string }> = [
-        { role: 'system', content: systemPrompt },
-      ];
-
-      messages.forEach((m) => {
-        if (m.id !== 'welcome') {
-          apiMessages.push({
-            role: m.role,
-            content: m.content,
-          });
-        }
-      });
-
-      // 今回のコンテキスト付きユーザー発言
-      let finalUserContent = userText;
-      if (contextContent.trim()) {
-        finalUserContent = `【参照原稿・設定資料コンテキスト】\n${contextContent}\n【作家からの質問・指示】\n${userText}`;
-      }
-      apiMessages.push({ role: 'user', content: finalUserContent });
-
-      // pi-coding-agent 自律ツール実行ループによる対話
-      await runAgentTurn(apiMessages, {
+      // @earendil-works/pi-agent-core ベースの PiWritingAgentSession でプロンプト実行
+      const session = new PiWritingAgentSession({
         model: selectedModel,
+        systemPrompt,
         enableTools: useTools,
         toolExecutor: useTools ? toolExecutor : undefined,
         onToken: (delta) => {
@@ -260,6 +240,8 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
           }
         },
       });
+
+      await session.prompt(userText, contextContent);
     } catch (err: any) {
       setMessages((prev) =>
         prev.map((msg) =>

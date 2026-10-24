@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { Agent, type AgentEvent, type AgentMessage, type StreamFn } from '@earendil-works/pi-agent-core';
 import { DEFAULT_LM_STUDIO_URL } from './modelManager';
 import { NOVELAID_AI_TOOLS, ToolDefinition } from '../domain/tools';
 import { AgentSessionEvent } from '../types';
@@ -18,66 +19,45 @@ export interface ChatMessageParam {
   }>;
 }
 
-export interface StreamChatOptions {
+export type ToolExecutor = (toolName: string, args: Record<string, any>) => Promise<any>;
+
+export interface PiAgentSessionOptions {
   model?: string;
   baseUrl?: string;
-  temperature?: number;
+  systemPrompt?: string;
   tools?: ToolDefinition[];
   enableTools?: boolean;
+  toolExecutor?: ToolExecutor;
+  onEvent?: (event: AgentSessionEvent) => void;
   onToken?: (delta: string) => void;
-  onThought?: (thought: string) => void;
-  signal?: AbortSignal;
-}
-
-interface RawToolCallChunk {
-  id?: string;
-  function?: {
-    name?: string;
-    arguments?: string;
-  };
 }
 
 /**
- * LM Studio / OpenAI互換エンドポイントまたは Tauri IPC に対するストリーミング対話（単一ターン）
+ * LM Studio / OpenAI 互換のエンドポイントに対するカスタム StreamFn
  */
-export async function streamChat(
-  messages: ChatMessageParam[],
-  options: StreamChatOptions = {}
-): Promise<{
-  content: string;
-  toolCalls?: Array<{ id: string; name: string; arguments: Record<string, any> }>;
-}> {
-  const {
-    model = 'lm-studio/qwen2.5-7b-instruct',
-    baseUrl = DEFAULT_LM_STUDIO_URL,
-    temperature = 0.7,
-    tools = NOVELAID_AI_TOOLS,
-    enableTools = true,
-    onToken,
-    signal,
-  } = options;
+function createLmStudioStreamFn(baseUrl: string = DEFAULT_LM_STUDIO_URL, model: string = 'lm-studio/qwen2.5-7b-instruct'): StreamFn {
+  return async (messages, options) => {
+    const endpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
 
-  const endpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    // pi-agent-core の messages 形式を OpenAI chat completions 形式に変換
+    const apiMessages = messages.map((m: any) => ({
+      role: m.role || 'user',
+      content: typeof m.content === 'string' ? m.content : Array.isArray(m.content) ? m.content.map((c: any) => c.text || '').join('') : '',
+      tool_calls: m.tool_calls || m.toolCalls,
+      tool_call_id: m.tool_call_id || m.toolCallId,
+    }));
 
-  const bodyPayload: Record<string, any> = {
-    model,
-    messages,
-    temperature,
-    stream: true,
-  };
-
-  if (enableTools && tools && tools.length > 0) {
-    bodyPayload.tools = tools;
-  }
-
-  try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(bodyPayload),
-      signal: signal || AbortSignal.timeout(45000),
+      body: JSON.stringify({
+        model,
+        messages: apiMessages,
+        stream: true,
+      }),
+      signal: options?.signal,
     });
 
     if (!res.ok || !res.body) {
@@ -86,204 +66,188 @@ export async function streamChat(
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
-    let fullContent = '';
     let buffer = '';
 
-    const accumulatedToolCalls: Map<number, { id: string; name: string; argumentsText: string }> = new Map();
+    // AsyncGenerator としてデルタトークンを送出
+    async function* eventGenerator(): AsyncGenerator<any, void, unknown> {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
 
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || '';
 
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split('\n');
-      buffer = lines.pop() || '';
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith(':')) continue;
+          if (trimmed === 'data: [DONE]') continue;
 
-      for (const line of lines) {
-        const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith(':')) continue;
-        if (trimmed === 'data: [DONE]') continue;
-
-        if (trimmed.startsWith('data: ')) {
-          try {
-            const data = JSON.parse(trimmed.slice(6));
-            const choice = data.choices?.[0];
-            const delta = choice?.delta;
-
-            // テキストトークンの受信
-            if (delta?.content) {
-              fullContent += delta.content;
-              onToken?.(delta.content);
-            }
-
-            // ツール呼び出し（Function calling）の逐次チャンク
-            if (delta?.tool_calls) {
-              for (const tc of delta.tool_calls as Array<RawToolCallChunk & { index?: number }>) {
-                const idx = tc.index ?? 0;
-                if (!accumulatedToolCalls.has(idx)) {
-                  accumulatedToolCalls.set(idx, {
-                    id: tc.id || `call_${Date.now()}_${idx}`,
-                    name: tc.function?.name || '',
-                    argumentsText: '',
-                  });
-                }
-                const current = accumulatedToolCalls.get(idx)!;
-                if (tc.id && !current.id) current.id = tc.id;
-                if (tc.function?.name) current.name += tc.function.name;
-                if (tc.function?.arguments) current.argumentsText += tc.function.arguments;
+          if (trimmed.startsWith('data: ')) {
+            try {
+              const data = JSON.parse(trimmed.slice(6));
+              const delta = data.choices?.[0]?.delta;
+              if (delta?.content) {
+                yield {
+                  type: 'text_delta',
+                  delta: delta.content,
+                };
               }
+            } catch {
+              // パースエラーは無視
             }
-          } catch {
-            // パースエラーは無視
           }
         }
       }
     }
 
-    // パース済みのツール呼び出しを構築
-    const toolCalls: Array<{ id: string; name: string; arguments: Record<string, any> }> = [];
-    accumulatedToolCalls.forEach((val) => {
-      let parsedArgs: Record<string, any> = {};
-      try {
-        if (val.argumentsText) {
-          parsedArgs = JSON.parse(val.argumentsText);
-        }
-      } catch {
-        parsedArgs = { raw: val.argumentsText };
-      }
-      toolCalls.push({
-        id: val.id,
-        name: val.name,
-        arguments: parsedArgs,
-      });
-    });
-
-    return {
-      content: fullContent,
-      toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-    };
-  } catch (err) {
-    // LM Studio が起動していない場合、Tauri IPC コマンドにフォールバック
-    const lastUserMsg = messages.filter((m) => m.role === 'user').pop()?.content || '';
-    const sysMsg = messages.find((m) => m.role === 'system')?.content || '';
-
-    try {
-      const response = await invoke<string>('plugin:novelaid-ai|ai_send_message', {
-        prompt: lastUserMsg,
-        persona: sysMsg.includes('編集') ? 'editor' : sysMsg.includes('校正') ? 'proofreader' : 'partner',
-      });
-      onToken?.(response);
-      return { content: response };
-    } catch {
-      throw err;
-    }
-  }
-}
-
-export type ToolExecutor = (toolName: string, args: Record<string, any>) => Promise<any>;
-
-export interface AgentTurnOptions extends StreamChatOptions {
-  toolExecutor?: ToolExecutor;
-  onEvent?: (event: AgentSessionEvent) => void;
-  maxToolLoops?: number;
+    return eventGenerator() as any;
+  };
 }
 
 /**
- * pi-coding-agent の自律ツール実行ループ（AgentSession）に準拠したセッション実行
+ * @earendil-works/pi-agent-core の Agent クラスを利用した小説執筆セッション
  */
-export async function runAgentTurn(
-  initialMessages: ChatMessageParam[],
-  options: AgentTurnOptions = {}
-): Promise<{ fullContent: string; history: ChatMessageParam[] }> {
-  const {
-    toolExecutor,
-    onEvent,
-    maxToolLoops = 5,
-    onToken,
-    ...streamOptions
-  } = options;
+export class PiWritingAgentSession {
+  private agent: Agent;
+  private toolExecutor?: ToolExecutor;
+  private onEvent?: (event: AgentSessionEvent) => void;
+  private onToken?: (delta: string) => void;
+  private isGenerating: boolean = false;
 
-  const history: ChatMessageParam[] = [...initialMessages];
-  let loopCount = 0;
-  let finalContent = '';
+  constructor(options: PiAgentSessionOptions = {}) {
+    const {
+      model = 'lm-studio/qwen2.5-7b-instruct',
+      baseUrl = DEFAULT_LM_STUDIO_URL,
+      systemPrompt = '小説執筆を支援してください。',
+      tools = NOVELAID_AI_TOOLS,
+      enableTools = true,
+      toolExecutor,
+      onEvent,
+      onToken,
+    } = options;
 
-  onEvent?.({
-    type: 'message_start',
-    role: 'assistant',
-    messageId: `msg_${Date.now()}`,
-  });
+    this.toolExecutor = toolExecutor;
+    this.onEvent = onEvent;
+    this.onToken = onToken;
 
-  while (loopCount < maxToolLoops) {
-    loopCount++;
+    const streamFunction = createLmStudioStreamFn(baseUrl, model);
 
-    const result = await streamChat(history, {
-      ...streamOptions,
-      onToken: (token) => {
-        onToken?.(token);
-        onEvent?.({ type: 'message_update', delta: token });
+    // pi-agent-core Agent インスタンスの生成
+    this.agent = new Agent({
+      initialState: {
+        systemPrompt,
+        tools: enableTools ? (tools as any) : undefined,
+      },
+      streamFn: streamFunction,
+      beforeToolCall: async (context) => {
+        this.onEvent?.({
+          type: 'tool_call_start',
+          toolName: (context as any).toolName || 'tool',
+          callId: (context as any).callId || `call_${Date.now()}`,
+          args: (context as any).params || {},
+        });
+        return undefined;
+      },
+      afterToolCall: async (context) => {
+        this.onEvent?.({
+          type: 'tool_call_end',
+          toolName: (context as any).toolName || 'tool',
+          callId: (context as any).callId || `call_${Date.now()}`,
+          result: (context as any).result,
+        });
+        return undefined;
       },
     });
 
-    finalContent = result.content;
+    // pi-agent-core イベントの購読
+    this.agent.subscribe((event: AgentEvent) => {
+      switch ((event as any).type) {
+        case 'turn_start':
+        case 'message_start':
+          this.onEvent?.({
+            type: 'message_start',
+            role: 'assistant',
+            messageId: `msg_${Date.now()}`,
+          });
+          break;
 
-    // ツール呼び出しが発生しなかった場合は終了
-    if (!result.toolCalls || result.toolCalls.length === 0 || !toolExecutor) {
-      break;
-    }
+        case 'message_update':
+          const delta = (event as any).delta || (event as any).textDelta || '';
+          if (delta) {
+            this.onToken?.(delta);
+            this.onEvent?.({
+              type: 'message_update',
+              delta,
+            });
+          }
+          break;
 
-    // ツール呼び出しを履歴に追加（role: assistant）
-    history.push({
-      role: 'assistant',
-      content: result.content,
-      tool_calls: result.toolCalls.map((tc) => ({
-        id: tc.id,
-        type: 'function',
-        function: {
-          name: tc.name,
-          arguments: JSON.stringify(tc.arguments),
-        },
-      })),
-    });
-
-    // 各ツールを順次実行
-    for (const tc of result.toolCalls) {
-      onEvent?.({
-        type: 'tool_call_start',
-        toolName: tc.name,
-        callId: tc.id,
-        args: tc.arguments,
-      });
-
-      let toolResult: any;
-      try {
-        toolResult = await toolExecutor(tc.name, tc.arguments);
-      } catch (e: any) {
-        toolResult = { error: String(e.message || e) };
+        case 'turn_end':
+          this.onEvent?.({
+            type: 'turn_end',
+            fullContent: (event as any).content || '',
+          });
+          break;
       }
-
-      onEvent?.({
-        type: 'tool_call_end',
-        toolName: tc.name,
-        callId: tc.id,
-        result: toolResult,
-      });
-
-      // ツール結果を履歴に追加（role: tool）
-      history.push({
-        role: 'tool',
-        tool_call_id: tc.id,
-        name: tc.name,
-        content: typeof toolResult === 'string' ? toolResult : JSON.stringify(toolResult),
-      });
-    }
-
-    // 次のループへ（LLM がツールの結果を反映して作家へ最終回答を生成する）
+    });
   }
 
-  onEvent?.({
-    type: 'turn_end',
-    fullContent: finalContent,
-  });
+  /**
+   * 作家からのプロンプトを投入してターンを実行
+   */
+  public async prompt(userText: string, contextContent?: string): Promise<string> {
+    if (this.isGenerating) {
+      throw new Error('現在エージェントが応答中です');
+    }
+    this.isGenerating = true;
 
-  return { fullContent: finalContent, history };
+    try {
+      let finalInput = userText;
+      if (contextContent && contextContent.trim()) {
+        finalInput = `【参照原稿・設定資料コンテキスト】\n${contextContent}\n【作家からの質問・指示】\n${userText}`;
+      }
+
+      // ツール呼び出しが発生した場合に備え、Tauri IPC へのフォールバック等もカバー
+      let accumulatedResponse = '';
+
+      // pi-agent-core の prompt 呼び出し
+      try {
+        await this.agent.prompt(finalInput);
+      } catch (agentErr) {
+        // LM Studio が未起動の場合、Tauri IPC コマンドにフォールバック
+        const fallbackRes = await invoke<string>('plugin:novelaid-ai|ai_send_message', {
+          prompt: finalInput,
+          persona: 'partner',
+        });
+        this.onToken?.(fallbackRes);
+        accumulatedResponse = fallbackRes;
+      }
+
+      return accumulatedResponse;
+    } finally {
+      this.isGenerating = false;
+    }
+  }
+
+  public abort(): void {
+    this.agent.abort();
+    this.isGenerating = false;
+  }
+}
+
+/**
+ * 簡易対話実行ヘルパー
+ */
+export async function runAgentTurn(
+  initialMessages: ChatMessageParam[],
+  options: PiAgentSessionOptions = {}
+): Promise<{ fullContent: string; history: ChatMessageParam[] }> {
+  const session = new PiWritingAgentSession(options);
+  const lastUserMsg = initialMessages.filter((m) => m.role === 'user').pop()?.content || '';
+  const result = await session.prompt(lastUserMsg);
+  return {
+    fullContent: result,
+    history: [...initialMessages, { role: 'assistant', content: result }],
+  };
 }
