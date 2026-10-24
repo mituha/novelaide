@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-get-directory-type"
+description = "Enables the get_directory_type command without any pre-configured scope."
+commands.allow = ["get_directory_type"]
+
+[[permission]]
+identifier = "deny-get-directory-type"
+description = "Denies the get_directory_type command without any pre-configured scope."
+commands.deny = ["get_directory_type"]

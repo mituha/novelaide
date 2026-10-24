@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-get-project-directory"
+description = "Enables the get_project_directory command without any pre-configured scope."
+commands.allow = ["get_project_directory"]
+
+[[permission]]
+identifier = "deny-get-project-directory"
+description = "Denies the get_project_directory command without any pre-configured scope."
+commands.deny = ["get_project_directory"]

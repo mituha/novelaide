@@ -1,4 +1,4 @@
-import { invoke } from "@tauri-apps/api/core";
+import * as novelaidFs from "tauri-plugin-novelaid-fs-api";
 import { DirEntry, FileDocument } from "../types/document";
 
 // ブラウザ環境やプレビュー撮影用のモックデータ
@@ -10,6 +10,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     fileTitle: "01_プロローグ",
     isDirectory: false,
     documentType: "novel",
+    children: null,
   },
   {
     name: "02_第1章_出会い.md",
@@ -18,6 +19,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     fileTitle: "02_第1章_出会い",
     isDirectory: false,
     documentType: "novel",
+    children: null,
   },
   {
     name: "03_第2章_旅立ち.md",
@@ -26,6 +28,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     fileTitle: "03_第2章_旅立ち",
     isDirectory: false,
     documentType: "novel",
+    children: null,
   },
   {
     name: "characters",
@@ -33,7 +36,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     baseName: "characters",
     fileTitle: "characters",
     isDirectory: true,
-    documentType: "directory",
+    documentType: "markdown",
     children: [
       {
         name: "主人公_ソラ.md",
@@ -42,6 +45,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         fileTitle: "主人公_ソラ",
         isDirectory: false,
         documentType: "markdown",
+        children: null,
       },
       {
         name: "魔女_ルナ.md",
@@ -50,6 +54,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         fileTitle: "魔女_ルナ",
         isDirectory: false,
         documentType: "markdown",
+        children: null,
       },
     ],
   },
@@ -59,7 +64,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     baseName: "settings",
     fileTitle: "settings",
     isDirectory: true,
-    documentType: "directory",
+    documentType: "markdown",
     children: [
       {
         name: "世界観_帝国史.md",
@@ -68,6 +73,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         fileTitle: "世界観_帝国史",
         isDirectory: false,
         documentType: "markdown",
+        children: null,
       },
     ],
   },
@@ -86,16 +92,35 @@ const MOCK_ENTRIES: DirEntry[] = [
         fileTitle: "大陸地図",
         isDirectory: false,
         documentType: "image",
+        children: null,
       },
     ],
   },
 ];
 
 export const fileService = {
+  // プロジェクトディレクトリの設定
+  async setProjectDirectory(path: string | null): Promise<void> {
+    try {
+      await novelaidFs.setProjectDirectory(path);
+    } catch (err) {
+      console.warn("setProjectDirectory fallback:", err);
+    }
+  },
+
+  // 現在のプロジェクトディレクトリの取得
+  async getProjectDirectory(): Promise<string | null> {
+    try {
+      return await novelaidFs.getProjectDirectory();
+    } catch {
+      return null;
+    }
+  },
+
   // フォルダ内のファイル・フォルダ一覧を再帰取得
   async readDirectory(path: string, recursive: boolean = true): Promise<DirEntry[]> {
     try {
-      return await invoke<DirEntry[]>("fs_read_dir", { path, recursive });
+      return await novelaidFs.readDirectory(path, recursive);
     } catch (err) {
       // ブラウザ環境やTauri外での実行時はモックを返却
       console.warn("Tauri IPC未接続のためモックデータを表示します:", err);
@@ -103,63 +128,72 @@ export const fileService = {
     }
   },
 
-  // ファイル読み込み
+  // ファイル読み込み（フロントマター付きMarkdownやテキスト）
   async readFile(path: string): Promise<FileDocument> {
     try {
-      return await invoke<FileDocument>("fs_read_file", { path });
+      return await novelaidFs.readDocument(path);
     } catch {
       return {
         path,
         baseName: "01_プロローグ.md",
         fileTitle: "01_プロローグ",
         content: "# プロローグ\n\n青い空の彼方から、一羽の鳥が舞い降りてきた。",
+        metadata: {},
         documentType: "novel",
       };
     }
   },
 
   // ファイル保存
-  async writeFile(path: string, content: string): Promise<void> {
+  async writeFile(path: string, content: string, metadata: any = {}): Promise<void> {
     try {
-      await invoke("fs_write_file", { path, content });
+      const doc: FileDocument = {
+        path,
+        baseName: path.split(/[/\\]/).pop() || "",
+        fileTitle: (path.split(/[/\\]/).pop() || "").replace(/\.[^/.]+$/, ""),
+        content,
+        metadata,
+        documentType: "novel",
+      };
+      await novelaidFs.writeDocument(path, doc);
     } catch (err) {
-      console.warn("fs_write_file fallback:", err);
+      console.warn("writeDocument fallback:", err);
     }
   },
 
   // 新規ファイル作成
-  async createFile(path: string): Promise<void> {
+  async createFile(path: string, content: string = ""): Promise<void> {
     try {
-      await invoke("fs_create_file", { path });
+      await novelaidFs.createFile(path, content);
     } catch (err) {
-      console.warn("fs_create_file fallback:", err);
+      console.warn("createFile fallback:", err);
     }
   },
 
   // 新規フォルダ作成
   async createDirectory(path: string): Promise<void> {
     try {
-      await invoke("fs_create_dir", { path });
+      await novelaidFs.createDirectory(path);
     } catch (err) {
-      console.warn("fs_create_dir fallback:", err);
+      console.warn("createDirectory fallback:", err);
     }
   },
 
   // ファイルまたはフォルダ削除
   async remove(path: string): Promise<void> {
     try {
-      await invoke("fs_remove", { path });
+      await novelaidFs.remove(path);
     } catch (err) {
-      console.warn("fs_remove fallback:", err);
+      console.warn("remove fallback:", err);
     }
   },
 
   // リネーム
   async rename(oldPath: string, newPath: string): Promise<void> {
     try {
-      await invoke("fs_rename", { oldPath, newPath });
+      await novelaidFs.rename(oldPath, newPath);
     } catch (err) {
-      console.warn("fs_rename fallback:", err);
+      console.warn("rename fallback:", err);
     }
   },
 };

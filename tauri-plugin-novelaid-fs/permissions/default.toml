@@ -1,0 +1,18 @@
+[default]
+description = "Default permissions for the plugin"
+permissions = [
+    "allow-ping",
+    "allow-get-document-type",
+    "allow-get-directory-type",
+    "allow-read-directory",
+    "allow-set-project-directory",
+    "allow-get-project-directory",
+    "allow-read-document",
+    "allow-write-document",
+    "allow-create-directory",
+    "allow-create-file",
+    "allow-remove",
+    "allow-rename",
+    "allow-get-metadata-cache",
+    "allow-scan-project-metadata",
+]

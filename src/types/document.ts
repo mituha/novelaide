@@ -1,27 +1,12 @@
-export type DocumentType =
-  | "novel"
-  | "markdown"
-  | "image"
-  | "chat"
-  | "css"
-  | "metadata"
-  | "directory"
-  | "unknown";
+import type {
+  NovelaidDirEntry,
+  NovelaidDocument,
+  NovelaidDocumentType,
+} from "tauri-plugin-novelaid-fs-api";
 
-export interface DirEntry {
-  name: string;
-  path: string;
-  baseName: string;
-  fileTitle: string;
-  isDirectory: boolean;
-  documentType: DocumentType;
-  children?: DirEntry[];
-}
+// Tauriプラグイン側のRust型定義（ts-rsによって自動生成された型）をベースにエクスポート
+export type DocumentType = NovelaidDocumentType | "directory" | "metadata";
+export type DirEntry = NovelaidDirEntry;
+export type FileDocument = NovelaidDocument;
 
-export interface FileDocument {
-  path: string;
-  baseName: string;
-  fileTitle: string;
-  content: string;
-  documentType: DocumentType;
-}
+export type { NovelaidDirEntry, NovelaidDocument, NovelaidDocumentType };
