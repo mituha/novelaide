@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from "react";
 import {
   Home,
   PanelLeft,
+  PanelRight,
   Globe,
 } from "lucide-react";
 import { DetailedCountResult } from "novelaid-ruby";
@@ -18,6 +19,8 @@ interface StatusBarProps {
   onOpenLauncher?: () => void;
   onToggleSidePane?: () => void;
   isSidePaneVisible?: boolean;
+  onToggleRightPane?: () => void;
+  isRightPaneVisible?: boolean;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -28,6 +31,8 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   onOpenLauncher,
   onToggleSidePane,
   isSidePaneVisible = true,
+  onToggleRightPane,
+  isRightPaneVisible = false,
 }) => {
   const { theme, toggleTheme } = useTheme();
   const [showPopup, setShowPopup] = useState(false);
@@ -150,6 +155,18 @@ export const StatusBar: React.FC<StatusBarProps> = ({
         >
           <span>{getThemeLabel()}</span>
         </div>
+
+        {onToggleRightPane && (
+          <button
+            type="button"
+            className={`status-btn ${isRightPaneVisible ? "active" : ""}`}
+            onClick={onToggleRightPane}
+            title={isRightPaneVisible ? "右サイドパネルを閉じる" : "右サイドパネルを開く"}
+            aria-label="右サイドパネル切り替え"
+          >
+            <PanelRight size={13} />
+          </button>
+        )}
       </div>
 
       {/* 文字数詳細分析ポップアップ */}

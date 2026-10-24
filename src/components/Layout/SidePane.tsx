@@ -1,44 +1,46 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import React, { useState, useRef, useEffect, useCallback } from "react";
 import { X } from "lucide-react";
-import { PanelId } from "./ActivityBar";
-import { useProject } from "../../contexts/ProjectContext";
-import { FileExplorer } from "../FileExplorer/FileExplorer";
-import { DirEntry } from "../../types/document";
+import { panelRegistry } from "../../core/panelRegistry";
+import { useDocument } from "../../contexts/DocumentContext";
 import "./SidePane.css";
 
 interface SidePaneProps {
-  activePanel: PanelId;
+  paneSide: "left" | "right";
+  activePanelId: string | null;
   onClose: () => void;
   onOpenLauncher?: () => void;
-  onSelectFile?: (file: DirEntry) => void;
-  selectedFilePath?: string | null;
 }
 
 export const SidePane: React.FC<SidePaneProps> = ({
-  activePanel,
+  paneSide,
+  activePanelId,
   onClose,
   onOpenLauncher,
-  onSelectFile,
-  selectedFilePath,
 }) => {
   const [width, setWidth] = useState(260);
   const isResizing = useRef(false);
   const startX = useRef(0);
   const startWidth = useRef(260);
-  const { projectPath, projectName } = useProject();
+  const { activeDocument } = useDocument();
 
-  const startResize = useCallback((e: React.MouseEvent) => {
-    isResizing.current = true;
-    startX.current = e.clientX;
-    startWidth.current = width;
-    document.body.style.cursor = "col-resize";
-    document.body.style.userSelect = "none";
-  }, [width]);
+  const startResize = useCallback(
+    (e: React.MouseEvent) => {
+      isResizing.current = true;
+      startX.current = e.clientX;
+      startWidth.current = width;
+      document.body.style.cursor = "col-resize";
+      document.body.style.userSelect = "none";
+    },
+    [width]
+  );
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing.current) return;
-      const delta = e.clientX - startX.current;
+      // 左ペインなら右ドラッグで広がり、右ペインなら左ドラッグで広がる
+      const delta = paneSide === "left"
+        ? e.clientX - startX.current
+        : startX.current - e.clientX;
       const newWidth = Math.min(Math.max(startWidth.current + delta, 180), 500);
       setWidth(newWidth);
     };
@@ -57,30 +59,23 @@ export const SidePane: React.FC<SidePaneProps> = ({
       window.removeEventListener("mousemove", handleMouseMove);
       window.removeEventListener("mouseup", handleMouseUp);
     };
-  }, []);
+  }, [paneSide]);
 
-  if (!activePanel) return null;
+  if (!activePanelId) return null;
 
-  const renderHeader = () => {
-    let title = "";
-    switch (activePanel) {
-      case "files":
-        title = projectName ? `作品: ${projectName}` : "エクスプローラー";
-        break;
-      case "search":
-        title = "作品内検索";
-        break;
-      case "git":
-        title = "執筆履歴 (Git)";
-        break;
-      case "metadata":
-        title = "登場人物・設定資料";
-        break;
-    }
+  const panel = panelRegistry.findPanel(activePanelId);
+  if (!panel) return null;
 
-    return (
+  const PanelComponent = panel.component;
+
+  return (
+    <aside
+      className={`side-pane-container pane-${paneSide}`}
+      style={{ width: `${width}px` }}
+      aria-label={`${paneSide === "left" ? "左" : "右"}サイドパネル`}
+    >
       <div className="side-pane-header">
-        <span className="side-pane-title">{title}</span>
+        <span className="side-pane-title">{panel.title}</span>
         <div className="side-pane-actions">
           <button
             type="button"
@@ -93,64 +88,22 @@ export const SidePane: React.FC<SidePaneProps> = ({
           </button>
         </div>
       </div>
-    );
-  };
 
-  const renderContent = () => {
-    switch (activePanel) {
-      case "files":
-        if (projectPath) {
-          return (
-            <FileExplorer
-              projectPath={projectPath}
-              onSelectFile={onSelectFile}
-              selectedFilePath={selectedFilePath}
-            />
-          );
-        }
-        return (
-          <div className="pane-placeholder">
-            <p className="placeholder-text">作品フォルダが開かれていません</p>
-            <button
-              type="button"
-              className="placeholder-btn"
-              onClick={onOpenLauncher}
-            >
-              作品フォルダを開く
-            </button>
-          </div>
-        );
-      case "search":
-        return (
-          <div className="pane-placeholder">
-            <input className="search-input" placeholder="原稿内を全文検索..." />
-            <p className="placeholder-subtext">キーワードを入力してEnterを押してください</p>
-          </div>
-        );
-      case "git":
-        return (
-          <div className="pane-placeholder">
-            <p className="placeholder-text">執筆履歴の記録（Git）</p>
-            <p className="placeholder-subtext">作品フォルダを開くと履歴タイムラインが表示されます</p>
-          </div>
-        );
-      case "metadata":
-        return (
-          <div className="pane-placeholder">
-            <p className="placeholder-text">キャラクター & 設定資料</p>
-            <p className="placeholder-subtext">YAML Frontmatterから登場人物カードを自動生成します</p>
-          </div>
-        );
-    }
-  };
-
-  return (
-    <div className="side-pane-container" style={{ width: `${width}px` }}>
-      {renderHeader()}
-      <div className="side-pane-body" style={{ padding: activePanel === "files" && projectPath ? 0 : "12px" }}>
-        {renderContent()}
+      <div className="side-pane-body">
+        <PanelComponent
+          paneSide={paneSide}
+          activeDocument={activeDocument}
+          onClose={onClose}
+          onOpenLauncher={onOpenLauncher}
+        />
       </div>
-      <div className="resize-handle" onMouseDown={startResize} />
-    </div>
+
+      {/* リサイズハンドル */}
+      <div
+        className={`resize-handle handle-${paneSide} ${isResizing.current ? "active" : ""}`}
+        onMouseDown={startResize}
+        title="ドラッグしてパネル幅を調整"
+      />
+    </aside>
   );
 };

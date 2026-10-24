@@ -1,31 +1,28 @@
-import {
-  Files,
-  Search,
-  GitBranch,
-  BookOpen,
-  Sun,
-  Moon,
-  Coffee,
-  Laptop,
-  Settings,
-} from "lucide-react";
+import React from "react";
+import { panelRegistry } from "../../core/panelRegistry";
 import { useTheme } from "../../contexts/ThemeContext";
+import { Sun, Moon, Coffee, Laptop, Settings } from "lucide-react";
 import "./ActivityBar.css";
 
-export type PanelId = "files" | "search" | "git" | "metadata" | null;
+export type PanelId = string | null;
 
 interface ActivityBarProps {
-  activePanel: PanelId;
-  onSelectPanel: (panel: PanelId) => void;
+  side?: "left" | "right";
+  activePanelId: string | null;
+  onSelectPanel: (panelId: string | null) => void;
   onOpenSettings?: () => void;
 }
 
 export const ActivityBar: React.FC<ActivityBarProps> = ({
-  activePanel,
+  side = "left",
+  activePanelId,
   onSelectPanel,
   onOpenSettings,
 }) => {
   const { theme, toggleTheme } = useTheme();
+
+  // レジストリから該当サイドのパネル一覧を取得
+  const panels = panelRegistry.getPanelsForSide(side);
 
   const getThemeIcon = () => {
     switch (theme) {
@@ -53,51 +50,50 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
     }
   };
 
-  const navItems = [
-    { id: "files" as const, title: "ファイル一覧 (Ctrl+Shift+E)", icon: <Files size={22} /> },
-    { id: "search" as const, title: "検索 (Ctrl+Shift+F)", icon: <Search size={22} /> },
-    { id: "git" as const, title: "執筆履歴 (Git)", icon: <GitBranch size={22} /> },
-    { id: "metadata" as const, title: "登場人物・設定資料", icon: <BookOpen size={22} /> },
-  ];
-
   return (
-    <aside className="activity-bar">
+    <aside className={`activity-bar side-${side}`} aria-label={`${side === "left" ? "左" : "右"}アクティビティバー`}>
       <div className="activity-bar-top">
-        {navItems.map((item) => (
+        {panels.map((panel) => {
+          const Icon = panel.icon;
+          const isActive = activePanelId === panel.id;
+          return (
+            <button
+              key={panel.id}
+              type="button"
+              className={`activity-button ${isActive ? "active" : ""}`}
+              onClick={() => onSelectPanel(isActive ? null : panel.id)}
+              title={panel.title}
+              aria-label={panel.title}
+            >
+              <Icon size={22} />
+            </button>
+          );
+        })}
+      </div>
+
+      {side === "left" && (
+        <div className="activity-bar-bottom">
           <button
-            key={item.id}
             type="button"
-            className={`activity-button ${activePanel === item.id ? "active" : ""}`}
-            onClick={() => onSelectPanel(activePanel === item.id ? null : item.id)}
-            title={item.title}
-            aria-label={item.title}
+            className="activity-button"
+            onClick={toggleTheme}
+            title={getThemeTitle()}
+            aria-label="テーマ切り替え"
           >
-            {item.icon}
+            {getThemeIcon()}
           </button>
-        ))}
-      </div>
 
-      <div className="activity-bar-bottom">
-        <button
-          type="button"
-          className="activity-button"
-          onClick={toggleTheme}
-          title={getThemeTitle()}
-          aria-label="テーマ切り替え"
-        >
-          {getThemeIcon()}
-        </button>
-
-        <button
-          type="button"
-          className="activity-button"
-          onClick={onOpenSettings}
-          title="環境設定"
-          aria-label="環境設定"
-        >
-          <Settings size={20} />
-        </button>
-      </div>
+          <button
+            type="button"
+            className="activity-button"
+            onClick={onOpenSettings}
+            title="環境設定"
+            aria-label="環境設定"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
+      )}
     </aside>
   );
 };

@@ -1,0 +1,68 @@
+.document-outline-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 13px;
+}
+
+.document-outline-header {
+  padding: 8px 14px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.document-outline-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px 0;
+  margin: 0;
+  list-style: none;
+}
+
+.document-outline-item {
+  display: flex;
+  align-items: center;
+  padding: 6px 14px;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  gap: 6px;
+}
+
+.document-outline-item:hover {
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}
+
+.document-outline-item.level-1 {
+  font-weight: 600;
+  padding-left: 14px;
+}
+
+.document-outline-item.level-2 {
+  padding-left: 26px;
+  color: var(--text-secondary);
+}
+
+.document-outline-item.level-3 {
+  padding-left: 38px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.document-outline-empty {
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 12px;
+}

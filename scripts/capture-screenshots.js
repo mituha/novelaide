@@ -52,6 +52,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/08"),
     path.join(rootDir, "making/notes/images/09"),
     path.join(rootDir, "making/notes/images/10"),
+    path.join(rootDir, "making/notes/images/11"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -75,7 +76,7 @@ async function capture() {
 
   for (const t of themes) {
     const context = await browser.newContext({
-      viewport: { width: 1100, height: 800 },
+      viewport: { width: 1200, height: 800 },
       deviceScaleFactor: 2,
     });
     const page = await context.newPage();
@@ -103,39 +104,24 @@ async function capture() {
       if (await previewBtn.isVisible()) {
         await previewBtn.click();
         await page.waitForSelector(".editor-split-container", { timeout: 5000 });
-        await page.waitForTimeout(800);
-
-        const splitOutPath = path.join(rootDir, `making/notes/images/09/09_スプリットビュー縦書きプレビュー_${t.name}.png`);
-        await page.screenshot({ path: splitOutPath });
-        console.log(`Saved: ${splitOutPath}`);
+        await page.waitForTimeout(600);
       }
 
-      // 2. characters フォルダを開いて「魔女_ルナ.md」を開く
-      const charFolder = page.locator(".folder-row", { hasText: "characters" });
-      if (await charFolder.isVisible()) {
-        await charFolder.click();
-        await page.waitForTimeout(300);
+      // 2. 右側アクティビティバーの見出しアウトラインボタンをクリックして右ペインを展開
+      const rightActivityBtn = page.locator(".activity-bar.side-right .activity-button").first();
+      if (await rightActivityBtn.isVisible()) {
+        await rightActivityBtn.click();
+        await page.waitForSelector(".side-pane-container.pane-right", { timeout: 5000 });
+        await page.waitForTimeout(800);
 
-        const lunaFile = page.locator(".file-row", { hasText: "魔女_ルナ.md" });
-        if (await lunaFile.isVisible()) {
-          await lunaFile.click();
-          await page.waitForTimeout(800);
+        // 左右ペイン（左: ファイルツリー、中央: スプリットエディター、右: アウトライン）の撮影 (11)
+        const uiOutPath = path.join(rootDir, `making/notes/images/11/11_統合UIプラグイン左右対称ペイン_${t.name}.png`);
+        await page.screenshot({ path: uiOutPath });
+        console.log(`Saved: ${uiOutPath}`);
 
-          // プレビューボタンを押してMarkdown拡張プレビューを表示
-          const lunaPreviewBtn = page.locator(".editor-tab-action-btn");
-          if (await lunaPreviewBtn.isVisible()) {
-            await lunaPreviewBtn.click();
-            await page.waitForTimeout(1500); // Mermaid / Map の描画待機
-
-            const mdOutPath = path.join(rootDir, `making/notes/images/10/10_Markdown拡張プレビュー_${t.name}.png`);
-            await page.screenshot({ path: mdOutPath });
-            console.log(`Saved: ${mdOutPath}`);
-
-            if (t.id === "dark") {
-              fs.copyFileSync(mdOutPath, path.join(rootDir, "docs/dev/images/10_Markdown拡張プレビュー_ダークモード.png"));
-              fs.copyFileSync(mdOutPath, path.join(rootDir, "docs/manual/images/10_Markdown拡張プレビュー_ダークモード.png"));
-            }
-          }
+        if (t.id === "dark") {
+          fs.copyFileSync(uiOutPath, path.join(rootDir, "docs/dev/images/11_統合UIプラグイン左右対称ペイン_ダークモード.png"));
+          fs.copyFileSync(uiOutPath, path.join(rootDir, "docs/manual/images/11_統合UIプラグイン左右対称ペイン_ダークモード.png"));
         }
       }
     } catch (e) {

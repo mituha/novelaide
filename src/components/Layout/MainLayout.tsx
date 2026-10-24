@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { ActivityBar, PanelId } from "./ActivityBar";
+import { ActivityBar } from "./ActivityBar";
 import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
 import { useProject } from "../../contexts/ProjectContext";
@@ -15,7 +15,12 @@ interface MainLayoutProps {
 }
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
-  const [activePanel, setActivePanel] = useState<PanelId>("files");
+  // 左ペイン・右ペインのアクティブパネルID
+  const [leftActivePanelId, setLeftActivePanelId] = useState<string | null>(
+    "novelaid.panel.files"
+  );
+  const [rightActivePanelId, setRightActivePanelId] = useState<string | null>(null);
+
   const [selectedText, setSelectedText] = useState("");
   const [splitRatio, setSplitRatio] = useState<number>(0.5); // 左右分割比率 (0.2 ~ 0.8)
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -24,10 +29,8 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   const { projectName, projectPath } = useProject();
   const {
     openDocuments,
-    activePath,
     activeDocument,
     isSplitActive,
-    openDocument,
     updateContent,
   } = useDocument();
 
@@ -86,22 +89,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
       <div className="main-layout-body">
         {/* 左端アクティビティバー */}
         <ActivityBar
-          activePanel={activePanel}
-          onSelectPanel={setActivePanel}
+          side="left"
+          activePanelId={leftActivePanelId}
+          onSelectPanel={setLeftActivePanelId}
           onOpenSettings={() => alert("環境設定モーダル（Step 5で実装予定）")}
         />
 
-        {/* 開閉式サイドペイン */}
+        {/* 左サイドペイン (プロジェクト全体) */}
         <SidePane
-          activePanel={activePanel}
-          onClose={() => setActivePanel(null)}
+          paneSide="left"
+          activePanelId={leftActivePanelId}
+          onClose={() => setLeftActivePanelId(null)}
           onOpenLauncher={onOpenLauncher}
-          onSelectFile={(file) => {
-            if (!file.isDirectory) {
-              openDocument(file.path);
-            }
-          }}
-          selectedFilePath={activePath}
         />
 
         {/* メイン執筆領域 / ワークスペース */}
@@ -200,6 +199,21 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
             </div>
           )}
         </main>
+
+        {/* 右サイドペイン (ドキュメント個別) */}
+        <SidePane
+          paneSide="right"
+          activePanelId={rightActivePanelId}
+          onClose={() => setRightActivePanelId(null)}
+          onOpenLauncher={onOpenLauncher}
+        />
+
+        {/* 右端アクティビティバー */}
+        <ActivityBar
+          side="right"
+          activePanelId={rightActivePanelId}
+          onSelectPanel={setRightActivePanelId}
+        />
       </div>
 
       {/* 最下部ステータスバー */}
@@ -208,6 +222,18 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
         selectedMetrics={selectedMetrics}
         activePath={activeDocument?.path}
         documentType={activeDocument?.documentType}
+        onToggleSidePane={() =>
+          setLeftActivePanelId((prev) =>
+            prev ? null : "novelaid.panel.files"
+          )
+        }
+        isSidePaneVisible={!!leftActivePanelId}
+        onToggleRightPane={() =>
+          setRightActivePanelId((prev) =>
+            prev ? null : "novelaid.panel.outline"
+          )
+        }
+        isRightPaneVisible={!!rightActivePanelId}
       />
     </div>
   );
