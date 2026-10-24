@@ -1,5 +1,6 @@
 import { invoke } from '@tauri-apps/api/core';
 import { Agent, type AgentEvent, type StreamFn } from '@earendil-works/pi-agent-core';
+import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';
 import { DEFAULT_LM_STUDIO_URL, fetchLmStudioModels } from './modelManager';
 import { Persona, AgentSessionEvent } from '../types';
 import { getPersonaPrompt } from '../domain/guidelines';
@@ -19,13 +20,15 @@ export interface PiAgentSessionOptions {
 
 /**
  * LM Studio / OpenAI 互換のブラウザセーフな StreamFn
- * pi-agent-core 公式の StreamFn(model, context, options) 規約に準拠
+ * pi-agent-core / pi-ai の AssistantMessageEventStream プロトコルに完全準拠
  */
 function createBrowserStreamFn(
   baseUrl: string = DEFAULT_LM_STUDIO_URL,
   defaultModel: string = 'lm-studio/qwen2.5-7b-instruct'
 ): StreamFn {
-  return async (modelOrMessages: any, contextOrOptions: any, maybeOptions?: any) => {
+  return (modelOrMessages: any, contextOrOptions: any, maybeOptions?: any) => {
+    const stream = createAssistantMessageEventStream();
+
     let messagesList: any[] = [];
     let signal: AbortSignal | undefined;
     let modelName = defaultModel;
@@ -52,7 +55,20 @@ function createBrowserStreamFn(
       tool_call_id: m.tool_call_id || m.toolCallId,
     }));
 
-    async function* eventGenerator(): AsyncGenerator<any, void, unknown> {
+    // 非同期でストリーミング通信を開始
+    (async () => {
+      console.groupCollapsed(`%c[Novelaid AI] リクエスト送信 🚀 (${modelName})`, 'color: #3b82f6; font-weight: bold;');
+      console.log('エンドポイント:', endpoint);
+      console.log('メッセージ履歴:', apiMessages);
+      console.groupEnd();
+
+      const partial: any = { role: 'assistant', content: [{ type: 'text', text: '' }] };
+      stream.push({ type: 'start', partial });
+      stream.push({ type: 'text_start', contentIndex: 0, partial });
+
+      let receivedTokenCount = 0;
+      let fullResponseText = '';
+
       try {
         const res = await fetch(endpoint, {
           method: 'POST',
@@ -66,7 +82,7 @@ function createBrowserStreamFn(
         });
 
         if (!res.ok || !res.body) {
-          throw new Error(`LM Studio HTTP ${res.status}`);
+          throw new Error(`LM Studio HTTP ${res.status}: ${res.statusText}`);
         }
 
         const reader = res.body.getReader();
@@ -86,8 +102,7 @@ function createBrowserStreamFn(
             if (!trimmed || !trimmed.startsWith('data: ')) continue;
             const dataStr = trimmed.slice(6);
             if (dataStr === '[DONE]') {
-              yield { type: 'done' };
-              return;
+              break;
             }
 
             try {
@@ -96,43 +111,75 @@ function createBrowserStreamFn(
               const delta = choice?.delta;
 
               if (delta?.content) {
-                yield {
-                  type: 'message_update',
-                  assistantMessageEvent: {
-                    type: 'text_delta',
-                    delta: delta.content,
-                  },
-                  delta: delta.content,
-                };
+                const token = delta.content;
+                receivedTokenCount++;
+                fullResponseText += token;
+                partial.content[0].text = fullResponseText;
+
+                // pi-agent-core 規格: partial を必ず含めて text_delta を送出
+                stream.push({
+                  type: 'text_delta',
+                  contentIndex: 0,
+                  delta: token,
+                  partial: { ...partial, content: [{ type: 'text', text: fullText(fullResponseText) }] },
+                });
               }
             } catch {
-              // JSON パースエラーは無視
+              // JSON パースエラーはスキップ
             }
           }
         }
-        yield { type: 'done' };
-      } catch (err: any) {
-        // オフライン・未接続時の安全なフォールバック
-        const fallbackText = `\n（※LM Studio への接続が検出されなかったため、ローカル補助モードで動作しています）\n\nご質問を受け付けました。執筆パートナーとして原稿を分析します。`;
-        yield {
-          type: 'message_update',
-          assistantMessageEvent: {
-            type: 'text_delta',
-            delta: fallbackText,
-          },
-          delta: fallbackText,
-        };
-        yield { type: 'done' };
-      }
-    }
 
-    return eventGenerator() as any;
+        console.log(
+          `%c[Novelaid AI] 受信完了 ✅ (トークン数: ${receivedTokenCount}, 文字数: ${fullResponseText.length})`,
+          'color: #10b981; font-weight: bold;',
+          '\n応答本文プレビュー:',
+          fullResponseText.slice(0, 100) + (fullResponseText.length > 100 ? '...' : '')
+        );
+
+        stream.push({ type: 'text_end', contentIndex: 0, partial });
+        stream.end({
+          role: 'assistant',
+          content: [{ type: 'text', text: fullResponseText }],
+          stopReason: 'stop',
+        });
+      } catch (err: any) {
+        console.warn(
+          `%c[Novelaid AI] LM Studio 通信エラー / オフラインフォールバック ⚠️: ${err.message}`,
+          'color: #f59e0b; font-weight: bold;'
+        );
+
+        const fallbackText = `\n（※LM Studio への接続が検出されなかったため、ローカル補助モードで動作しています）\n\nご質問を受け付けました。執筆パートナーとして原稿を分析します。`;
+        fullResponseText = fallbackText;
+        partial.content[0].text = fullResponseText;
+
+        stream.push({
+          type: 'text_delta',
+          contentIndex: 0,
+          delta: fallbackText,
+          partial: { ...partial, content: [{ type: 'text', text: fallbackText }] },
+        });
+
+        stream.push({ type: 'text_end', contentIndex: 0, partial });
+        stream.end({
+          role: 'assistant',
+          content: [{ type: 'text', text: fullResponseText }],
+          stopReason: 'stop',
+        });
+      }
+    })();
+
+    return stream;
   };
+}
+
+function fullText(text: string): string {
+  return text;
 }
 
 /**
  * Pi SDK（pi-agent-core）準拠の執筆エージェントセッション管理クラス
- * ブラウザ/WebView 環境で安全に動作し、Node.js 固有パッケージによるクラッシュを防止
+ * ブラウザ/WebView 環境で安全に動作し、送受信ログをリアルタイム出力
  */
 export class PiWritingAgentSession {
   private agent: Agent | null = null;
@@ -169,6 +216,7 @@ export class PiWritingAgentSession {
       },
       streamFn,
       beforeToolCall: async (context: any) => {
+        console.log('%c[Novelaid AI] ツール実行開始 🔧:', 'color: #8b5cf6;', context.toolName, context.params);
         this.onEvent?.({
           type: 'tool_call_start',
           toolName: context.toolName || 'tool',
@@ -178,6 +226,7 @@ export class PiWritingAgentSession {
         return undefined;
       },
       afterToolCall: async (context: any) => {
+        console.log('%c[Novelaid AI] ツール実行完了 🔧:', 'color: #8b5cf6;', context.toolName, context.result);
         this.onEvent?.({
           type: 'tool_call_end',
           toolName: context.toolName || 'tool',
@@ -202,15 +251,17 @@ export class PiWritingAgentSession {
     switch (event.type) {
       case 'turn_start':
       case 'message_start':
-        this.onEvent?.({
-          type: 'message_start',
-          role: 'assistant',
-          messageId: `msg_${Date.now()}`,
-        });
+        if (event.message?.role === 'assistant' || event.type === 'message_start') {
+          this.onEvent?.({
+            type: 'message_start',
+            role: 'assistant',
+            messageId: `msg_${Date.now()}`,
+          });
+        }
         break;
 
       case 'message_update':
-        const delta = event.delta || event.assistantMessageEvent?.delta || '';
+        const delta = event.assistantMessageEvent?.delta || event.delta || '';
         if (delta) {
           this.onToken?.(delta);
           this.onEvent?.({
@@ -240,11 +291,12 @@ export class PiWritingAgentSession {
         promptText = `${text}\n\n【参照コンテキスト】\n${contextContent.trim()}`;
       }
 
+      console.log('%c[Novelaid AI] プロンプト実行開始 💬:', 'color: #3b82f6;', promptText.slice(0, 100));
       await (this.agent as any).prompt(promptText);
       return '';
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.warn('[PiWritingAgentSession] prompt 失敗:', message);
+      console.error('%c[Novelaid AI] prompt エラー ❌:', 'color: #ef4444;', message);
       this.onEvent?.({
         type: 'turn_end',
         status: 'success',

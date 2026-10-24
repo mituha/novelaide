@@ -262,6 +262,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         contextContent,
         toolExecutor: useTools ? toolExecutor : undefined,
         onToken: (delta) => {
+          console.log('[AIChatPanel] トークン描画更新:', delta);
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === assistantMsgId ? { ...msg, content: msg.content + delta } : msg
@@ -269,6 +270,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
           );
         },
         onEvent: (event) => {
+          console.log('[AIChatPanel] エージェントイベント受信:', event.type, event);
           if (event.type === 'tool_call_start') {
             const toolLabel =
               event.toolName === 'scan_proofread' || event.toolName === 'proofread_scan'

@@ -109,3 +109,6 @@ UI側は `session.subscribe` で届くイベント（`message_start`, `message_u
 5. **ビルド検証 & 動作確認 (完了)**:
    - `npm run build:plugin:ai`（Rollup）および `npm run build`（Vite + TypeScript）のバンドル成功を確認。
 6. **日次作業ログ・メイキング更新 & バージョン更新（`npm version patch`） (完了)**。
+7. **ストリーミングプロトコル準拠と送受信ログ強化 (完了)**:
+   - `@earendil-works/pi-agent-core` の `agentLoop`（`runLoop`）における `partialMessage` 保持要件（各 `text_delta` イベントに `event.partial` が必須であること）の解明と `AssistantMessageEventStream` 準拠実装。
+   - ブラウザ開発者コンソール（F12）における送受信詳細ログ（リクエスト、SSEトークン受信数、描画更新、エージェントライフサイクル、エラー）の構造化出力。
