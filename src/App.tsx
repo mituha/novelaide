@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
+import { DocumentProvider } from "./contexts/DocumentContext";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
 import "./styles/theme.css";
@@ -28,7 +29,9 @@ function App() {
   return (
     <ThemeProvider>
       <ProjectProvider>
-        <AppContent />
+        <DocumentProvider>
+          <AppContent />
+        </DocumentProvider>
       </ProjectProvider>
     </ThemeProvider>
   );

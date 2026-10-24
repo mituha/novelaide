@@ -1,0 +1,83 @@
+.editor-tabs-bar {
+  display: flex;
+  height: 36px;
+  background-color: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  overflow-x: auto;
+  overflow-y: hidden;
+  user-select: none;
+}
+
+.editor-tabs-bar::-webkit-scrollbar {
+  height: 3px;
+}
+
+.editor-tabs-bar::-webkit-scrollbar-thumb {
+  background: var(--border-color);
+  border-radius: 2px;
+}
+
+.editor-tabs-list {
+  display: flex;
+  align-items: stretch;
+}
+
+.editor-tab-item {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0 0.8rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  background-color: transparent;
+  border-right: 1px solid var(--border-color);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.editor-tab-item:hover {
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}
+
+.editor-tab-item.active {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border-bottom: 2px solid var(--accent-color);
+  font-weight: 500;
+}
+
+.tab-title {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dirty-indicator {
+  font-size: 8px;
+  color: var(--accent-color);
+  margin-left: 2px;
+}
+
+.tab-close-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  opacity: 0.7;
+  transition: all 0.15s ease;
+}
+
+.tab-close-btn:hover {
+  opacity: 1;
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}

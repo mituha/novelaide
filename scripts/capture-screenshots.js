@@ -48,6 +48,7 @@ async function capture() {
 
   const outDirs = [
     path.join(rootDir, "making/notes/images/05"),
+    path.join(rootDir, "making/notes/images/07"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -64,11 +65,12 @@ async function capture() {
   const url = `http://localhost:${port}`;
 
   const themes = [
-    { name: "ダークモード", id: "dark", file: "05_ファイルエクスプローラー_ダークモード.png" },
-    { name: "ライトモード", id: "light", file: "05_ファイルエクスプローラー_ライトモード.png" },
-    { name: "セピアモード", id: "sepia", file: "05_ファイルエクスプローラー_セピアモード.png" },
+    { name: "ダークモード", id: "dark" },
+    { name: "ライトモード", id: "light" },
+    { name: "セピアモード", id: "sepia" },
   ];
 
+  // 1. ファイルエクスプローラー（05）の撮影
   for (const t of themes) {
     const context = await browser.newContext({
       viewport: { width: 1024, height: 768 },
@@ -77,7 +79,6 @@ async function capture() {
     const page = await context.newPage();
     await page.goto(url, { waitUntil: "networkidle" });
 
-    // 作品を開いた状態（エディター画面表示）を設定
     await page.evaluate(({ themeId }) => {
       localStorage.setItem("novelaide-theme", themeId);
       localStorage.setItem("novelaide-current-project", "D:\\Novels\\猫と魔法使いの旅路");
@@ -86,21 +87,38 @@ async function capture() {
 
     await page.reload({ waitUntil: "networkidle" });
 
-    // フォルダ「characters」を展開する
     try {
       const folder = page.locator(".folder-row", { hasText: "characters" });
       await folder.click();
       await page.waitForTimeout(300);
-    } catch {
-      // 展開できなくても続行
-    }
+    } catch {}
 
-    const outPath = path.join(rootDir, `making/notes/images/05/${t.file}`);
+    const outPath = path.join(rootDir, `making/notes/images/05/05_ファイルエクスプローラー_${t.name}.png`);
     await page.screenshot({ path: outPath });
     console.log(`Saved: ${outPath}`);
 
-    fs.copyFileSync(outPath, path.join(rootDir, `docs/manual/images/${t.file}`));
-    fs.copyFileSync(outPath, path.join(rootDir, `docs/dev/images/${t.file}`));
+    // 2. 本文エディター（07）の撮影: ファイルをクリックしてエディターを開く
+    try {
+      const fileItem = page.locator(".file-row", { hasText: "01_プロローグ.md" });
+      await fileItem.waitFor({ timeout: 5000 });
+      await fileItem.click();
+
+      // Monaco Editor のレンダリング完了を待機
+      await page.waitForSelector(".monaco-editor", { timeout: 10000 });
+      await page.waitForTimeout(1500);
+
+      const editorOutPath = path.join(rootDir, `making/notes/images/07/07_小説エディター_${t.name}.png`);
+      await page.screenshot({ path: editorOutPath });
+      console.log(`Saved: ${editorOutPath}`);
+
+      // docs/manual, docs/dev へもコピー
+      if (t.id === "dark") {
+        fs.copyFileSync(editorOutPath, path.join(rootDir, "docs/dev/images/07_小説エディター_ダークモード.png"));
+        fs.copyFileSync(editorOutPath, path.join(rootDir, "docs/manual/images/07_小説エディター_ダークモード.png"));
+      }
+    } catch (e) {
+      console.warn("エディター撮影スキップ:", e);
+    }
 
     await context.close();
   }
