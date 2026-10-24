@@ -8,7 +8,10 @@
     "build": "tsc && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "build:plugin": "npm run build --prefix tauri-plugin-novelaid-fs",
+    "build:plugin:fs": "npm run build --prefix tauri-plugin-novelaid-fs",
+    "build:plugin:ai": "npm run build --prefix tauri-plugin-novelaid-ai",
+    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai",
+    "build:plugin": "npm run build:plugins",
     "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin"
   },
   "dependencies": {
