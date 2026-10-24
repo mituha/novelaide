@@ -1,37 +1,241 @@
 .status-bar {
-  height: 24px;
-  background-color: var(--bg-status-bar);
-  color: var(--bg-status-bar-text);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 10px;
+  height: 24px;
+  background-color: var(--bg-tertiary);
+  border-top: 1px solid var(--border-color);
   font-size: 0.75rem;
+  color: var(--text-secondary);
+  padding: 0 0.5rem;
   user-select: none;
-  flex-shrink: 0;
-  z-index: 10;
+  position: relative;
+  z-index: 50;
 }
 
 .status-bar-left,
 .status-bar-right {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 0.6rem;
+}
+
+.status-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 3px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.status-action-btn:hover {
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}
+
+.status-action-btn.inactive {
+  opacity: 0.5;
+}
+
+.status-file-info {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.status-file-name {
+  font-weight: 500;
+  color: var(--text-primary);
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.status-doc-badge {
+  font-size: 0.65rem;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background-color: var(--hover-color);
+  color: var(--accent-color);
+  text-transform: uppercase;
+}
+
+.status-no-file {
+  color: var(--text-muted);
+  font-style: italic;
 }
 
 .status-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 2px 4px;
-  border-radius: 3px;
-  line-height: 1;
+  gap: 0.3rem;
 }
 
 .status-item.clickable {
   cursor: pointer;
+  padding: 1px 4px;
+  border-radius: 3px;
+  transition: background-color 0.15s ease;
 }
 
 .status-item.clickable:hover {
-  background-color: rgba(255, 255, 255, 0.2);
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}
+
+/* 文字数トリガー */
+.status-char-count-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-weight: 500;
+  transition: all 0.15s ease;
+}
+
+.status-char-count-trigger:hover {
+  background-color: var(--hover-color);
+  color: var(--accent-color);
+}
+
+.status-metric-highlight {
+  color: #f59e0b;
+  font-weight: 600;
+}
+
+/* 文字数詳細分析ポップアップ */
+.char-count-popup {
+  position: absolute;
+  bottom: 28px;
+  right: 12px;
+  width: 320px;
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  padding: 0.8rem;
+  color: var(--text-primary);
+  animation: popupFadeIn 0.15s ease-out;
+}
+
+@keyframes popupFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.char-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.6rem;
+  padding-bottom: 0.3rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.char-popup-title {
+  font-weight: 600;
+  font-size: 0.85rem;
+  color: var(--accent-color);
+}
+
+.char-popup-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 1.1rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+
+.char-popup-close-btn:hover {
+  color: var(--text-primary);
+}
+
+.char-popup-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.8rem;
+}
+
+.char-section-title {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 0.3rem;
+}
+
+.char-popup-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.75rem;
+}
+
+.char-popup-table td {
+  padding: 2px 0;
+}
+
+.char-col-label {
+  color: var(--text-secondary);
+}
+
+.char-col-value {
+  text-align: right;
+  font-weight: 500;
+}
+
+.highlight-sheets {
+  color: var(--accent-color);
+  font-weight: 700;
+}
+
+/* 文体比率バー (セリフ / 地の文) */
+.char-ratio-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 4px;
+  overflow: hidden;
+  background-color: var(--border-color);
+  margin-bottom: 0.3rem;
+}
+
+.char-ratio-dialogue {
+  background-color: #10b981; /* グリーン（セリフ） */
+  transition: width 0.2s ease;
+}
+
+.char-ratio-narrative {
+  background-color: #3b82f6; /* ブルー（地の文） */
+  transition: width 0.2s ease;
+}
+
+.char-ratio-labels {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 0.7rem;
+}
+
+.char-label-dialogue {
+  color: #10b981;
+}
+
+.char-label-narrative {
+  color: #3b82f6;
 }

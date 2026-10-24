@@ -1,9 +1,10 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ActivityBar, PanelId } from "./ActivityBar";
 import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
 import { useProject } from "../../contexts/ProjectContext";
 import { useDocument } from "../../contexts/DocumentContext";
+import { useCharacterCount } from "../../hooks/useCharacterCount";
 import { EditorTabs } from "../Editor/EditorTabs";
 import { CodeEditor } from "../Editor/CodeEditor";
 import { Feather, FolderOpen, PlusCircle } from "lucide-react";
@@ -15,8 +16,28 @@ interface MainLayoutProps {
 
 export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   const [activePanel, setActivePanel] = useState<PanelId>("files");
+  const [selectedText, setSelectedText] = useState("");
   const { projectName, projectPath } = useProject();
   const { openDocuments, activePath, activeDocument, openDocument, updateContent } = useDocument();
+
+  // 選択テキスト変更イベントの受信
+  useEffect(() => {
+    const handleSelectionChange = (e: any) => {
+      setSelectedText(e.detail?.text || "");
+    };
+
+    window.addEventListener("editor-selection-change", handleSelectionChange);
+    return () => {
+      window.removeEventListener("editor-selection-change", handleSelectionChange);
+    };
+  }, []);
+
+  // リアルタイム文字数・原稿用紙換算カウント
+  const { detailedMetrics, selectedMetrics } = useCharacterCount(
+    activeDocument?.content || "",
+    selectedText,
+    150
+  );
 
   return (
     <div className="main-layout-root">
@@ -50,7 +71,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
                 <CodeEditor
                   path={activeDocument.path}
                   value={activeDocument.content}
-                  language={activeDocument.documentType === 'novel' ? 'novel' : 'markdown'}
+                  language={activeDocument.documentType === "novel" ? "novel" : "markdown"}
                   onChange={(val) => updateContent(activeDocument.path, val || "")}
                 />
               </div>
@@ -95,7 +116,15 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
       </div>
 
       {/* 下部ステータスバー */}
-      <StatusBar />
+      <StatusBar
+        detailedMetrics={detailedMetrics}
+        selectedMetrics={selectedMetrics}
+        activePath={activePath}
+        documentType={activeDocument?.documentType}
+        onOpenLauncher={onOpenLauncher}
+        onToggleSidePane={() => setActivePanel(activePanel ? null : "files")}
+        isSidePaneVisible={activePanel !== null}
+      />
     </div>
   );
 };

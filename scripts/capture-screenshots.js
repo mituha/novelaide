@@ -49,6 +49,7 @@ async function capture() {
   const outDirs = [
     path.join(rootDir, "making/notes/images/05"),
     path.join(rootDir, "making/notes/images/07"),
+    path.join(rootDir, "making/notes/images/08"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -70,7 +71,6 @@ async function capture() {
     { name: "セピアモード", id: "sepia" },
   ];
 
-  // 1. ファイルエクスプローラー（05）の撮影
   for (const t of themes) {
     const context = await browser.newContext({
       viewport: { width: 1024, height: 768 },
@@ -87,17 +87,7 @@ async function capture() {
 
     await page.reload({ waitUntil: "networkidle" });
 
-    try {
-      const folder = page.locator(".folder-row", { hasText: "characters" });
-      await folder.click();
-      await page.waitForTimeout(300);
-    } catch {}
-
-    const outPath = path.join(rootDir, `making/notes/images/05/05_ファイルエクスプローラー_${t.name}.png`);
-    await page.screenshot({ path: outPath });
-    console.log(`Saved: ${outPath}`);
-
-    // 2. 本文エディター（07）の撮影: ファイルをクリックしてエディターを開く
+    // ファイル「01_プロローグ.md」をクリックしてエディターを開く
     try {
       const fileItem = page.locator(".file-row", { hasText: "01_プロローグ.md" });
       await fileItem.waitFor({ timeout: 5000 });
@@ -105,19 +95,30 @@ async function capture() {
 
       // Monaco Editor のレンダリング完了を待機
       await page.waitForSelector(".monaco-editor", { timeout: 10000 });
-      await page.waitForTimeout(1500);
+      await page.waitForTimeout(1000);
 
+      // 1. エディター画面全体の撮影 (07)
       const editorOutPath = path.join(rootDir, `making/notes/images/07/07_小説エディター_${t.name}.png`);
       await page.screenshot({ path: editorOutPath });
       console.log(`Saved: ${editorOutPath}`);
 
-      // docs/manual, docs/dev へもコピー
+      // 2. 文字数トリガーをクリックして詳細分析ポップアップを展開 (08)
+      const charTrigger = page.locator(".status-char-count-trigger");
+      await charTrigger.waitFor({ timeout: 5000 });
+      await charTrigger.click();
+      await page.waitForSelector(".char-count-popup", { timeout: 3000 });
+      await page.waitForTimeout(500);
+
+      const statusOutPath = path.join(rootDir, `making/notes/images/08/08_文字数カウント詳細分析_${t.name}.png`);
+      await page.screenshot({ path: statusOutPath });
+      console.log(`Saved: ${statusOutPath}`);
+
       if (t.id === "dark") {
-        fs.copyFileSync(editorOutPath, path.join(rootDir, "docs/dev/images/07_小説エディター_ダークモード.png"));
-        fs.copyFileSync(editorOutPath, path.join(rootDir, "docs/manual/images/07_小説エディター_ダークモード.png"));
+        fs.copyFileSync(statusOutPath, path.join(rootDir, "docs/dev/images/08_文字数カウント詳細分析_ダークモード.png"));
+        fs.copyFileSync(statusOutPath, path.join(rootDir, "docs/manual/images/08_文字数カウント詳細分析_ダークモード.png"));
       }
     } catch (e) {
-      console.warn("エディター撮影スキップ:", e);
+      console.warn("撮影スキップ:", e);
     }
 
     await context.close();
