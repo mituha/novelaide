@@ -2,6 +2,7 @@ import React, { useCallback, useRef, useEffect } from 'react';
 import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDocument } from '../../contexts/DocumentContext';
+import { useSettings } from '../../contexts/SettingsContext';
 import { EditorSupport } from './EditorSupport';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';
@@ -24,6 +25,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const { effectiveTheme } = useTheme();
   const { saveDocument } = useDocument();
+  const { settings } = useSettings();
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const saveDocumentRef = useRef(saveDocument);
@@ -121,12 +123,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         theme={getTheme()}
         options={{
           readOnly: isReadOnly,
-          wordWrap: 'on',
-          minimap: { enabled: false }, // 小説執筆時はミニマップをオフにしてすっきり表示
-          fontSize: 16,
-          lineHeight: 28, // 小説の読みやすさに適したゆったりとした行間
-          fontFamily: "'Yu Gothic', 'Meiryo', 'Hiragino Mincho ProN', sans-serif",
-          lineNumbers: 'on',
+          wordWrap: settings.editorWordWrap || 'on',
+          minimap: { enabled: !!settings.editorMinimap },
+          fontSize: settings.editorFontSize ?? 16,
+          lineHeight: Math.round((settings.editorFontSize ?? 16) * (settings.editorLineHeight ?? 1.8)),
+          fontFamily: settings.editorFontFamily || "'Yu Gothic', 'Meiryo', 'Hiragino Mincho ProN', sans-serif",
+          lineNumbers: settings.editorLineNumbers || 'on',
           renderWhitespace: 'all',
           renderControlCharacters: true,
           scrollBeyondLastLine: false,

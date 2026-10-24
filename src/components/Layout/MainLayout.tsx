@@ -4,6 +4,7 @@ import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
 import { useProject } from "../../contexts/ProjectContext";
 import { useDocument } from "../../contexts/DocumentContext";
+import { useSettings } from "../../contexts/SettingsContext";
 import { useCharacterCount } from "../../hooks/useCharacterCount";
 import { EditorTabs } from "../Editor/EditorTabs";
 import { DocumentPane } from "../DocumentPane/DocumentPane";
@@ -27,6 +28,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
   const { projectName, projectPath } = useProject();
+  const { openSettings } = useSettings();
   const {
     openDocuments,
     activeDocument,
@@ -92,7 +94,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
           side="left"
           activePanelId={leftActivePanelId}
           onSelectPanel={setLeftActivePanelId}
-          onOpenSettings={() => alert("環境設定モーダル（Step 5で実装予定）")}
+          onOpenSettings={() => openSettings()}
         />
 
         {/* 左サイドペイン (プロジェクト全体) */}

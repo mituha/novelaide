@@ -1,8 +1,10 @@
 import { useState } from "react";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { SettingsProvider } from "./contexts/SettingsContext";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
 import { MainLayout } from "./components/Layout/MainLayout";
+import { SettingsModal } from "./components/Settings/SettingsModal";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
 import "./styles/theme.css";
 import "./App.css";
@@ -28,11 +30,14 @@ function AppContent() {
 function App() {
   return (
     <ThemeProvider>
-      <ProjectProvider>
-        <DocumentProvider>
-          <AppContent />
-        </DocumentProvider>
-      </ProjectProvider>
+      <SettingsProvider>
+        <ProjectProvider>
+          <DocumentProvider>
+            <AppContent />
+            <SettingsModal />
+          </DocumentProvider>
+        </ProjectProvider>
+      </SettingsProvider>
     </ThemeProvider>
   );
 }

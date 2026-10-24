@@ -55,6 +55,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/11"),
     path.join(rootDir, "making/notes/images/12"),
     path.join(rootDir, "making/notes/images/13"),
+    path.join(rootDir, "making/notes/images/14"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -132,6 +133,29 @@ async function capture() {
         if (t.id === "dark") {
           fs.copyFileSync(searchOutPath, path.join(rootDir, "docs/dev/images/13_汎用検索パネル結果ツリー_ダークモード.png"));
           fs.copyFileSync(searchOutPath, path.join(rootDir, "docs/manual/images/13_汎用検索パネル結果ツリー_ダークモード.png"));
+        }
+      }
+
+      // 3. 左アクティビティバー最下部の環境設定（歯車アイコン）をクリックして SettingsModal を開く
+      const settingsNavBtn = page.locator('.activity-bar.side-left .activity-button[title="環境設定"]');
+      if (await settingsNavBtn.isVisible()) {
+        await settingsNavBtn.click();
+        await page.waitForSelector(".settings-modal-container", { timeout: 5000 });
+
+        // 「エディター」タブを選択してエディター設定画面を展開
+        const editorTabBtn = page.locator('.settings-nav-item:has-text("エディター")');
+        if (await editorTabBtn.isVisible()) {
+          await editorTabBtn.click();
+          await page.waitForTimeout(400);
+        }
+
+        const settingsOutPath = path.join(rootDir, `making/notes/images/14/14_環境設定モーダル_${t.name}.png`);
+        await page.screenshot({ path: settingsOutPath });
+        console.log(`Saved: ${settingsOutPath}`);
+
+        if (t.id === "dark") {
+          fs.copyFileSync(settingsOutPath, path.join(rootDir, "docs/dev/images/14_環境設定モーダル_ダークモード.png"));
+          fs.copyFileSync(settingsOutPath, path.join(rootDir, "docs/manual/images/14_環境設定モーダル_ダークモード.png"));
         }
       }
     } catch (e) {

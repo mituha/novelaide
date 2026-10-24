@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { transformToHtml } from 'novelaid-ruby';
 import { DocumentViewProps } from '../../types/viewPlugin';
+import { useSettings } from '../../contexts/SettingsContext';
 import { BookOpen, AlignLeft, ZoomIn, ZoomOut } from 'lucide-react';
 import './NovelPreview.css';
 
@@ -10,10 +11,12 @@ interface NovelPreviewProps extends DocumentViewProps {
 
 export const NovelPreview: React.FC<NovelPreviewProps> = ({
   content,
-  initialVertical = true,
+  initialVertical,
 }) => {
-  const [isVertical, setIsVertical] = useState<boolean>(initialVertical);
-  const [fontSize, setFontSize] = useState<number>(17);
+  const { settings } = useSettings();
+  const defaultVertical = initialVertical ?? (settings.previewWritingMode !== 'horizontal-tb');
+  const [isVertical, setIsVertical] = useState<boolean>(defaultVertical);
+  const [fontSize, setFontSize] = useState<number>(settings.previewFontSize ?? 17);
 
   // novelaid-ruby によるルビ・傍点HTML変換
   const formattedHtml = useMemo(() => {
@@ -83,7 +86,10 @@ export const NovelPreview: React.FC<NovelPreviewProps> = ({
       >
         <div
           className={`novel-paper ${isVertical ? 'is-vertical' : 'is-horizontal'}`}
-          style={{ fontSize: `${fontSize}px` }}
+          style={{
+            fontSize: `${fontSize}px`,
+            fontFamily: settings.previewFontFamily || undefined,
+          }}
           dangerouslySetInnerHTML={{ __html: formattedHtml }}
         />
       </div>
