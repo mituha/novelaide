@@ -9,6 +9,7 @@ interface SidePaneProps {
   activePanelId: string | null;
   onClose: () => void;
   onOpenLauncher?: () => void;
+  onOpenFileDiff?: (filePath: string, staged: boolean) => void;
 }
 
 export const SidePane: React.FC<SidePaneProps> = ({
@@ -16,6 +17,7 @@ export const SidePane: React.FC<SidePaneProps> = ({
   activePanelId,
   onClose,
   onOpenLauncher,
+  onOpenFileDiff,
 }) => {
   const [width, setWidth] = useState(260);
   const isResizing = useRef(false);
@@ -95,6 +97,7 @@ export const SidePane: React.FC<SidePaneProps> = ({
           activeDocument={activeDocument}
           onClose={onClose}
           onOpenLauncher={onOpenLauncher}
+          onOpenFileDiff={onOpenFileDiff}
         />
       </div>
 

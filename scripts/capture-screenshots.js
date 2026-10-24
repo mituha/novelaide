@@ -56,6 +56,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/12"),
     path.join(rootDir, "making/notes/images/13"),
     path.join(rootDir, "making/notes/images/14"),
+    path.join(rootDir, "making/notes/images/15"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -138,7 +139,32 @@ async function capture() {
         }
       }
 
-      // 3. 左アクティビティバー最下部の環境設定（歯車アイコン）をクリックして SettingsModal を開く
+      // 3. 左アクティビティバーのソース管理（Git）アイコンをクリックして GitPanel を開く
+      const gitNavBtn = page.locator('.activity-bar.side-left .activity-button[title*="ソース管理"]');
+      if (await gitNavBtn.isVisible()) {
+        await gitNavBtn.click();
+        await page.waitForSelector(".git-panel-container", { timeout: 5000 });
+        await page.waitForTimeout(500);
+
+        // 変更一覧にある「01_プロローグ.md」をクリックして Monaco DiffEditorView を表示
+        const diffFileItem = page.locator('.git-file-item:has-text("01_プロローグ.md")');
+        if (await diffFileItem.isVisible()) {
+          await diffFileItem.click();
+          await page.waitForSelector(".diff-editor-container", { timeout: 5000 });
+          await page.waitForTimeout(1000);
+        }
+
+        const gitOutPath = path.join(rootDir, `making/notes/images/15/15_Gitソース管理と差分比較_${t.name}.png`);
+        await page.screenshot({ path: gitOutPath });
+        console.log(`Saved: ${gitOutPath}`);
+
+        if (t.id === "dark") {
+          fs.copyFileSync(gitOutPath, path.join(rootDir, "docs/dev/images/15_Gitソース管理と差分比較_ダークモード.png"));
+          fs.copyFileSync(gitOutPath, path.join(rootDir, "docs/manual/images/15_Gitソース管理と差分比較_ダークモード.png"));
+        }
+      }
+
+      // 4. 左アクティビティバー最下部の環境設定（歯車アイコン）をクリックして SettingsModal を開く
       const settingsNavBtn = page.locator('.activity-bar.side-left .activity-button[title="環境設定"]');
       if (await settingsNavBtn.isVisible()) {
         await settingsNavBtn.click();

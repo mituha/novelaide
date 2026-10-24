@@ -1,0 +1,13 @@
+[default]
+description = "Default permissions for restar-git plugin"
+permissions = [
+    "allow-git-is-repo",
+    "allow-git-init",
+    "allow-git-status",
+    "allow-git-stage",
+    "allow-git-unstage",
+    "allow-git-commit",
+    "allow-git-log",
+    "allow-git-diff-file",
+    "allow-git-discard",
+]

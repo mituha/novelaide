@@ -106,3 +106,10 @@ fn run_git_command(repo_path: &Path, args: &[&str]) -> Result<String, String> {
    - **Commit History アコーディオン**: コミットハッシュ、メッセージ、作者、経過時間、SVGコミットグラフ。
 3. **Monaco `<DiffEditor />`（中央ビュー）**:
    - リスト内のファイルをクリックすると、中央エディターで差分比較タブが開き、行・文字単位のハイライトを表示。
+
+---
+
+## 5. UIスクリーンショット
+
+![Gitソース管理パネルと差分比較（ダークモード）](./images/15_Gitソース管理と差分比較_ダークモード.png)
+

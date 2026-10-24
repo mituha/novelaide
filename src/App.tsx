@@ -4,6 +4,7 @@ import { SettingsProvider, SettingsModal } from "restar-app-settings";
 import "restar-app-settings/styles.css";
 import "./core/settingsRegistry";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
+import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
@@ -40,10 +41,12 @@ function SettingsBoundApp() {
       }}
     >
       <ProjectProvider>
-        <DocumentProvider>
-          <AppContent />
-          <SettingsModal />
-        </DocumentProvider>
+        <GitProvider>
+          <DocumentProvider>
+            <AppContent />
+            <SettingsModal />
+          </DocumentProvider>
+        </GitProvider>
       </ProjectProvider>
     </SettingsProvider>
   );

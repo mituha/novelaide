@@ -4,10 +4,12 @@ import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
 import { useProject } from "../../contexts/ProjectContext";
 import { useDocument } from "../../contexts/DocumentContext";
+import { useGit } from "../../contexts/GitContext";
 import { useSettings } from "restar-app-settings";
 import { useCharacterCount } from "../../hooks/useCharacterCount";
 import { EditorTabs } from "../Editor/EditorTabs";
 import { DocumentPane } from "../DocumentPane/DocumentPane";
+import { DiffEditorView } from "../Diff/DiffEditorView";
 import { Feather, FolderOpen, PlusCircle } from "lucide-react";
 import "./MainLayout.css";
 
@@ -29,6 +31,12 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
 
   const { projectName, projectPath } = useProject();
   const { openSettings } = useSettings();
+  const { getDiff } = useGit();
+  const [activeDiff, setActiveDiff] = useState<{
+    filePath: string;
+    original: string;
+    modified: string;
+  } | null>(null);
   const {
     openDocuments,
     activeDocument,
@@ -55,7 +63,19 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
     150
   );
 
-  // スプリッターのドラッグ開始
+  // 差分ファイルの表示
+  const handleOpenFileDiff = useCallback(async (filePath: string, staged: boolean) => {
+    try {
+      const diffResult = await getDiff(filePath, staged);
+      setActiveDiff({
+        filePath,
+        original: diffResult.originalContent,
+        modified: diffResult.modifiedContent,
+      });
+    } catch (e) {
+      console.error("[MainLayout] Failed to open diff:", e);
+    }
+  }, [getDiff]);
   const handleMouseDownSplitter = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -103,11 +123,34 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
           activePanelId={leftActivePanelId}
           onClose={() => setLeftActivePanelId(null)}
           onOpenLauncher={onOpenLauncher}
+          onOpenFileDiff={handleOpenFileDiff}
         />
 
         {/* メイン執筆領域 / ワークスペース */}
         <main className="main-content-area">
-          {openDocuments.length > 0 && activeDocument ? (
+          {activeDiff ? (
+            <div className="editor-workspace-view">
+              <div className="diff-view-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', background: 'var(--bg-secondary, #252526)', borderBottom: '1px solid var(--border-color, #333)' }}>
+                <span style={{ fontSize: '12px', fontWeight: 600 }}>差分比較: {activeDiff.filePath}</span>
+                <button
+                  type="button"
+                  style={{ background: 'none', border: 'none', color: 'var(--text-secondary, #888)', cursor: 'pointer', padding: '2px 6px', fontSize: '12px' }}
+                  onClick={() => setActiveDiff(null)}
+                  title="差分比較を閉じてエディターに戻る"
+                >
+                  ✕ 差分を閉じる
+                </button>
+              </div>
+              <div className="editor-pane-body">
+                <DiffEditorView
+                  filePath={activeDiff.filePath}
+                  originalContent={activeDiff.original}
+                  modifiedContent={activeDiff.modified}
+                  language={activeDiff.filePath.endsWith('.md') ? 'markdown' : 'plaintext'}
+                />
+              </div>
+            </div>
+          ) : openDocuments.length > 0 && activeDocument ? (
             <div className="editor-workspace-view">
               <EditorTabs />
               <div className="editor-pane-body" ref={containerRef}>

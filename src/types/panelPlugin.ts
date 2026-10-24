@@ -9,6 +9,7 @@ export interface PanelProps {
   activeDocument: DocumentState | null;
   onClose?: () => void;
   onOpenLauncher?: () => void;
+  onOpenFileDiff?: (filePath: string, staged: boolean) => void;
 }
 
 /**

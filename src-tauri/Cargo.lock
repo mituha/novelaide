@@ -2110,6 +2110,7 @@ dependencies = [
  "tauri-plugin-dialog",
  "tauri-plugin-novelaid-fs",
  "tauri-plugin-opener",
+ "tauri-plugin-restar-git",
  "tauri-plugin-restar-settings",
 ]
 
@@ -3614,6 +3615,17 @@ dependencies = [
  "url",
  "windows",
  "zbus",
+]
+
+[[package]]
+name = "tauri-plugin-restar-git"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

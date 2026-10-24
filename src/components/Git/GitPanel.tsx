@@ -1,0 +1,277 @@
+import React, { useState } from 'react';
+import {
+  GitBranch,
+  RefreshCw,
+  Plus,
+  Minus,
+  Check,
+  Undo2,
+  ChevronDown,
+  ChevronRight,
+  GitCommit,
+  FolderGit2,
+} from 'lucide-react';
+import { useGit } from '../../contexts/GitContext';
+import { GitGraph } from './GitGraph';
+import './GitPanel.css';
+
+interface GitPanelProps {
+  onOpenFileDiff?: (filePath: string, staged: boolean) => void;
+}
+
+export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
+  const {
+    isRepo,
+    currentBranch,
+    staged,
+    unstaged,
+    untracked,
+    history,
+    isLoading,
+    refresh,
+    initRepo,
+    stageFiles,
+    unstageFiles,
+    commit,
+    discardFile,
+  } = useGit();
+
+  const [commitMessage, setCommitMessage] = useState('');
+  const [isCommitting, setIsCommitting] = useState(false);
+
+  // アコーディオン開閉状態
+  const [expandedStaged, setExpandedStaged] = useState(true);
+  const [expandedChanges, setExpandedChanges] = useState(true);
+  const [expandedHistory, setExpandedHistory] = useState(true);
+
+  // 未ステージと未追跡の合算
+  const allChanges = [...unstaged, ...untracked];
+
+  const handleCommit = async () => {
+    if (!commitMessage.trim()) return;
+    setIsCommitting(true);
+    try {
+      // ステージ済みがない場合は、全変更をステージしてコミット
+      const stageAll = staged.length === 0;
+      await commit(commitMessage.trim(), stageAll);
+      setCommitMessage('');
+    } catch (e) {
+      console.error('[GitPanel] Commit failed:', e);
+    } finally {
+      setIsCommitting(false);
+    }
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+      e.preventDefault();
+      handleCommit();
+    }
+  };
+
+  if (!isRepo) {
+    return (
+      <div className="git-panel-container">
+        <div className="git-empty-state">
+          <FolderGit2 size={36} className="git-empty-icon" />
+          <p>この作品フォルダーはGitリポジトリとして初期化されていません。</p>
+          <button type="button" className="git-init-btn" onClick={initRepo}>
+            Git リポジトリを初期化 (git init)
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="git-panel-container">
+      {/* ヘッダー */}
+      <div className="git-panel-header">
+        <div className="git-branch-info">
+          <GitBranch size={14} />
+          <span>{currentBranch || 'HEAD'}</span>
+        </div>
+        <div className="git-header-actions">
+          <button
+            type="button"
+            className={`git-action-icon-btn ${isLoading ? 'spinning' : ''}`}
+            onClick={refresh}
+            title="リポジトリ状態を更新"
+            disabled={isLoading}
+          >
+            <RefreshCw size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* コミット入力フォーム */}
+      <div className="git-commit-box">
+        <textarea
+          className="git-commit-input"
+          placeholder="コミットメッセージを入力 (Ctrl+Enterでコミット)..."
+          value={commitMessage}
+          onChange={(e) => setCommitMessage(e.target.value)}
+          onKeyDown={handleKeyDown}
+          rows={2}
+        />
+        <button
+          type="button"
+          className="git-commit-btn"
+          onClick={handleCommit}
+          disabled={!commitMessage.trim() || isCommitting || (staged.length === 0 && allChanges.length === 0)}
+        >
+          <Check size={14} />
+          <span>{staged.length > 0 ? 'Commit (Staged)' : 'Commit All'}</span>
+        </button>
+      </div>
+
+      {/* ボディ（アコーディオンリスト） */}
+      <div className="git-panel-body">
+        {/* Staged Changes セクション */}
+        <div className="git-section">
+          <div className="git-section-header" onClick={() => setExpandedStaged((prev) => !prev)}>
+            <div className="git-section-title">
+              {expandedStaged ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <span>STAGED CHANGES</span>
+              <span className="git-badge">{staged.length}</span>
+            </div>
+            {staged.length > 0 && (
+              <div className="git-section-actions" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="git-action-icon-btn"
+                  onClick={() => unstageFiles([])}
+                  title="すべてアンステージ (git reset)"
+                >
+                  <Minus size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {expandedStaged && (
+            <div className="git-section-list">
+              {staged.map((file) => (
+                <div
+                  key={`staged-${file.path}`}
+                  className="git-file-row"
+                  onClick={() => onOpenFileDiff?.(file.path, true)}
+                >
+                  <div className="git-file-info">
+                    <span className={`git-file-badge ${file.status[0]}`}>
+                      {file.status[0].toUpperCase()}
+                    </span>
+                    <span className="git-file-name" title={file.path}>
+                      {file.path}
+                    </span>
+                  </div>
+                  <div className="git-file-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="git-action-icon-btn"
+                      onClick={() => unstageFiles([file.path])}
+                      title="アンステージ"
+                    >
+                      <Minus size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Changes セクション */}
+        <div className="git-section">
+          <div className="git-section-header" onClick={() => setExpandedChanges((prev) => !prev)}>
+            <div className="git-section-title">
+              {expandedChanges ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <span>CHANGES</span>
+              <span className="git-badge">{allChanges.length}</span>
+            </div>
+            {allChanges.length > 0 && (
+              <div className="git-section-actions" onClick={(e) => e.stopPropagation()}>
+                <button
+                  type="button"
+                  className="git-action-icon-btn"
+                  onClick={() => stageFiles([])}
+                  title="すべてステージ (git add -A)"
+                >
+                  <Plus size={13} />
+                </button>
+              </div>
+            )}
+          </div>
+
+          {expandedChanges && (
+            <div className="git-section-list">
+              {allChanges.map((file) => (
+                <div
+                  key={`unstaged-${file.path}`}
+                  className="git-file-row"
+                  onClick={() => onOpenFileDiff?.(file.path, false)}
+                >
+                  <div className="git-file-info">
+                    <span className={`git-file-badge ${file.status === 'untracked' ? 'u' : file.status[0]}`}>
+                      {file.status === 'untracked' ? 'U' : file.status[0].toUpperCase()}
+                    </span>
+                    <span className="git-file-name" title={file.path}>
+                      {file.path}
+                    </span>
+                  </div>
+                  <div className="git-file-actions" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      className="git-action-icon-btn"
+                      onClick={() => discardFile(file.path)}
+                      title="変更を破棄 (元に戻す)"
+                    >
+                      <Undo2 size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      className="git-action-icon-btn"
+                      onClick={() => stageFiles([file.path])}
+                      title="ステージに追加"
+                    >
+                      <Plus size={13} />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        {/* Commit History セクション */}
+        <div className="git-section">
+          <div className="git-section-header" onClick={() => setExpandedHistory((prev) => !prev)}>
+            <div className="git-section-title">
+              {expandedHistory ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <GitCommit size={14} />
+              <span>COMMIT HISTORY</span>
+              <span className="git-badge">{history.length}</span>
+            </div>
+          </div>
+
+          {expandedHistory && history.length > 0 && (
+            <div className="git-history-container">
+              <GitGraph history={history} />
+              <div className="git-history-list">
+                {history.map((commit) => (
+                  <div key={commit.hash} className="git-history-item" title={commit.message}>
+                    <div className="git-history-message">{commit.message}</div>
+                    <div className="git-history-meta">
+                      <span className="git-history-hash">{commit.shortHash}</span>
+                      <span>{commit.authorName}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
