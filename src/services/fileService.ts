@@ -133,13 +133,86 @@ export const fileService = {
     try {
       return await novelaidFs.readDocument(path);
     } catch {
+      const baseName = path.split(/[/\\]/).pop() || "";
+      const isMd = baseName.endsWith('.md');
+
+      if (baseName.includes('魔女_ルナ') || baseName.includes('キャラクター')) {
+        return {
+          path,
+          baseName,
+          fileTitle: "魔女_ルナ",
+          documentType: "markdown",
+          metadata: { role: "ヒロイン", age: 17 },
+          content: `# キャラクター設定：|魔女《まじょ》ルナ・アルテミス
+
+月光の力を操る《《銀髪の天才少女》》。
+主人公|神代玲央《かみしろれお》の幼馴染にして、魔法結社の最年少幹部。
+
+## 能力値ステータス
+
+\`\`\`radar{width=450}
+---
+title: "ルナ・アルテミス 能力チャート"
+color: "#8A2BE2"
+max: 100
+---
+魔力: 98
+知力: 90
+素早さ: 82
+精神力: 75
+攻撃力: 50
+防御力: 45
+運: 88
+\`\`\`
+
+## 人物相関図
+
+\`\`\`mermaid
+graph TD
+    Luna["魔女ルナ<br/>(ヒロイン)"]
+    Hero["神代玲央<br/>(主人公)"]
+    Master["大賢者ギード<br/>(師匠)"]
+    Empire["帝国軍特務隊"]
+
+    Luna -->|"絶対の信頼"| Hero
+    Hero -->|"守るべき存在"| Luna
+    Master -->|"禁呪の伝承"| Luna
+    Empire -.->|"暗殺標的"| Luna
+\`\`\`
+
+## 拠点マップ
+
+\`\`\`map
+id: luna-hideout
+width: 100%
+height: 380px
+lat: 35.681236
+long: 139.767125
+defaultZoom: 13
+marker:
+  - book, 35.681236, 139.767125, 月影の秘密研究所, "古代の禁呪や調合器具が隠された拠点"
+  - school, 35.689506, 139.691701, 王立魔導学園, "ルナが通っていたかつての学園"
+  - default, 35.676231, 139.752311, 逢魔が時の辻, "主人公玲央と再会した交差点"
+\`\`\`
+`,
+        };
+      }
+
       return {
         path,
         baseName: "01_プロローグ.md",
         fileTitle: "01_プロローグ",
-        content: "# プロローグ\n\n青い空の彼方から、一羽の鳥が舞い降りてきた。",
+        content: `# プロローグ：運命の邂逅
+
+　青い空の彼方から、一羽の鳥が舞い降りてきた。
+　それは|漆黒《しっこく》の羽根を持つ、不思議な鳥だった。
+
+「待っていたぞ、|神代玲央《かみしろれお》」
+
+　鳥は突然、人の言葉を話した。
+　少年の日常が、《《音を立てて崩れ去った》》瞬間だった。`,
         metadata: {},
-        documentType: "novel",
+        documentType: isMd ? "novel" : "novel",
       };
     }
   },

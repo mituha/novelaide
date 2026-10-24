@@ -1,7 +1,7 @@
 {
   "name": "novelaide",
   "private": true,
-  "version": "0.8.0",
+  "version": "0.9.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -19,6 +19,7 @@
     "@tauri-apps/plugin-dialog": "^2.8.3",
     "@tauri-apps/plugin-opener": "^2",
     "lucide-react": "^1.61.0",
+    "novelaid-markdown": "^0.7.0",
     "novelaid-ruby": "^0.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",

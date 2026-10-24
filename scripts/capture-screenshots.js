@@ -51,6 +51,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/07"),
     path.join(rootDir, "making/notes/images/08"),
     path.join(rootDir, "making/notes/images/09"),
+    path.join(rootDir, "making/notes/images/10"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -74,7 +75,7 @@ async function capture() {
 
   for (const t of themes) {
     const context = await browser.newContext({
-      viewport: { width: 1024, height: 768 },
+      viewport: { width: 1100, height: 800 },
       deviceScaleFactor: 2,
     });
     const page = await context.newPage();
@@ -88,51 +89,53 @@ async function capture() {
 
     await page.reload({ waitUntil: "networkidle" });
 
-    // ファイル「01_プロローグ.md」をクリックしてエディターを開く
     try {
-      const fileItem = page.locator(".file-row", { hasText: "01_プロローグ.md" });
-      await fileItem.waitFor({ timeout: 5000 });
-      await fileItem.click();
+      // 1. 小説「01_プロローグ.md」を開く
+      const novelFile = page.locator(".file-row", { hasText: "01_プロローグ.md" });
+      await novelFile.waitFor({ timeout: 5000 });
+      await novelFile.click();
 
-      // Monaco Editor のレンダリング完了を待機
       await page.waitForSelector(".monaco-editor", { timeout: 10000 });
-      await page.waitForTimeout(1000);
-
-      // 1. エディター画面全体の撮影 (07)
-      const editorOutPath = path.join(rootDir, `making/notes/images/07/07_小説エディター_${t.name}.png`);
-      await page.screenshot({ path: editorOutPath });
-      console.log(`Saved: ${editorOutPath}`);
-
-      // 2. 文字数トリガーをクリックして詳細分析ポップアップを展開 (08)
-      const charTrigger = page.locator(".status-char-count-trigger");
-      await charTrigger.waitFor({ timeout: 5000 });
-      await charTrigger.click();
-      await page.waitForSelector(".char-count-popup", { timeout: 3000 });
       await page.waitForTimeout(500);
 
-      const statusOutPath = path.join(rootDir, `making/notes/images/08/08_文字数カウント詳細分析_${t.name}.png`);
-      await page.screenshot({ path: statusOutPath });
-      console.log(`Saved: ${statusOutPath}`);
-
-      // ポップアップを閉じるために背景をクリック
-      await page.mouse.click(300, 300);
-      await page.waitForTimeout(300);
-
-      // 3. プレビューボタンをクリックして左右スプリットビューを展開 (09)
+      // プレビューボタンをクリックして縦書きスプリットビューを展開
       const previewBtn = page.locator(".editor-tab-action-btn");
       if (await previewBtn.isVisible()) {
         await previewBtn.click();
-        // プレビューコンテナまたはスプリットペインの出現を待機
         await page.waitForSelector(".editor-split-container", { timeout: 5000 });
-        await page.waitForTimeout(1000);
+        await page.waitForTimeout(800);
 
         const splitOutPath = path.join(rootDir, `making/notes/images/09/09_スプリットビュー縦書きプレビュー_${t.name}.png`);
         await page.screenshot({ path: splitOutPath });
         console.log(`Saved: ${splitOutPath}`);
+      }
 
-        if (t.id === "dark") {
-          fs.copyFileSync(splitOutPath, path.join(rootDir, "docs/dev/images/09_スプリットビュー縦書きプレビュー_ダークモード.png"));
-          fs.copyFileSync(splitOutPath, path.join(rootDir, "docs/manual/images/09_スプリットビュー縦書きプレビュー_ダークモード.png"));
+      // 2. characters フォルダを開いて「魔女_ルナ.md」を開く
+      const charFolder = page.locator(".folder-row", { hasText: "characters" });
+      if (await charFolder.isVisible()) {
+        await charFolder.click();
+        await page.waitForTimeout(300);
+
+        const lunaFile = page.locator(".file-row", { hasText: "魔女_ルナ.md" });
+        if (await lunaFile.isVisible()) {
+          await lunaFile.click();
+          await page.waitForTimeout(800);
+
+          // プレビューボタンを押してMarkdown拡張プレビューを表示
+          const lunaPreviewBtn = page.locator(".editor-tab-action-btn");
+          if (await lunaPreviewBtn.isVisible()) {
+            await lunaPreviewBtn.click();
+            await page.waitForTimeout(1500); // Mermaid / Map の描画待機
+
+            const mdOutPath = path.join(rootDir, `making/notes/images/10/10_Markdown拡張プレビュー_${t.name}.png`);
+            await page.screenshot({ path: mdOutPath });
+            console.log(`Saved: ${mdOutPath}`);
+
+            if (t.id === "dark") {
+              fs.copyFileSync(mdOutPath, path.join(rootDir, "docs/dev/images/10_Markdown拡張プレビュー_ダークモード.png"));
+              fs.copyFileSync(mdOutPath, path.join(rootDir, "docs/manual/images/10_Markdown拡張プレビュー_ダークモード.png"));
+            }
+          }
         }
       }
     } catch (e) {
