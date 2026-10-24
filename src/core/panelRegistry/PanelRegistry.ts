@@ -6,12 +6,16 @@ import { PanelPlugin } from '../../types/panelPlugin';
  */
 export class PanelRegistry {
   private plugins: Map<string, PanelPlugin> = new Map();
+  private placements: Map<string, 'left' | 'right'> = new Map();
 
   /**
    * パネルを登録
    */
   register(plugin: PanelPlugin): void {
     this.plugins.set(plugin.id, plugin);
+    if (!this.placements.has(plugin.id)) {
+      this.placements.set(plugin.id, plugin.defaultPlacement);
+    }
   }
 
   /**
@@ -19,6 +23,24 @@ export class PanelRegistry {
    */
   unregister(pluginId: string): void {
     this.plugins.delete(pluginId);
+    this.placements.delete(pluginId);
+  }
+
+  /**
+   * パネルの配置サイドを変更
+   */
+  setPlacement(pluginId: string, side: 'left' | 'right'): void {
+    const plugin = this.plugins.get(pluginId);
+    if (plugin && (!plugin.allowedPlacements || plugin.allowedPlacements.includes(side))) {
+      this.placements.set(pluginId, side);
+    }
+  }
+
+  /**
+   * パネルの現在の配置サイドを取得
+   */
+  getPlacement(pluginId: string): 'left' | 'right' {
+    return this.placements.get(pluginId) || this.plugins.get(pluginId)?.defaultPlacement || 'left';
   }
 
   /**
@@ -34,10 +56,8 @@ export class PanelRegistry {
   getPanelsForSide(side: 'left' | 'right'): PanelPlugin[] {
     return Array.from(this.plugins.values())
       .filter((p) => {
-        if (p.allowedPlacements) {
-          return p.allowedPlacements.includes(side);
-        }
-        return p.defaultPlacement === side;
+        const placement = this.placements.get(p.id) || p.defaultPlacement;
+        return placement === side;
       })
       .sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
   }

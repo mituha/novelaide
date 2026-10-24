@@ -147,10 +147,10 @@ async function capture() {
         await page.waitForTimeout(500);
 
         // 変更一覧にある「01_プロローグ.md」をクリックして Monaco DiffEditorView を表示
-        const diffFileItem = page.locator('.git-file-item:has-text("01_プロローグ.md")');
+        const diffFileItem = page.locator('.git-file-row:has-text("01_プロローグ.md")');
         if (await diffFileItem.isVisible()) {
           await diffFileItem.click();
-          await page.waitForSelector(".diff-editor-container", { timeout: 5000 });
+          await page.waitForSelector(".diff-editor-view-container", { timeout: 5000 });
           await page.waitForTimeout(1000);
         }
 
