@@ -1,20 +1,28 @@
 import React, { useState, useMemo } from 'react';
 import { X, Search, Settings, Palette, FileText, BookOpen } from 'lucide-react';
-import { useSettings } from '../../contexts/SettingsContext';
-import { settingsRegistry } from '../../core/settingsRegistry';
-import './SettingsModal.css';
+import { useSettings } from './SettingsContext';
+import { settingsRegistry } from './SettingsRegistry';
 
-// アイコンマッピング
-const iconMap: Record<string, React.ReactNode> = {
+const defaultIconMap: Record<string, React.ReactNode> = {
   Palette: <Palette size={16} />,
   FileText: <FileText size={16} />,
   BookOpen: <BookOpen size={16} />,
   Settings: <Settings size={16} />,
 };
 
-export const SettingsModal: React.FC = () => {
+export interface SettingsModalProps {
+  title?: string;
+  customIcons?: Record<string, React.ReactNode>;
+}
+
+export const SettingsModal: React.FC<SettingsModalProps> = ({
+  title = '環境設定',
+  customIcons = {},
+}) => {
   const { isSettingsOpen, closeSettings, activeTabId, setActiveTabId, settings, updateSetting, resetSetting } = useSettings();
   const [searchQuery, setSearchQuery] = useState('');
+
+  const icons = useMemo(() => ({ ...defaultIconMap, ...customIcons }), [customIcons]);
 
   // 登録済み全プラグインを取得
   const allTabs = useMemo(() => settingsRegistry.getAll(), []);
@@ -44,7 +52,7 @@ export const SettingsModal: React.FC = () => {
         <div className="settings-modal-header">
           <div className="settings-modal-title">
             <Settings size={20} className="settings-modal-icon" />
-            <span>環境設定</span>
+            <span>{title}</span>
           </div>
           <div className="settings-search-box">
             <Search size={14} className="settings-search-icon" />
@@ -89,7 +97,7 @@ export const SettingsModal: React.FC = () => {
                   onClick={() => setActiveTabId(tab.id)}
                 >
                   <span className="settings-nav-icon">
-                    {tab.icon && iconMap[tab.icon] ? iconMap[tab.icon] : <Settings size={16} />}
+                    {tab.icon && icons[tab.icon] ? icons[tab.icon] : <Settings size={16} />}
                   </span>
                   <span className="settings-nav-title">{tab.title}</span>
                 </button>

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { transformToHtml } from 'novelaid-ruby';
 import { DocumentViewProps } from '../../types/viewPlugin';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSettings } from 'restar-app-settings';
 import { BookOpen, AlignLeft, ZoomIn, ZoomOut } from 'lucide-react';
 import './NovelPreview.css';
 

@@ -2,7 +2,7 @@ import React, { useCallback, useRef, useEffect } from 'react';
 import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDocument } from '../../contexts/DocumentContext';
-import { useSettings } from '../../contexts/SettingsContext';
+import { useSettings } from 'restar-app-settings';
 import { EditorSupport } from './EditorSupport';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';

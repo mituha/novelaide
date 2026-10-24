@@ -1,5 +1,5 @@
 import React from 'react';
-import type { SettingTabPlugin, SettingTabProps } from '../../types/settingsPlugin';
+import type { SettingTabPlugin, SettingTabProps } from 'restar-app-settings';
 
 const EditorSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) => {
   return (

@@ -94,9 +94,11 @@ async function capture() {
     await page.reload({ waitUntil: "networkidle" });
 
     try {
+      await page.waitForTimeout(1000);
+
       // 1. 小説「01_プロローグ.md」を開く
       const novelFile = page.locator(".file-row", { hasText: "01_プロローグ.md" });
-      await novelFile.waitFor({ timeout: 5000 });
+      await novelFile.waitFor({ timeout: 10000 });
       await novelFile.click();
 
       await page.waitForSelector(".monaco-editor", { timeout: 10000 });

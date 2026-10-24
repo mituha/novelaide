@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { ThemeProvider } from "./contexts/ThemeContext";
-import { SettingsProvider } from "./contexts/SettingsContext";
+import { ThemeProvider, useTheme, type Theme } from "./contexts/ThemeContext";
+import { SettingsProvider, SettingsModal } from "restar-app-settings";
+import "restar-app-settings/styles.css";
+import "./core/settingsRegistry";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
 import { MainLayout } from "./components/Layout/MainLayout";
-import { SettingsModal } from "./components/Settings/SettingsModal";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
 import "./styles/theme.css";
 import "./App.css";
@@ -27,17 +28,31 @@ function AppContent() {
   );
 }
 
+function SettingsBoundApp() {
+  const { setTheme } = useTheme();
+
+  return (
+    <SettingsProvider
+      onSettingChange={(key, value) => {
+        if (key === "theme") {
+          setTheme(value as Theme);
+        }
+      }}
+    >
+      <ProjectProvider>
+        <DocumentProvider>
+          <AppContent />
+          <SettingsModal />
+        </DocumentProvider>
+      </ProjectProvider>
+    </SettingsProvider>
+  );
+}
+
 function App() {
   return (
     <ThemeProvider>
-      <SettingsProvider>
-        <ProjectProvider>
-          <DocumentProvider>
-            <AppContent />
-            <SettingsModal />
-          </DocumentProvider>
-        </ProjectProvider>
-      </SettingsProvider>
+      <SettingsBoundApp />
     </ThemeProvider>
   );
 }

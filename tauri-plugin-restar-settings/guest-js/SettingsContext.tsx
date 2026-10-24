@@ -6,14 +6,13 @@ import React, {
   useEffect,
   type ReactNode,
 } from 'react';
-import { settingsRegistry } from '../core/settingsRegistry';
-import type { AppSettings } from '../types/settingsPlugin';
-import { useTheme, type Theme } from './ThemeContext';
+import { invoke } from '@tauri-apps/api/core';
+import { settingsRegistry } from './SettingsRegistry';
 
-const SETTINGS_STORAGE_KEY = 'novelaide-settings';
+const SETTINGS_STORAGE_KEY = 'restar-app-settings';
 
-interface SettingsContextType {
-  settings: AppSettings;
+export interface SettingsContextType {
+  settings: Record<string, any>;
   updateSetting: <T>(key: string, value: T) => void;
   resetSetting: (key: string) => void;
   isSettingsOpen: boolean;
@@ -25,43 +24,73 @@ interface SettingsContextType {
 
 const SettingsContext = createContext<SettingsContextType | undefined>(undefined);
 
-export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { theme, setTheme } = useTheme();
+export interface SettingsProviderProps {
+  children: ReactNode;
+  initialTabId?: string;
+  onSettingChange?: (key: string, value: any, allSettings: Record<string, any>) => void;
+}
 
-  // 初期設定値をレジストリのデフォルト値とローカルストレージから結合してロード
-  const [settings, setSettings] = useState<AppSettings>(() => {
-    const defaults = settingsRegistry.getAllDefaultValues() as AppSettings;
+export const SettingsProvider: React.FC<SettingsProviderProps> = ({
+  children,
+  initialTabId = 'appearance',
+  onSettingChange,
+}) => {
+  const [settings, setSettings] = useState<Record<string, any>>(() => {
+    const defaults = settingsRegistry.getAllDefaultValues();
     try {
       const saved = localStorage.getItem(SETTINGS_STORAGE_KEY);
       if (saved) {
         return { ...defaults, ...JSON.parse(saved) };
       }
-    } catch (e) {
-      console.warn('[SettingsContext] Failed to load settings from localStorage:', e);
+    } catch {
+      // LocalStorage load error fallback
     }
     return defaults;
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [activeTabId, setActiveTabId] = useState<string>('appearance');
+  const [activeTabId, setActiveTabId] = useState<string>(initialTabId);
+
+  // Tauriネイティブ設定ファイルからのロード
+  useEffect(() => {
+    async function loadNativeSettings() {
+      try {
+        const nativeSettings = await invoke<Record<string, any>>('plugin:restar-settings|load_settings');
+        if (nativeSettings && Object.keys(nativeSettings).length > 0) {
+          setSettings((prev) => ({ ...prev, ...nativeSettings }));
+        }
+      } catch {
+        // Tauri環境外や初回起動時は無視
+      }
+    }
+    loadNativeSettings();
+  }, []);
 
   // 設定値の更新
   const updateSetting = useCallback(<T,>(key: string, value: T) => {
     setSettings((prev) => {
       const next = { ...prev, [key]: value };
+
+      // LocalStorage 保存（フォールバック）
       try {
         localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(next));
-      } catch (e) {
-        console.warn('[SettingsContext] Failed to save settings to localStorage:', e);
+      } catch {
+        // LocalStorage save error
       }
+
+      // Tauri ネイティブ保存
+      invoke('plugin:restar-settings|save_settings', { settings: next }).catch(() => {
+        // Non-tauri environment or error
+      });
+
+      // 外部コールバック通知
+      if (onSettingChange) {
+        onSettingChange(key, value, next);
+      }
+
       return next;
     });
-
-    // テーマ変更時は ThemeContext にも即座に同期
-    if (key === 'theme') {
-      setTheme(value as Theme);
-    }
-  }, [setTheme]);
+  }, [onSettingChange]);
 
   // 設定値のリセット
   const resetSetting = useCallback((key: string) => {
@@ -82,13 +111,6 @@ export const SettingsProvider: React.FC<{ children: ReactNode }> = ({ children }
   const closeSettings = useCallback(() => {
     setIsSettingsOpen(false);
   }, []);
-
-  // ThemeContext の変更を settings に同期
-  useEffect(() => {
-    if (settings.theme !== theme && (theme === 'dark' || theme === 'light' || theme === 'sepia')) {
-      setSettings((prev) => ({ ...prev, theme }));
-    }
-  }, [theme]);
 
   // Ctrl + , (Cmd + ,) ショートカットキーで設定を開く
   useEffect(() => {

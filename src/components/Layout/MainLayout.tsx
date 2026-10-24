@@ -4,7 +4,7 @@ import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
 import { useProject } from "../../contexts/ProjectContext";
 import { useDocument } from "../../contexts/DocumentContext";
-import { useSettings } from "../../contexts/SettingsContext";
+import { useSettings } from "restar-app-settings";
 import { useCharacterCount } from "../../hooks/useCharacterCount";
 import { EditorTabs } from "../Editor/EditorTabs";
 import { DocumentPane } from "../DocumentPane/DocumentPane";

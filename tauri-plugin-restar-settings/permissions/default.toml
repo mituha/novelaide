@@ -1,0 +1,8 @@
+[default]
+description = "Default permissions for restar-settings plugin"
+permissions = [
+    "allow-load-settings",
+    "allow-save-settings",
+    "allow-reset-settings",
+    "allow-get-settings-path",
+]

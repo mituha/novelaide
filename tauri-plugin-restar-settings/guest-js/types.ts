@@ -18,9 +18,9 @@ export interface SettingTabProps {
  * 設定タブプラグインのインターフェース
  */
 export interface SettingTabPlugin {
-  /** 一意なタブ識別子 (例: 'appearance', 'editor', 'preview') */
+  /** 一意なタブ識別子 (例: 'general', 'appearance', 'editor') */
   id: string;
-  /** タブの表示名 (例: '外観・テーマ', 'エディター') */
+  /** タブの表示名 (例: '一般設定', '外観・テーマ') */
   title: string;
   /** アイコン識別名 (Lucideアイコン等) */
   icon?: string;
@@ -32,27 +32,4 @@ export interface SettingTabPlugin {
   defaultValues: Record<string, any>;
   /** 設定UIコンポーネントを描画する関数 */
   render: (props: SettingTabProps) => ReactNode;
-}
-
-/**
- * アプリケーションの基本設定型
- */
-export interface AppSettings {
-  // 外観
-  theme: 'dark' | 'light' | 'sepia';
-  // エディター
-  editorFontFamily: string;
-  editorFontSize: number;
-  editorLineHeight: number;
-  editorLineNumbers: 'on' | 'off' | 'relative';
-  editorMinimap: boolean;
-  editorWordWrap: 'on' | 'off';
-  manuscriptCharsPerLine: number;
-  manuscriptLinesPerPage: number;
-  autoSaveInterval: number;
-  // プレビュー
-  previewWritingMode: 'vertical-rl' | 'horizontal-tb';
-  previewFontSize: number;
-  previewFontFamily: string;
-  [key: string]: any;
 }

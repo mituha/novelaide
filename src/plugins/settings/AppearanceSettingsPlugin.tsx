@@ -1,5 +1,5 @@
 import React from 'react';
-import type { SettingTabPlugin, SettingTabProps } from '../../types/settingsPlugin';
+import type { SettingTabPlugin, SettingTabProps } from 'restar-app-settings';
 
 const AppearanceSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) => {
   const currentTheme = settings.theme || 'dark';

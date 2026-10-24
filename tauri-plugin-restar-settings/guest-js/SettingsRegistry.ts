@@ -1,4 +1,4 @@
-import type { SettingTabPlugin } from '../../types/settingsPlugin';
+import type { SettingTabPlugin } from './types';
 
 /**
  * 設定タブプラグインを登録・管理するレジストリ
