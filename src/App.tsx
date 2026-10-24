@@ -6,7 +6,8 @@ import "./core/settingsRegistry";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
-import { AiProvider } from "./contexts/AiContext";
+import { AIContextProvider } from "tauri-plugin-novelaid-ai-api";
+import "tauri-plugin-novelaid-ai-api/styles.css";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
 import "./styles/theme.css";
@@ -44,10 +45,10 @@ function SettingsBoundApp() {
       <ProjectProvider>
         <GitProvider>
           <DocumentProvider>
-            <AiProvider>
+            <AIContextProvider>
               <AppContent />
               <SettingsModal />
-            </AiProvider>
+            </AIContextProvider>
           </DocumentProvider>
         </GitProvider>
       </ProjectProvider>

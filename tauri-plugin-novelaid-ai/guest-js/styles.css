@@ -1,3 +1,5 @@
+/* tauri-plugin-novelaid-ai styles */
+
 .ai-chat-panel {
   display: flex;
   flex-direction: column;
@@ -9,7 +11,7 @@
   overflow: hidden;
 }
 
-/* 上部コントロールバー */
+/* ヘッダー */
 .ai-chat-header {
   display: flex;
   flex-direction: column;
@@ -69,27 +71,8 @@
   color: var(--color-text, #1e293b);
   font-size: 11px;
   outline: none;
-  max-width: 160px;
+  max-width: 200px;
   text-overflow: ellipsis;
-}
-
-.ai-header-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.ai-toggle-doc {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  color: var(--color-text-secondary, #64748b);
-  user-select: none;
-}
-
-.ai-toggle-doc input {
-  cursor: pointer;
 }
 
 .ai-action-btn {
@@ -102,7 +85,6 @@
   background: transparent;
   color: var(--color-text-secondary, #64748b);
   cursor: pointer;
-  transition: background-color 0.15s;
 }
 
 .ai-action-btn:hover {
@@ -110,7 +92,7 @@
   color: var(--color-text, #1e293b);
 }
 
-/* メッセージ履歴タイムライン */
+/* メッセージ履歴 */
 .ai-messages-container {
   flex: 1;
   overflow-y: auto;
@@ -168,7 +150,16 @@
   border-bottom-left-radius: 2px;
 }
 
-/* クイックツールアクションバー */
+.ai-streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--color-text-secondary, #64748b);
+  padding: 4px 8px;
+}
+
+/* クイックツールバー */
 .ai-quick-tools {
   display: flex;
   gap: 6px;
@@ -201,74 +192,207 @@
   cursor: not-allowed;
 }
 
-/* 入力エリア */
-.ai-input-container {
+/* 入力エリア (AIChatInput) */
+.ai-chat-input-container {
   display: flex;
   flex-direction: column;
-  padding: 8px 12px 10px;
   background-color: var(--color-surface, #ffffff);
   border-top: 1px solid var(--color-border, #e2e8f0);
+  padding: 8px 12px 10px;
+  gap: 6px;
 }
 
-.ai-input-wrapper {
+.ai-chat-input-wrapper {
   display: flex;
+  align-items: flex-end;
   position: relative;
   border: 1px solid var(--color-border, #e2e8f0);
   border-radius: 6px;
   background-color: var(--color-surface-secondary, #ffffff);
-  transition: border-color 0.15s;
+  padding-right: 70px;
 }
 
-.ai-input-wrapper:focus-within {
+.ai-chat-input-wrapper:focus-within {
   border-color: var(--color-primary, #3b82f6);
   box-shadow: 0 0 0 1px var(--color-primary, #3b82f6);
 }
 
-.ai-textarea {
+.ai-chat-textarea {
   flex: 1;
   border: none;
   background: transparent;
-  padding: 8px 36px 8px 10px;
+  padding: 8px 10px;
   font-size: 13px;
   line-height: 1.4;
   color: var(--color-text, #1e293b);
   resize: none;
-  min-height: 48px;
-  max-height: 120px;
+  min-height: 38px;
+  max-height: 160px;
   outline: none;
   font-family: inherit;
 }
 
-.ai-send-btn {
+.ai-chat-features-toggles {
+  position: absolute;
+  right: 36px;
+  bottom: 6px;
+  display: flex;
+  gap: 2px;
+}
+
+.ai-chat-feature-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--color-text-secondary, #94a3b8);
+  cursor: pointer;
+}
+
+.ai-chat-feature-toggle.active {
+  color: var(--color-primary, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.1);
+}
+
+.ai-chat-send-btn {
   position: absolute;
   right: 6px;
   bottom: 6px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   border-radius: 4px;
   border: none;
   background-color: var(--color-primary, #3b82f6);
   color: #ffffff;
   cursor: pointer;
-  transition: opacity 0.15s;
 }
 
-.ai-send-btn:hover:not(:disabled) {
-  opacity: 0.9;
-}
-
-.ai-send-btn:disabled {
+.ai-chat-send-btn:disabled {
   background-color: var(--color-border, #cbd5e1);
   cursor: not-allowed;
 }
 
-.ai-input-hint {
+/* コンテキストセレクター (AIContextSelector) */
+.ai-context-selector {
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 4px;
+  background-color: var(--color-surface-secondary, #f8fafc);
+  font-size: 11px;
+}
+
+.ai-context-summary {
   display: flex;
-  justify-content: space-between;
-  margin-top: 4px;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 8px;
+  cursor: pointer;
+  user-select: none;
+  color: var(--color-text, #1e293b);
+}
+
+.ai-context-summary .summary-text {
+  font-weight: 500;
+  flex: 1;
+}
+
+.ai-context-summary .badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: 8px;
+  background-color: var(--color-primary, #3b82f6);
+  color: #ffffff;
   font-size: 10px;
+  font-weight: bold;
+}
+
+.ai-context-details {
+  border-top: 1px solid var(--color-border, #e2e8f0);
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--color-surface, #ffffff);
+}
+
+.context-section {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.context-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  color: var(--color-text, #334155);
+}
+
+.context-item .side-label {
+  font-weight: 600;
+  color: var(--color-text-secondary, #64748b);
+}
+
+.context-item .file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.context-custom-dropzone {
+  border: 1px dashed var(--color-border, #cbd5e1);
+  border-radius: 4px;
+  padding: 6px;
+  background-color: var(--color-surface-secondary, #f8fafc);
+  transition: all 0.15s ease;
+}
+
+.context-custom-dropzone.drag-over {
+  border-color: var(--color-primary, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.05);
+}
+
+.dropzone-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--color-text-secondary, #64748b);
+  font-size: 10px;
+}
+
+.custom-file-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 4px;
+}
+
+.custom-file-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 2px 6px;
+  background-color: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: 3px;
+}
+
+.custom-file-item .remove-btn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
   color: var(--color-text-secondary, #94a3b8);
 }

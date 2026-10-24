@@ -16,17 +16,25 @@ export interface AiPersona {
   systemPrompt?: string;
 }
 
-export interface AiChatMessage {
+export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system';
   persona?: AiPersonaType;
   content: string;
+  thoughts?: string;
   timestamp: string;
   toolCalls?: Array<{
     name: string;
     params: any;
     result?: any;
   }>;
+}
+
+export interface AIContextState {
+  includeLeftActive: boolean;
+  includeRightActive: boolean;
+  includeAllOpen: boolean;
+  customPaths: string[];
 }
 
 export interface AiToolResult {
@@ -41,6 +49,8 @@ export interface AiToolResult {
     type: string;
     message: string;
     line?: number;
+    text?: string;
+    suggestion?: string;
   }>;
   [key: string]: any;
 }

@@ -62,28 +62,32 @@ sequenceDiagram
 
 ## 3. 実装のハイライト
 
-### ① 独立プラグイン `tauri-plugin-novelaid-ai` の構成
+### ① `tauri-plugin-novelaid-ai` への完全カプセル化と疎結合設計
 
-Tauri 2 の公式プラグイン構成に準拠し、以下のファイル群を実装しました。
+ホストアプリ本体（`novelaide`）のコードを汚さず、通信から UI、コンテキスト管理までの全機能をプラグインパッケージ（`tauri-plugin-novelaid-ai-api`）に内包させました。
 
-- `Cargo.toml`: クレート名 `tauri-plugin-novelaid-ai`
-- `src/commands.rs`: `ai_is_available`, `ai_get_models`, `ai_send_message`, `ai_run_tool`
-- `permissions/default.toml`: デフォルト実行権限の定義
-- `guest-js/`: TypeScript 型定義（`AiModelInfo`, `AiPersona`, `AiChatMessage`）とクライアントAPI
+- `guest-js/client/`: `modelManager.ts`（LM Studio 等の検出）および `chatSession.ts`（SSE ストリーミング対話）
+- `guest-js/contexts/`: `AIContextContext.tsx` および `useAIContextContent.ts`
+- `guest-js/components/`: `AIChatPanel.tsx`, `AIChatInput.tsx`, `AIContextSelector.tsx`
 
-### ② 4つの執筆ペルソナの切り替え
+ホストアプリ側（`novelaide`）は、プラグインから `AIChatPanel` をインポートしてパネルに登録するだけで済み、コードベースの肥大化を完全に防止しています。
 
-画面上部にチップUIを配置し、作家の用途に応じてワンクリックで役割を切り替えられます。
+### ② `novelaid-editor` 互換のコンテキストセレクター (`AIContextSelector`)
 
-- **執筆パートナー**: 物語の展開やキャラクター設定、描写の言い換えを一緒にブレインストーミング。
-- **担当編集者**: 読者視点で作品のテンポや伏線、ストーリー構成に率直な意見や講評を提供。
-- **校正係**: 助詞の重なり、文末の連続、ルビ書式、表記ゆれを厳格にチェック。
-- **作中人物**: 登場人物になりきって対話し、台詞の口調や感情の反応を検証。
+原稿をただ全量送るのではなく、作家が今AIに見せたい背景資料を細かくアコーディオンで選択できます。
 
-### ③ 開いている原稿の自動文脈注入
+- **左ペイン・右ペイン個別選択**: エディターの未保存最新テキストや、右ペインの設定資料を個別トグル。
+- **その他の開いているタブ**: 他の章や設定メモもワンクリックで文脈に結合。
+- **Drag & Drop によるカスタム追加**: ファイルツリーから特定ファイルをドロップゾーンにドラッグして個別追加。
+- **合成フォーマット**: `[File: {fileName}]\n```\n{content}\n```\n\n` の統一記法でプロンプトに注入。
 
-執筆中の原稿をわざわざ全選択してチャット欄に貼り付ける必要はありません。
-「原稿文脈」トグルをONにしておくだけで、`DocumentContext` から現在開いているMarkdownの先頭4,000文字が自動的に背景プロンプトとしてAIへ送られます。
+### ③ 自動伸縮入力エリアとリアルタイムストリーミング (`AIChatInput`)
+
+`novelaid-editor` の優れた入力操作性を完全再現しました。
+
+- **自動伸縮 textarea**: 入力文字数・行数に応じて滑らかに高さが拡張。
+- **キーバインド**: `Enter` で即時送信、`Shift + Enter` で改行。
+- **ストリーミング逐次描画**: Server-Sent Events（SSE）のチャンクをリアルタイムに受信し、タイピング風のアニメーションでAIの回答を描画。
 
 ---
 
