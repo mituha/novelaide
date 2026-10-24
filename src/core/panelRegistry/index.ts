@@ -2,7 +2,9 @@ import { PanelRegistry } from './PanelRegistry';
 import { ExplorerPanelPlugin } from '../../plugins/panels/ExplorerPanelPlugin';
 import { SearchPanelPlugin } from '../../plugins/panels/SearchPanelPlugin';
 import { GitPanelPlugin } from '../../plugins/panels/GitPanelPlugin';
+import { MetadataListPanelPlugin } from '../../plugins/panels/MetadataListPanelPlugin';
 import { OutlinePanelPlugin } from '../../plugins/panels/OutlinePanelPlugin';
+import { MetadataPanelPlugin } from '../../plugins/panels/MetadataPanelPlugin';
 
 export const panelRegistry = new PanelRegistry();
 
@@ -10,6 +12,8 @@ export const panelRegistry = new PanelRegistry();
 panelRegistry.register(ExplorerPanelPlugin);
 panelRegistry.register(SearchPanelPlugin);
 panelRegistry.register(GitPanelPlugin);
+panelRegistry.register(MetadataListPanelPlugin);
 panelRegistry.register(OutlinePanelPlugin);
+panelRegistry.register(MetadataPanelPlugin);
 
 export { PanelRegistry };

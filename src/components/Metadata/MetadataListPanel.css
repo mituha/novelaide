@@ -1,0 +1,190 @@
+/* 設定資料一覧パネルルート */
+.metadata-list-panel-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  background-color: var(--bg-primary, #1e1e1e);
+  color: var(--text-primary, #d4d4d4);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+/* ヘッダー */
+.metadata-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color, #333333);
+  background-color: var(--bg-secondary, #252526);
+}
+
+.metadata-list-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary, #9da5b4);
+}
+
+.metadata-refresh-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #858585);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metadata-refresh-btn:hover:not(:disabled) {
+  color: var(--text-primary, #ffffff);
+  background-color: var(--hover-color, #383838);
+}
+
+.metadata-refresh-btn.spinning svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ボディ */
+.metadata-list-body {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 0;
+}
+
+/* カテゴリセクション */
+.metadata-cat-section {
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-color, #2a2d32);
+}
+
+.metadata-cat-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 12px;
+  background: none;
+  border: none;
+  color: var(--text-primary, #cccccc);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.15s ease;
+}
+
+.metadata-cat-header:hover {
+  background-color: var(--hover-color, #2a2d32);
+}
+
+.metadata-cat-name {
+  flex: 1;
+}
+
+.metadata-cat-badge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background-color: var(--bg-tertiary, #333333);
+  color: var(--text-secondary, #858585);
+}
+
+/* アイテムリスト */
+.metadata-cat-items {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 6px 10px 10px 10px;
+}
+
+.metadata-cat-empty {
+  padding: 8px 12px;
+  font-size: 11px;
+  color: var(--text-secondary, #757575);
+  font-style: italic;
+}
+
+/* カード */
+.metadata-item-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 4px;
+  background-color: var(--bg-secondary, #252526);
+  border: 1px solid var(--border-color, #333333);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.metadata-item-card:hover {
+  border-color: var(--accent-color, #007acc);
+  background-color: var(--hover-color, #2d2d2d);
+  transform: translateY(-1px);
+}
+
+.metadata-item-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.metadata-item-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata-item-role {
+  font-size: 10px;
+  padding: 1px 5px;
+  border-radius: 3px;
+  background-color: var(--accent-subtle, rgba(0, 122, 204, 0.2));
+  color: var(--accent-color, #3794ff);
+  white-space: nowrap;
+}
+
+.metadata-item-summary {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary, #9da5b4);
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.metadata-item-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+.metadata-item-tag {
+  font-size: 10px;
+  color: var(--text-secondary, #858585);
+}

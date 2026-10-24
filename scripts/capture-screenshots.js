@@ -57,6 +57,7 @@ async function capture() {
     path.join(rootDir, "making/notes/images/13"),
     path.join(rootDir, "making/notes/images/14"),
     path.join(rootDir, "making/notes/images/15"),
+    path.join(rootDir, "making/notes/images/16"),
     path.join(rootDir, "docs/manual/images"),
     path.join(rootDir, "docs/dev/images"),
   ];
@@ -111,6 +112,27 @@ async function capture() {
         await previewBtn.click();
         await page.waitForSelector(".editor-split-container", { timeout: 5000 });
         await page.waitForTimeout(500);
+      }
+
+      // 1.5 右アクティビティバーのメタデータアイコンをクリックして右ペインに MetadataPanel を展開
+      const metaNavBtn = page.locator('.activity-bar.side-right .activity-button[title*="メタデータ"]');
+      if (await metaNavBtn.isVisible()) {
+        await metaNavBtn.click();
+        await page.waitForSelector(".metadata-panel-root", { timeout: 5000 });
+        await page.waitForTimeout(600);
+
+        const metaOutPath = path.join(rootDir, `making/notes/images/16/16_メタデータ編集パネル_${t.name}.png`);
+        await page.screenshot({ path: metaOutPath });
+        console.log(`Saved: ${metaOutPath}`);
+
+        if (t.id === "dark") {
+          fs.copyFileSync(metaOutPath, path.join(rootDir, "docs/dev/images/16_メタデータ編集パネル_ダークモード.png"));
+          fs.copyFileSync(metaOutPath, path.join(rootDir, "docs/manual/images/16_メタデータ編集パネル_ダークモード.png"));
+        }
+
+        // メタデータパネルを閉じて以降の撮影に影響しないようにする
+        await metaNavBtn.click();
+        await page.waitForTimeout(300);
       }
 
       // 2. 左アクティビティバーの検索アイコンをクリックして SearchPanel を開く

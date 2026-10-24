@@ -14,6 +14,7 @@ interface DocumentContextType {
   closeDocument: (path: string) => void;
   setActivePath: (path: string) => void;
   updateContent: (path: string, content: string) => void;
+  updateMetadata: (path: string, metadata: Record<string, any>) => void;
   saveDocument: (path?: string) => Promise<void>;
   changeViewMode: (path: string, viewMode: DocumentViewMode, side?: 'left' | 'right') => void;
   openPreview: (path: string, mode?: 'preview' | 'reader') => void;
@@ -88,6 +89,22 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return {
             ...doc,
             content,
+            isDirty: true,
+          };
+        }
+        return doc;
+      })
+    );
+  }, []);
+
+  // メタデータ（Frontmatter）を更新
+  const updateMetadata = useCallback((path: string, metadata: Record<string, any>) => {
+    setOpenDocuments((prev) =>
+      prev.map((doc) => {
+        if (doc.path === path) {
+          return {
+            ...doc,
+            metadata,
             isDirty: true,
           };
         }
@@ -187,6 +204,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         closeDocument,
         setActivePath,
         updateContent,
+        updateMetadata,
         saveDocument,
         changeViewMode,
         openPreview,

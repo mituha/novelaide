@@ -1,0 +1,228 @@
+/* メタデータパネルルート */
+.metadata-panel-root {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  padding: 12px;
+  background-color: var(--bg-primary, #1e1e1e);
+  color: var(--text-primary, #d4d4d4);
+  font-size: 13px;
+  box-sizing: border-box;
+}
+
+/* 空状態 */
+.metadata-panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 24px;
+  text-align: center;
+  color: var(--text-secondary, #858585);
+}
+
+.metadata-empty-icon {
+  margin-bottom: 12px;
+  opacity: 0.5;
+}
+
+/* セクション */
+.metadata-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+/* 共通フィールド */
+.metadata-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.metadata-field.half {
+  flex: 1;
+}
+
+.metadata-row {
+  display: flex;
+  gap: 8px;
+}
+
+.metadata-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary, #9da5b4);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* 入力欄 */
+.metadata-input,
+.metadata-textarea {
+  width: 100%;
+  padding: 6px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #333333);
+  background-color: var(--bg-secondary, #252526);
+  color: var(--text-primary, #cccccc);
+  font-size: 12px;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease;
+}
+
+.metadata-input:focus,
+.metadata-textarea:focus {
+  outline: none;
+  border-color: var(--accent-color, #007acc);
+}
+
+.metadata-textarea {
+  resize: vertical;
+  line-height: 1.5;
+}
+
+/* クイック分類タグチップ */
+.metadata-quick-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.metadata-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border-color, #3a3d41);
+  background-color: var(--bg-secondary, #2d2d2d);
+  color: var(--text-secondary, #858585);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.metadata-tag-chip:hover {
+  background-color: var(--hover-color, #383838);
+  color: var(--text-primary, #e0e0e0);
+}
+
+.metadata-tag-chip.active {
+  background-color: var(--accent-subtle, rgba(0, 122, 204, 0.2));
+  border-color: var(--accent-color, #007acc);
+  color: var(--accent-color, #3794ff);
+  font-weight: 600;
+}
+
+/* アコーディオンセクション */
+.metadata-accordion-section {
+  border-top: 1px solid var(--border-color, #333333);
+  padding-top: 10px;
+  margin-bottom: 12px;
+}
+
+.metadata-accordion-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  color: var(--text-primary, #cccccc);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.metadata-accordion-header:hover {
+  color: var(--accent-color, #3794ff);
+}
+
+.metadata-accordion-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+/* カスタムフィールド行 */
+.metadata-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.metadata-custom-key {
+  width: 70px;
+  font-size: 11px;
+  color: var(--text-secondary, #858585);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.metadata-input.custom {
+  flex: 1;
+}
+
+.metadata-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #858585);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.metadata-delete-btn:hover {
+  color: #f48771;
+  background-color: rgba(244, 135, 113, 0.15);
+}
+
+/* フィールド追加バー */
+.metadata-add-field-bar {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.metadata-input.add-key {
+  flex: 1;
+}
+
+.metadata-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #333333);
+  background-color: var(--bg-secondary, #252526);
+  color: var(--text-primary, #cccccc);
+  font-size: 11px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.metadata-add-btn:hover:not(:disabled) {
+  border-color: var(--accent-color, #007acc);
+  color: var(--accent-color, #3794ff);
+}
+
+.metadata-add-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

@@ -269,4 +269,45 @@ marker:
       console.warn("rename fallback:", err);
     }
   },
+
+  // メタデータキャッシュ取得
+  async getMetadataCache(): Promise<Record<string, any>> {
+    try {
+      return await novelaidFs.getMetadataCache();
+    } catch (err) {
+      console.warn("getMetadataCache fallback:", err);
+      return {
+        "mock/characters/主人公_ソラ.md": {
+          title: "主人公 ソラ",
+          name: "ソラ・アルスター",
+          reading: "そら あるすたー",
+          role: "主人公",
+          gender: "男性",
+          age: "17歳",
+          tags: ["character", "主人公", "風魔法"],
+          summary: "空の彼方から落ちてきた謎の少年。風を操る古代魔法の継承者。",
+        },
+        "mock/characters/魔女_ルナ.md": {
+          title: "星詠みの魔女 ルナ",
+          name: "ルナ・シルフィード",
+          reading: "るな しるふぃーど",
+          role: "ヒロイン / 導き手",
+          gender: "女性",
+          age: "16歳",
+          tags: ["character", "ヒロイン", "星魔法"],
+          summary: "星の言葉を聞くことができる静謐な少女。ソラの記憶を探す旅を共にする。",
+        },
+        "mock/settings/世界観_帝国史.md": {
+          title: "アルテリア帝国史",
+          tags: ["location", "歴史", "帝国", "世界観"],
+          summary: "千年の栄華を誇る軍事大国。近年は禁忌の黒魔術を研究していると噂される。",
+        },
+        "mock/01_プロローグ.md": {
+          title: "01_プロローグ",
+          tags: ["plot", "第1章", "プロローグ"],
+          summary: "青い空の彼方から漆黒の羽根を持つ鳥が舞い降り、日常が崩壊する導入部。",
+        },
+      };
+    }
+  },
 };
