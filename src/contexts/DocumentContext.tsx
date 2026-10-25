@@ -46,9 +46,11 @@ interface DocumentContextType {
   setActivePane: (paneId: PaneId) => void;
   setActivePath: (path: string) => void;
 
-  // ビューモード & プレビュー操作
+  // ビューモード & プレビュー & 分割操作
   changeViewMode: (path: string, viewMode: DocumentViewMode, paneId?: PaneId) => void;
   openPreview: (path: string, mode?: 'preview' | 'reader', targetPane?: PaneId) => void;
+  openPreviewInOtherPane: (path?: string, fromPane?: PaneId) => void;
+  splitToOtherPane: (path?: string, fromPane?: PaneId) => void;
   openPreviewInSplit: (path?: string) => void;
   toggleSplitPreview: (path?: string) => void;
   toggleSplit: () => void;
@@ -457,32 +459,82 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [changeViewMode, activePane]
   );
 
-  // 別ペイン（右ペイン）へのプレビュー展開
-  const openPreviewInSplit = useCallback(
-    (path?: string) => {
-      const targetPath = path || activePath;
+  // 反対側のペインIDを取得するヘルパー
+  const getOppositePane = useCallback((paneId: PaneId): PaneId => {
+    return paneId === 'editor.left' ? 'editor.right' : 'editor.left';
+  }, []);
+
+  // 別サイドのビューに、プレビュー状態で開く（すでに存在する場合はアクティブ化）
+  const openPreviewInOtherPane = useCallback(
+    (path?: string, fromPane?: PaneId) => {
+      const sourcePane = fromPane || activePane;
+      const targetPane = getOppositePane(sourcePane);
+      const targetPath = path || activePathByPane[sourcePane];
       if (!targetPath) return;
 
       const doc = openDocuments.find((d) => d.path === targetPath);
-      const defaultMode = doc?.documentType === 'novel' ? 'reader' : 'preview';
+      const previewMode = doc?.documentType === 'novel' ? 'reader' : 'preview';
 
       setIsSplit(true);
-      openDocument(targetPath, { paneId: 'editor.right', viewMode: defaultMode });
-    },
-    [activePath, openDocuments, openDocument]
-  );
 
-  // スプリットプレビューのトグル
-  const toggleSplitPreview = useCallback(
-    (path?: string) => {
-      if (isSplit) {
-        // スプリットを閉じる（右ペインを一括アンロード）
-        closePane('editor.right');
+      // 反対ペインに既に開かれているか確認
+      const existingView = doc?.views.find((v) => v.viewId === targetPane);
+      if (existingView) {
+        // すでに開かれている場合：プレビュー系でなければプレビューに切り替え、アクティブ化
+        if (existingView.viewMode !== previewMode) {
+          changeViewMode(targetPath, previewMode, targetPane);
+        }
+        setActivePathByPane((prev) => ({ ...prev, [targetPane]: targetPath }));
+        setActivePane(targetPane);
       } else {
-        openPreviewInSplit(path);
+        // まだ開かれていない場合は新規追加してアクティブ化
+        openDocument(targetPath, { paneId: targetPane, viewMode: previewMode });
       }
     },
-    [isSplit, closePane, openPreviewInSplit]
+    [activePane, activePathByPane, getOppositePane, openDocuments, changeViewMode, openDocument]
+  );
+
+  // 同じ状態のまま、別サイドに表示する（すでに存在する場合はアクティブ化）
+  const splitToOtherPane = useCallback(
+    (path?: string, fromPane?: PaneId) => {
+      const sourcePane = fromPane || activePane;
+      const targetPane = getOppositePane(sourcePane);
+      const targetPath = path || activePathByPane[sourcePane];
+      if (!targetPath) return;
+
+      const doc = openDocuments.find((d) => d.path === targetPath);
+      const sourceView = doc?.views.find((v) => v.viewId === sourcePane);
+      const targetMode = sourceView?.viewMode || 'editor';
+
+      setIsSplit(true);
+
+      // 反対ペインに既に開かれているか確認
+      const existingView = doc?.views.find((v) => v.viewId === targetPane);
+      if (existingView) {
+        // すでに開かれている場合は、そのドキュメントをアクティブ化
+        setActivePathByPane((prev) => ({ ...prev, [targetPane]: targetPath }));
+        setActivePane(targetPane);
+      } else {
+        // 同じ表示モードのまま反対ペインに開き、アクティブ化
+        openDocument(targetPath, { paneId: targetPane, viewMode: targetMode });
+      }
+    },
+    [activePane, activePathByPane, getOppositePane, openDocuments, openDocument]
+  );
+
+  // 後方互換用：ペイン閉鎖は行わず、安全に別サイドプレビューを実行
+  const openPreviewInSplit = useCallback(
+    (path?: string) => {
+      openPreviewInOtherPane(path, 'editor.left');
+    },
+    [openPreviewInOtherPane]
+  );
+
+  const toggleSplitPreview = useCallback(
+    (path?: string) => {
+      openPreviewInOtherPane(path, activePane);
+    },
+    [openPreviewInOtherPane, activePane]
   );
 
   // スプリット開閉トグル
@@ -493,10 +545,10 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setIsSplit(true);
       // 右ペインが空なら、現在のアクティブドキュメントをプレビューで開く
       if (activePath && !activePathByPane['editor.right']) {
-        openPreviewInSplit(activePath);
+        openPreviewInOtherPane(activePath, 'editor.left');
       }
     }
-  }, [isSplit, closePane, activePath, activePathByPane, openPreviewInSplit]);
+  }, [isSplit, closePane, activePath, activePathByPane, openPreviewInOtherPane]);
 
   return (
     <DocumentContext.Provider
@@ -523,6 +575,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setActivePath,
         changeViewMode,
         openPreview,
+        openPreviewInOtherPane,
+        splitToOtherPane,
         openPreviewInSplit,
         toggleSplitPreview,
         toggleSplit,

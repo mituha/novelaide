@@ -13,11 +13,11 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
     getTabsForPane,
     getActiveDocumentForPane,
     activePathByPane,
-    isSplit,
     switchTab,
     closeTab,
     changeViewMode,
-    toggleSplitPreview,
+    openPreviewInOtherPane,
+    splitToOtherPane,
     closePane,
   } = useDocument();
 
@@ -106,20 +106,33 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
           </button>
         )}
 
-        {/* 2. 左ペイン時: 左右分割プレビュートグル */}
-        {paneId === 'editor.left' && canPreview && (
+        {/* 2. 単にドキュメントを分割表示する機能（同じ状態のまま反対ペインに表示/アクティブ化） */}
+        {activePath && (
           <button
             type="button"
-            className={`editor-tab-action-btn ${isSplit ? 'active' : ''}`}
-            onClick={() => toggleSplitPreview()}
-            title={isSplit ? '左右分割プレビューを閉じる' : '右ペインにプレビューを分割表示'}
+            className="editor-tab-action-btn"
+            onClick={() => splitToOtherPane(activePath, paneId)}
+            title="反対側のペインに分割表示（同じ状態で開く/既存ならアクティブ化）"
           >
-            {isSplit ? <BookOpen size={13} /> : <Columns2 size={13} />}
-            <span>{isSplit ? '分割プレビュー中' : '別窓プレビュー'}</span>
+            <Columns2 size={13} />
+            <span>横に分割</span>
           </button>
         )}
 
-        {/* 3. 右ペイン時: ペインを閉じるボタン */}
+        {/* 3. 別サイドのビューにプレビュー状態で開く機能（既存ならアクティブ化） */}
+        {activePath && canPreview && (
+          <button
+            type="button"
+            className="editor-tab-action-btn"
+            onClick={() => openPreviewInOtherPane(activePath, paneId)}
+            title="反対側のペインにプレビューとして開く（既存ならアクティブ化）"
+          >
+            <BookOpen size={13} />
+            <span>分割プレビュー</span>
+          </button>
+        )}
+
+        {/* 4. 右ペイン時: ペインを閉じるボタン */}
         {paneId === 'editor.right' && (
           <button
             type="button"
