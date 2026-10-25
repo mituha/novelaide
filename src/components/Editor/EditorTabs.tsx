@@ -1,58 +1,86 @@
 import React from 'react';
-import { useDocument } from '../../contexts/DocumentContext';
+import { useDocument, PaneId } from '../../contexts/DocumentContext';
 import { DocumentIcon } from '../FileExplorer/DocumentIcon';
-import { X, Columns2, BookOpen } from 'lucide-react';
+import { X, Columns2, BookOpen, Eye, Edit3 } from 'lucide-react';
 import './EditorTabs.css';
 
-export const EditorTabs: React.FC = () => {
+interface EditorTabsProps {
+  paneId?: PaneId;
+}
+
+export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }) => {
   const {
-    openDocuments,
-    activePath,
-    activeDocument,
-    isSplitActive,
-    setActivePath,
-    closeDocument,
+    getTabsForPane,
+    getActiveDocumentForPane,
+    activePathByPane,
+    isSplit,
+    switchTab,
+    closeTab,
+    changeViewMode,
     toggleSplitPreview,
+    closePane,
   } = useDocument();
 
-  if (openDocuments.length === 0) {
+  const tabs = getTabsForPane(paneId);
+  const activeDoc = getActiveDocumentForPane(paneId);
+  const activePath = activePathByPane[paneId];
+
+  if (tabs.length === 0) {
     return null;
   }
 
   // アクティブなドキュメントがプレビュー可能か（novel, markdown）
   const canPreview =
-    activeDocument &&
-    (activeDocument.documentType === 'novel' ||
-      activeDocument.documentType === 'markdown');
+    activeDoc &&
+    (activeDoc.documentType === 'novel' || activeDoc.documentType === 'markdown');
+
+  // 現在のペインでのアクティブタブのビューモード
+  const currentViewMode = tabs.find((t) => t.path === activePath)?.viewMode || 'editor';
+  const isPreviewMode = currentViewMode === 'preview' || currentViewMode === 'reader';
+
+  const handleToggleCurrentMode = () => {
+    if (!activePath || !activeDoc) return;
+    if (isPreviewMode) {
+      changeViewMode(activePath, 'editor', paneId);
+    } else {
+      const targetMode = activeDoc.documentType === 'novel' ? 'reader' : 'preview';
+      changeViewMode(activePath, targetMode, paneId);
+    }
+  };
 
   return (
-    <div className="editor-tabs-bar">
+    <div className={`editor-tabs-bar pane-bar-${paneId.replace('.', '-')}`}>
       <div className="editor-tabs-list">
-        {openDocuments.map((doc) => {
-          const isActive = doc.path === activePath;
+        {tabs.map((tab) => {
+          const isActive = tab.path === activePath;
+          const isTabPreview = tab.viewMode === 'preview' || tab.viewMode === 'reader';
+
           return (
             <div
-              key={doc.path}
+              key={`${paneId}-${tab.path}`}
               className={`editor-tab-item ${isActive ? 'active' : ''}`}
-              onClick={() => setActivePath(doc.path)}
-              title={doc.path}
+              onClick={() => switchTab(tab.path, paneId)}
+              title={`${tab.path} (${tab.viewMode})`}
             >
               <DocumentIcon
-                type={doc.documentType}
+                type={tab.documentType}
                 isOpen={false}
                 size={14}
               />
-              <span className="tab-title">{doc.baseName}</span>
-              {doc.isDirty ? (
-                <span className="dirty-indicator" title="未保存の変更あり">
+              <span className="tab-title">
+                {isTabPreview ? `[Preview] ${tab.baseName}` : tab.baseName}
+              </span>
+              {tab.isDirty ? (
+                <span className="dirty-indicator" title="未保存の変更あり（閉じるときに自動保存）">
                   ●
                 </span>
               ) : null}
               <button
+                type="button"
                 className="tab-close-btn"
                 onClick={(e) => {
                   e.stopPropagation();
-                  closeDocument(doc.path);
+                  closeTab(tab.path, paneId);
                 }}
                 title="閉じる"
               >
@@ -63,24 +91,47 @@ export const EditorTabs: React.FC = () => {
         })}
       </div>
 
-      {/* 右端のアクション群（スプリットプレビュートグル） */}
-      {canPreview && (
-        <div className="editor-tabs-actions">
+      {/* 右端のアクション群 */}
+      <div className="editor-tabs-actions">
+        {/* 1. 同一ペイン内での viewMode 切り替え (edit <-> preview) */}
+        {canPreview && (
           <button
             type="button"
-            className={`editor-tab-action-btn ${isSplitActive ? 'active' : ''}`}
-            onClick={() => toggleSplitPreview()}
-            title={
-              isSplitActive
-                ? 'プレビュー分割表示を閉じる'
-                : 'プレビューを左右分割で表示'
-            }
+            className="editor-tab-action-btn"
+            onClick={handleToggleCurrentMode}
+            title={isPreviewMode ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
           >
-            {isSplitActive ? <BookOpen size={13} /> : <Columns2 size={13} />}
-            <span>{isSplitActive ? 'プレビュー表示中' : 'プレビュー'}</span>
+            {isPreviewMode ? <Edit3 size={13} /> : <Eye size={13} />}
+            <span>{isPreviewMode ? '編集へ' : '表示'}</span>
           </button>
-        </div>
-      )}
+        )}
+
+        {/* 2. 左ペイン時: 左右分割プレビュートグル */}
+        {paneId === 'editor.left' && canPreview && (
+          <button
+            type="button"
+            className={`editor-tab-action-btn ${isSplit ? 'active' : ''}`}
+            onClick={() => toggleSplitPreview()}
+            title={isSplit ? '左右分割プレビューを閉じる' : '右ペインにプレビューを分割表示'}
+          >
+            {isSplit ? <BookOpen size={13} /> : <Columns2 size={13} />}
+            <span>{isSplit ? '分割プレビュー中' : '別窓プレビュー'}</span>
+          </button>
+        )}
+
+        {/* 3. 右ペイン時: ペインを閉じるボタン */}
+        {paneId === 'editor.right' && (
+          <button
+            type="button"
+            className="editor-tab-action-btn pane-close-action-btn"
+            onClick={() => closePane('editor.right')}
+            title="右ペインを閉じる"
+          >
+            <X size={13} />
+            <span>ペインを閉じる</span>
+          </button>
+        )}
+      </div>
     </div>
   );
 };

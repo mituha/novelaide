@@ -25,7 +25,6 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   const [rightActivePanelId, setRightActivePanelId] = useState<string | null>(null);
 
   const [selectedText, setSelectedText] = useState("");
-  const [splitRatio, setSplitRatio] = useState<number>(0.5); // 左右分割比率 (0.2 ~ 0.8)
   const [isDragging, setIsDragging] = useState<boolean>(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -39,8 +38,13 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
   } | null>(null);
   const {
     openDocuments,
+    activePane,
     activeDocument,
-    isSplitActive,
+    getActiveDocumentForPane,
+    isSplit,
+    splitRatio,
+    setSplitRatio,
+    setActivePane,
     updateContent,
   } = useDocument();
 
@@ -150,26 +154,41 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
                 />
               </div>
             </div>
-          ) : openDocuments.length > 0 && activeDocument ? (
+          ) : openDocuments.length > 0 ? (
             <div className="editor-workspace-view">
-              <EditorTabs />
-              <div className="editor-pane-body" ref={containerRef}>
-                {isSplitActive ? (
-                  /* 左右スプリット表示 */
-                  <div className="editor-split-container">
-                    {/* 左ペイン */}
+              <div className="editor-pane-body" ref={containerRef} style={{ height: '100%', display: 'flex' }}>
+                {isSplit ? (
+                  /* 左右分割表示: それぞれ独立したタブバーとペインを持つ構造 */
+                  <div className="editor-split-container" style={{ display: 'flex', width: '100%', height: '100%' }}>
+                    {/* 左ペイン領域 */}
                     <div
-                      className="editor-split-pane pane-left"
-                      style={{ width: `${splitRatio * 100}%` }}
+                      className={`editor-split-pane pane-left ${activePane === 'editor.left' ? 'pane-active' : ''}`}
+                      style={{ width: `${splitRatio * 100}%`, display: 'flex', flexDirection: 'column', height: '100%' }}
+                      onClick={() => setActivePane('editor.left')}
                     >
-                      <DocumentPane
-                        document={activeDocument}
-                        viewMode={activeDocument.leftViewMode}
-                        paneSide="left"
-                        onChangeContent={(val) =>
-                          updateContent(activeDocument.path, val)
-                        }
-                      />
+                      <EditorTabs paneId="editor.left" />
+                      <div className="pane-document-container" style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                        {(() => {
+                          const leftDoc = getActiveDocumentForPane('editor.left');
+                          if (!leftDoc) {
+                            return (
+                              <div className="empty-pane-placeholder" style={{ padding: '24px', color: 'var(--text-secondary, #888)' }}>
+                                <p>タブが開かれていません</p>
+                              </div>
+                            );
+                          }
+                          const leftViewRef = leftDoc.views.find((v) => v.viewId === 'editor.left');
+                          const leftViewMode = leftViewRef?.viewMode || 'editor';
+                          return (
+                            <DocumentPane
+                              document={leftDoc}
+                              viewMode={leftViewMode}
+                              paneSide="left"
+                              onChangeContent={(val) => updateContent(leftDoc.path, val)}
+                            />
+                          );
+                        })()}
+                      </div>
                     </div>
 
                     {/* スプリッター (リサイズハンドル) */}
@@ -179,31 +198,62 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
                       title="ドラッグして画面分割比率を調整"
                     />
 
-                    {/* 右ペイン */}
+                    {/* 右ペイン領域 */}
                     <div
-                      className="editor-split-pane pane-right"
-                      style={{ width: `${(1 - splitRatio) * 100}%` }}
+                      className={`editor-split-pane pane-right ${activePane === 'editor.right' ? 'pane-active' : ''}`}
+                      style={{ width: `${(1 - splitRatio) * 100}%`, display: 'flex', flexDirection: 'column', height: '100%' }}
+                      onClick={() => setActivePane('editor.right')}
                     >
-                      <DocumentPane
-                        document={activeDocument}
-                        viewMode={activeDocument.rightViewMode}
-                        paneSide="right"
-                        onChangeContent={(val) =>
-                          updateContent(activeDocument.path, val)
-                        }
-                      />
+                      <EditorTabs paneId="editor.right" />
+                      <div className="pane-document-container" style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                        {(() => {
+                          const rightDoc = getActiveDocumentForPane('editor.right');
+                          if (!rightDoc) {
+                            return (
+                              <div className="empty-pane-placeholder" style={{ padding: '24px', color: 'var(--text-secondary, #888)' }}>
+                                <p>タブが開かれていません</p>
+                              </div>
+                            );
+                          }
+                          const rightViewRef = rightDoc.views.find((v) => v.viewId === 'editor.right');
+                          const rightViewMode = rightViewRef?.viewMode || 'preview';
+                          return (
+                            <DocumentPane
+                              document={rightDoc}
+                              viewMode={rightViewMode}
+                              paneSide="right"
+                              onChangeContent={(val) => updateContent(rightDoc.path, val)}
+                            />
+                          );
+                        })()}
+                      </div>
                     </div>
                   </div>
                 ) : (
                   /* 単一ペイン表示 (左ペインのみ) */
-                  <DocumentPane
-                    document={activeDocument}
-                    viewMode={activeDocument.leftViewMode}
-                    paneSide="left"
-                    onChangeContent={(val) =>
-                      updateContent(activeDocument.path, val)
-                    }
-                  />
+                  <div
+                    className="editor-single-pane-container"
+                    style={{ display: 'flex', flexDirection: 'column', width: '100%', height: '100%' }}
+                    onClick={() => setActivePane('editor.left')}
+                  >
+                    <EditorTabs paneId="editor.left" />
+                    <div className="pane-document-container" style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+                      {(() => {
+                        const leftDoc = getActiveDocumentForPane('editor.left');
+                        if (!leftDoc) return null;
+                        const leftViewRef = leftDoc.views.find((v) => v.viewId === 'editor.left');
+                        const leftViewMode = leftViewRef?.viewMode || 'editor';
+                        return (
+                          <DocumentPane
+                            document={leftDoc}
+                            viewMode={leftViewMode}
+                            paneSide="left"
+                            onChangeContent={(val) => updateContent(leftDoc.path, val)}
+                          />
+                        );
+                      })()}
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

@@ -6,15 +6,36 @@ import { useDocument } from '../../contexts/DocumentContext';
 import { fileService } from '../../services/fileService';
 
 const AiPanelWrapper: React.FC = () => {
-  const { activeDocument, openDocuments } = useDocument();
+  const { activeDocument, activeLeftItem, activeRightItem, openDocuments } = useDocument();
 
   return (
     <AIChatPanel
-      activeLeftItem={activeDocument ? {
-        path: activeDocument.path,
-        baseName: activeDocument.fileTitle || activeDocument.baseName,
-        content: activeDocument.content,
-      } : null}
+      activeLeftItem={
+        activeLeftItem
+          ? {
+              path: activeLeftItem.path,
+              baseName: activeLeftItem.fileTitle || activeLeftItem.baseName,
+              content:
+                openDocuments.find((d) => d.path === activeLeftItem.path)?.content || '',
+            }
+          : activeDocument
+          ? {
+              path: activeDocument.path,
+              baseName: activeDocument.fileTitle || activeDocument.baseName,
+              content: activeDocument.content,
+            }
+          : null
+      }
+      activeRightItem={
+        activeRightItem
+          ? {
+              path: activeRightItem.path,
+              baseName: activeRightItem.fileTitle || activeRightItem.baseName,
+              content:
+                openDocuments.find((d) => d.path === activeRightItem.path)?.content || '',
+            }
+          : null
+      }
       openDocuments={openDocuments.map((doc) => ({
         path: doc.path,
         baseName: doc.fileTitle || doc.baseName,

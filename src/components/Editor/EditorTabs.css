@@ -119,3 +119,13 @@
   color: #ffffff;
   border-color: var(--accent-color);
 }
+
+.editor-tab-action-btn.pane-close-action-btn:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+  border-color: #ef4444;
+}
+
+.pane-bar-editor-right {
+  border-left: 1px solid var(--border-color);
+}
