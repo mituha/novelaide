@@ -9,8 +9,10 @@ import {
   ExtensionCommandDefinition,
   NovelaidExtensionAPI,
   NovelaidToolProxy,
+  UIDocumentContext,
 } from '../extensions/novelaidExtension';
 
+export type { UIDocumentContext };
 export type ToolExecutor = (toolName: string, args: Record<string, any>) => Promise<any>;
 
 export interface PiAgentSessionOptions {
@@ -18,6 +20,7 @@ export interface PiAgentSessionOptions {
   baseUrl?: string;
   persona?: Persona;
   contextContent?: string;
+  uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
   toolExecutor?: ToolExecutor;
   onEvent?: (event: AgentSessionEvent) => void;
@@ -232,6 +235,7 @@ export class PiWritingAgentSession {
       lmStudioUrl: baseUrl,
       persona: this.options.persona,
       contextContent: this.options.contextContent,
+      uiDocumentContext: this.options.uiDocumentContext,
       toolProxy: this.options.toolProxy,
       invokeTool: this.options.toolExecutor,
     });

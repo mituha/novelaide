@@ -78,5 +78,22 @@ AI エージェントをバックエンド（CLI/Sidecar や Rust 単体）だ�
 ## 4. 将来の `novelaid-cli` / Sidecar 連携への適合性
 
 * 本アーキテクチャでは、ツールのインターフェース（スキーマ・名前）が標準化されているため、
-  - **novelaid-cli (CLI環境)**: そもそも UI が存在しないため、CLI 自信がカレントディレクトリやファイルを直接読み取って実行。
+  - **novelaid-cli (CLI環境)**: そもそも UI が存在しないため、CLI 自身がカレントディレクトリやファイルを直接読み取って実行。
   - **Sidecar 連携時**: 将来 CLI を Sidecar 化した場合でも、フロントエンドが未保存バッファを把握し、Sidecar プロセスに対して未保存テキスト付きで解析リクエストを送信する形になるため、アーキテクチャの破綻が一切ありません。
+
+---
+
+## 5. 実装状況と検証実績 (v0.18.7)
+
+- [x] **`novelaidExtension.ts`**:
+  - `UIDocumentContext` インターフェースの策定
+  - UI連携ツール `get_open_documents`, `get_active_document` の `api.registerTool` による登録
+  - `scan_proofread`, `extract_ruby` ツール呼び出し時の未保存バッファ自動補填ロジック
+- [x] **`chatSession.ts`**:
+  - `PiAgentSessionOptions` への `uiDocumentContext` の引き渡しと Extension 初期化連携
+- [x] **`AIChatPanel.tsx`**:
+  - `openDocuments`, `activeLeftItem`, `activeRightItem` をリアルタイム監視し `uiDocumentContext` を提供
+  - `toolExecutor` 経由での UI 直接解決およびバックエンド Rust 委譲のハイブリッド処理
+- [x] **検証**:
+  - Node.js ESM 環境での単体検証スクリプトによるツール登録・実行テスト成功
+  - `npm run build:plugin:ai` および `npm run build` による TypeScript 型検査・バンドルビルド成功

@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { ChatMessage, AiModelInfo, AiPersonaType, AiPersona } from '../types';
 import { fetchLmStudioModels, getFallbackModels } from '../client/modelManager';
-import { PiWritingAgentSession, ToolExecutor } from '../client/chatSession';
+import { PiWritingAgentSession, ToolExecutor, UIDocumentContext } from '../client/chatSession';
 import { getPersonaGuideline } from '../domain/guidelines';
 import { useAIContextContent, ContextDocumentItem } from '../hooks/useAIContextContent';
 import { AIChatInput } from './AIChatInput';
@@ -162,10 +162,43 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
     }
   };
 
+  // UI ドキュメントコンテキスト（未保存バッファおよび開いているタブ一覧へのリアルタイムアクセス）
+  const uiDocumentContext: UIDocumentContext = {
+    getOpenDocuments: () =>
+      openDocuments.map((doc) => ({
+        path: doc.path,
+        title: doc.name || doc.path.split(/[/\\]/).pop() || '無題',
+        isDirty: doc.isDirty ?? false,
+      })),
+    getActiveDocument: (side?: 'left' | 'right') => {
+      const doc = side === 'right' ? activeRightItem : (activeLeftItem || activeRightItem);
+      if (!doc) return null;
+      return {
+        path: doc.path,
+        title: doc.name || doc.path.split(/[/\\]/).pop() || '無題',
+        content: doc.content || '',
+        isDirty: doc.isDirty ?? false,
+      };
+    },
+  };
+
   // pi-coding-agent 互換ツールエグゼキューター（Rustネイティブツール ＆ インメモリフォールバック）
   const toolExecutor: ToolExecutor = async (toolName: string, args: Record<string, any>) => {
+    // 1. UI・未保存バッファ直接連携ツール（フロントエンド完結）
+    if (toolName === 'get_open_documents') {
+      const docs = uiDocumentContext.getOpenDocuments();
+      return { status: 'success', documents: docs, count: docs.length };
+    }
+
+    if (toolName === 'get_active_document') {
+      const doc = uiDocumentContext.getActiveDocument(args.side);
+      if (doc) return { status: 'success', document: doc };
+      return { status: 'not_found', message: 'アクティブなドキュメントが見つかりませんでした。' };
+    }
+
+    // 2. 解析ツール（未保存最新バッファを補填してバックエンドRustへ委譲）
     const activeDoc = activeLeftItem || activeRightItem;
-    const content = args.content || activeDoc?.content || '';
+    const content = args.text || args.content || activeDoc?.content || '';
 
     if (toolName === 'scan_proofread' || toolName === 'proofread_scan') {
       return await invoke<any>('plugin:novelaid-ai|ai_run_tool', {
@@ -260,6 +293,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         model: selectedModel,
         persona: currentPersona,
         contextContent,
+        uiDocumentContext,
         toolExecutor: useTools ? toolExecutor : undefined,
         onToken: (delta) => {
           console.log('[AIChatPanel] トークン描画更新:', delta);
@@ -273,7 +307,11 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
           console.log('[AIChatPanel] エージェントイベント受信:', event.type, event);
           if (event.type === 'tool_call_start') {
             const toolLabel =
-              event.toolName === 'scan_proofread' || event.toolName === 'proofread_scan'
+              event.toolName === 'get_open_documents'
+                ? '開いている文書一覧取得'
+                : event.toolName === 'get_active_document'
+                ? '未保存原稿バッファ取得'
+                : event.toolName === 'scan_proofread' || event.toolName === 'proofread_scan'
                 ? '校正解析エンジン'
                 : event.toolName === 'extract_ruby' || event.toolName === 'ruby_suggest'
                 ? 'ルビ候補抽出'
@@ -318,6 +356,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         model: selectedModel,
         persona: currentPersona,
         contextContent,
+        uiDocumentContext,
         toolExecutor: useTools ? toolExecutor : undefined,
       });
       const res = await session.executeCommand('/proofread');
@@ -350,6 +389,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         model: selectedModel,
         persona: currentPersona,
         contextContent,
+        uiDocumentContext,
         toolExecutor: useTools ? toolExecutor : undefined,
       });
       const res = await session.executeCommand('/ruby');

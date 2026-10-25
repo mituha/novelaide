@@ -37,6 +37,19 @@ export interface NovelaidExtensionAPI {
 }
 
 /**
+ * UI ドキュメントコンテキスト（フロントエンドの未保存バッファやタブ状態へのアクセスインターフェース）
+ */
+export interface UIDocumentContext {
+  getOpenDocuments: () => Array<{ path: string; title: string; isDirty?: boolean }>;
+  getActiveDocument: (side?: 'left' | 'right') => {
+    path: string;
+    title: string;
+    content: string;
+    isDirty?: boolean;
+  } | null;
+}
+
+/**
  * ツール実行プロキシ（GUI では Tauri IPC、CLI では直接実行に切り替え可能）
  */
 export interface NovelaidToolProxy {
@@ -49,6 +62,7 @@ export interface NovelaidExtensionOptions {
   lmStudioUrl?: string;
   persona?: Persona;
   contextContent?: string;
+  uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
   invokeTool?: (toolName: string, args: Record<string, any>) => Promise<any>;
   notify?: (message: string, type?: 'info' | 'warning' | 'error') => void;
@@ -95,24 +109,39 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
 
       // ツール実行プロキシハンドラー
       const runTool = async (name: string, args: Record<string, any>): Promise<any> => {
+        // 未保存バッファの自動補填（text / content が省略された場合、アクティブ原稿の最新未保存バッファを使用）
+        const resolvedArgs = { ...args };
+        if (
+          (name === 'scan_proofread' || name === 'extract_ruby') &&
+          (!resolvedArgs.text || resolvedArgs.text.trim().length === 0)
+        ) {
+          const activeDoc = options.uiDocumentContext?.getActiveDocument('left');
+          if (activeDoc?.content) {
+            resolvedArgs.text = activeDoc.content;
+            resolvedArgs.fileName = activeDoc.path;
+          } else if (options.contextContent) {
+            resolvedArgs.text = options.contextContent;
+          }
+        }
+
         if (options.toolProxy) {
           if (name === 'scan_proofread' && options.toolProxy.scanProofread) {
-            return await options.toolProxy.scanProofread(args);
+            return await options.toolProxy.scanProofread(resolvedArgs);
           }
           if (name === 'extract_ruby' && options.toolProxy.extractRuby) {
-            return await options.toolProxy.extractRuby(args);
+            return await options.toolProxy.extractRuby(resolvedArgs);
           }
           if (name === 'search_metadata' && options.toolProxy.searchMetadata) {
-            return await options.toolProxy.searchMetadata(args as any);
+            return await options.toolProxy.searchMetadata(resolvedArgs as any);
           }
         }
 
         if (options.invokeTool) {
-          return await options.invokeTool(name, args);
+          return await options.invokeTool(name, resolvedArgs);
         }
 
         try {
-          return await invoke('plugin:novelaid-ai|ai_run_tool', { toolName: name, args });
+          return await invoke('plugin:novelaid-ai|ai_run_tool', { toolName: name, args: resolvedArgs });
         } catch {
           if (name === 'scan_proofread') {
             return {
@@ -142,7 +171,60 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
         }
       };
 
-      // 2. 執筆支援ツールの登録 (api.registerTool)
+      // 2. UI・未保存バッファ連携ツールの登録 (フロントエンド完結)
+      api.registerTool({
+        name: 'get_open_documents',
+        description: '現在エディターで開かれているドキュメント（タブ）一覧と未保存状態を取得します。',
+        parameters: {
+          type: 'object',
+          properties: {},
+          required: [],
+        },
+        execute: async () => {
+          if (options.uiDocumentContext) {
+            const docs = options.uiDocumentContext.getOpenDocuments();
+            return {
+              status: 'success',
+              documents: docs,
+              count: docs.length,
+            };
+          }
+          return { status: 'success', documents: [], count: 0 };
+        },
+      });
+
+      api.registerTool({
+        name: 'get_active_document',
+        description: '現在フォーカスされている原稿の最新バッファ（未保存テキスト含む）を取得します。',
+        parameters: {
+          type: 'object',
+          properties: {
+            side: {
+              type: 'string',
+              enum: ['left', 'right'],
+              description: '左右ペインの指定（省略時は左またはアクティブペイン）',
+            },
+          },
+          required: [],
+        },
+        execute: async (args: any) => {
+          if (options.uiDocumentContext) {
+            const doc = options.uiDocumentContext.getActiveDocument(args?.side);
+            if (doc) {
+              return {
+                status: 'success',
+                document: doc,
+              };
+            }
+          }
+          return {
+            status: 'not_found',
+            message: 'アクティブなドキュメントが見つかりませんでした。',
+          };
+        },
+      });
+
+      // 3. 執筆支援ツールの登録 (api.registerTool)
       api.registerTool({
         name: 'scan_proofread',
         description: '現在開いている原稿テキストの文末重複（「〜た。」の3連続など）、誤字脱字、表記揺れ、ら抜き言葉を高速スキャンします。',
@@ -151,7 +233,7 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
           properties: {
             text: {
               type: 'string',
-              description: 'スキャン対象の本文テキスト。省略時は現在アクティブな原稿が対象になります。',
+              description: 'スキャン対象の本文テキスト。省略時は現在アクティブな原稿（未保存含む）が対象になります。',
             },
           },
           required: [],
@@ -169,7 +251,7 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
           properties: {
             text: {
               type: 'string',
-              description: 'ルビ抽出対象の本文テキスト。省略時は現在アクティブな原稿が対象になります。',
+              description: 'ルビ抽出対象の本文テキスト。省略時は現在アクティブな原稿（未保存含む）が対象になります。',
             },
           },
           required: [],
@@ -240,7 +322,7 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             '【novelaid AI 執筆支援ステータス】',
             `・接続エンドポイント: ${lmStudioUrl}`,
             `・現在のペルソナ: ${options.persona || 'partner'}`,
-            '・登録ツール: scan_proofread, extract_ruby, search_metadata',
+            '・登録ツール: get_open_documents, get_active_document, scan_proofread, extract_ruby, search_metadata',
             '・登録コマンド: /ruby, /proofread, /check, /info, /help',
             '・基盤アーキテクチャ: Pi Coding Agent SDK (Extension / registerTool)',
           ].join('\n');
