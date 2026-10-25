@@ -16,6 +16,7 @@
     "noImplicitReturns": true,
     "skipLibCheck": true,
     "declaration": true,
+    "rootDir": "./guest-js",
     "jsx": "react-jsx"
   },
   "include": ["guest-js"]

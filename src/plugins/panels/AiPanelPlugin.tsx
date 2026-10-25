@@ -41,7 +41,7 @@ const AiPanelWrapper: React.FC = () => {
         baseName: doc.fileTitle || doc.baseName,
         content: doc.content,
       }))}
-      readFileDiskFn={async (path) => {
+      readFileDiskFn={async (path: string) => {
         const fileDoc = await fileService.readFile(path);
         return fileDoc.content;
       }}
