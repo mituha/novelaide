@@ -12,7 +12,8 @@
     "build:plugin:ai": "npm run build --prefix tauri-plugin-novelaid-ai",
     "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai",
     "build:plugin": "npm run build:plugins",
-    "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin"
+    "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "^1.4.0",

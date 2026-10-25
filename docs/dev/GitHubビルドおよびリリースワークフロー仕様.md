@@ -47,15 +47,33 @@
 
 ---
 
-## 4. リリース手順
+## 4. リリース手順（一括自動実行）
 
-新しいバージョンをリリースする際は、以下のステップで進めます：
+`scripts/release.mjs`（および `scripts/release.ps1`）により、`package.json` のバージョン自動読み取り、タグ生成、およびリモートへのプッシュを一発で安全に実行できます。
+リモート名が `origin` ではなく `github` 等になっている場合も自動検出されます。
 
-1. `npm version patch`（または minor）でバージョンを更新（`package.json`, `tauri.conf.json`, `Cargo.toml` の連動確認）。
-2. Git コミットを作成。
-3. バージョンタグを付与して push：
-   ```pwsh
-   git tag v0.18.9
-   git push origin main --tags
-   ```
-4. GitHub Actions の `Release` ジョブが自動起動し、約5〜10分で [GitHub Releases](https://github.com/mituha/novelaide/releases) にドラフトが生成されます。
+### 4.1 基本的な実行方法
+
+```pwsh
+# 1. バージョンの更新（コミットを作成）
+npm version patch --no-git-tag-version
+git commit -am "chore: release v0.18.10"
+
+# 2. リリーススクリプトの実行（タグ自動作成 ＆ リモートへプッシュ）
+npm run release
+```
+
+### 4.2 オプションとカスタム指定
+
+```pwsh
+# 実行内容の事前確認（タグ作成やプッシュは行わない）
+npm run release -- --dry-run
+
+# リモートリポジトリを明示的に指定する場合
+npm run release -- github
+
+# PowerShell スクリプトを直接実行する場合
+pwsh scripts/release.ps1 -Remote github -DryRun
+```
+
+実行後、GitHub Actions の `Release` ジョブが自動起動し、約5〜10分で [GitHub Releases](https://github.com/mituha/novelaide/releases) にインストーラー付きドラフトが生成されます。
