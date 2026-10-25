@@ -1,0 +1,62 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    name: Build Installer & Release
+    runs-on: windows-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      - name: Setup Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust Cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: 'src-tauri'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build internal plugins
+        run: npm run build:plugins
+
+      - name: Build frontend
+        run: npm run build
+
+      - name: Build Tauri app and create GitHub Release
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'novelaide v__VERSION__'
+          releaseBody: |
+            ## novelaide v__VERSION__ リリース 🎉
+
+            小説執筆専用デスクトップIDE **`novelaide`** の最新バージョンです。
+            以下のインストーラーまたはセットアップ実行ファイルをダウンロードしてご利用ください。
+
+            ### インストール方法
+            - **Windows**: `novelaide_${{ github.ref_name }}_x64-setup.exe` または `.msi` をダウンロードして実行してください。
+          releaseDraft: true
+          prerelease: false
