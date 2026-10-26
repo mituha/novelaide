@@ -46,8 +46,16 @@ try {
         }
 
         # セッションのプライマリ（メイン）ワークスペースを取得
+        # 1. Antigravity IDE / Orca の環境変数 (ORCA_WORKSPACE_ID / ORCA_WORKTREE_ID) を最優先
+        # 2. 次点に payload.workspacePaths[0]
         $PrimaryWorkspace = $null
-        if ($payload.workspacePaths -and $payload.workspacePaths.Count -gt 0) {
+        if ($env:ORCA_WORKSPACE_ID -match "::(.+)$") {
+            $PrimaryWorkspace = $Matches[1]
+        }
+        elseif ($env:ORCA_WORKTREE_ID -match "::(.+)$") {
+            $PrimaryWorkspace = $Matches[1]
+        }
+        elseif ($payload.workspacePaths -and $payload.workspacePaths.Count -gt 0) {
             $PrimaryWorkspace = $payload.workspacePaths[0]
         }
 
