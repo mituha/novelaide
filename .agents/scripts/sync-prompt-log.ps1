@@ -20,6 +20,18 @@ try {
         $stdinText = [Console]::In.ReadToEnd()
     }
 
+    $MyProjectRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+
+    # パス正規化関数（大文字小文字・スラッシュ差異・末尾区切り文字を吸収）
+    function Normalize-PathStr([string]$p) {
+        if ([string]::IsNullOrWhiteSpace($p)) { return "" }
+        try {
+            return [System.IO.Path]::GetFullPath($p).TrimEnd('\', '/').ToLowerInvariant()
+        } catch {
+            return $p.TrimEnd('\', '/').ToLowerInvariant()
+        }
+    }
+
     $payload = $null
     if (-not [string]::IsNullOrWhiteSpace($stdinText)) {
         $payload = $stdinText | ConvertFrom-Json -ErrorAction SilentlyContinue
@@ -32,14 +44,34 @@ try {
         if ([string]::IsNullOrWhiteSpace($ConversationId) -and $payload.conversationId) {
             $ConversationId = $payload.conversationId
         }
-        if ([string]::IsNullOrWhiteSpace($WorkspaceRoot) -and $payload.workspacePaths -and $payload.workspacePaths.Count -gt 0) {
-            $WorkspaceRoot = $payload.workspacePaths[0]
+
+        # セッションのプライマリ（メイン）ワークスペースを取得
+        $PrimaryWorkspace = $null
+        if ($payload.workspacePaths -and $payload.workspacePaths.Count -gt 0) {
+            $PrimaryWorkspace = $payload.workspacePaths[0]
+        }
+
+        # Hook経由(-FromHook)の場合の主従判定ガード:
+        # メインワークスペースが存在し、かつ自分自身のプロジェクトと一致しない場合は、
+        # サブプロジェクトとして読み込まれているため処理をスキップして即座に終了する
+        if ($FromHook -and -not [string]::IsNullOrWhiteSpace($PrimaryWorkspace)) {
+            $normMy = Normalize-PathStr $MyProjectRoot
+            $normPrimary = Normalize-PathStr $PrimaryWorkspace
+
+            if ($normMy -ne $normPrimary) {
+                if ($isStopEvent) {
+                    Write-Output '{"decision": "stop"}'
+                } else {
+                    Write-Output '{}'
+                }
+                exit 0
+            }
         }
     }
 
-    # WorkspaceRootの解決（未指定時はスクリプト位置 .agents/scripts の2階層上）
+    # WorkspaceRootの解決（未指定時はスクリプト自身が属するプロジェクトルート）
     if ([string]::IsNullOrWhiteSpace($WorkspaceRoot)) {
-        $WorkspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..\..")).Path
+        $WorkspaceRoot = $MyProjectRoot
     }
 
     $brainDir = Join-Path $env:USERPROFILE ".gemini\antigravity\brain"
