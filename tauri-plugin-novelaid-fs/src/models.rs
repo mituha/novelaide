@@ -16,6 +16,23 @@ pub enum NovelaidDocumentType {
     External,
 }
 
+impl NovelaidDocumentType {
+    pub fn from_name(name: &str) -> Option<Self> {
+        match name.trim().to_lowercase().as_str() {
+            "novel" => Some(Self::Novel),
+            "markdown" => Some(Self::Markdown),
+            "image" => Some(Self::Image),
+            "chat" => Some(Self::Chat),
+            "css" => Some(Self::Css),
+            "gitdiff" | "git-diff" => Some(Self::GitDiff),
+            "browser" => Some(Self::Browser),
+            "external" => Some(Self::External),
+            "unknown" => Some(Self::Unknown),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../guest-js/models.ts")]
 #[serde(rename_all = "camelCase")]

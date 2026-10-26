@@ -13,6 +13,7 @@ mod mobile;
 mod commands;
 mod error;
 mod models;
+pub mod attributes;
 
 pub use error::{Error, Result};
 

@@ -20,6 +20,8 @@ fn read_dir_recursive<R: Runtime>(
 ) -> std::result::Result<Vec<NovelaidDirEntry>, std::io::Error> {
     let mut entries = vec![];
     let dir = std::fs::read_dir(path)?;
+    let novelaid_fs = app.novelaid_fs();
+
     for entry in dir {
         let entry = entry?;
         let path_buf = entry.path();
@@ -27,20 +29,19 @@ fn read_dir_recursive<R: Runtime>(
         let is_directory = file_type.is_dir();
         let name = entry.file_name().to_string_lossy().to_string();
 
-        // . で始まるフォルダ（ディレクトリ）は除外する
+        // . で始まるフォルダ（ディレクトリ）は除外する（ファイルは保持）
         if is_directory && name.starts_with('.') {
             continue;
         }
 
         let document_type = if is_directory {
-            get_directory_type(name.clone(), parent_type)
+            novelaid_fs.attributes_manager.get_directory_type(&path_buf, parent_type)
         } else {
-            get_document_type(name.clone())
+            novelaid_fs.attributes_manager.get_document_type(&path_buf)
         };
 
         // メタデータスキャンが必要なファイル形式である場合、非同期キャッシュ更新判定を行う
         if !is_directory && matches!(document_type, NovelaidDocumentType::Novel | NovelaidDocumentType::Markdown) {
-            let novelaid_fs = app.novelaid_fs();
             let path_str = path_buf.to_string_lossy().to_string();
             
             let file_mtime = std::fs::metadata(&path_buf)
@@ -111,48 +112,20 @@ pub(crate) async fn read_directory<R: Runtime>(
 }
 
 #[command]
-pub(crate) fn get_document_type(
+pub(crate) fn get_document_type<R: Runtime>(
+    app: AppHandle<R>,
     path: String,
 ) -> NovelaidDocumentType {
-    let ext = std::path::Path::new(&path)
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())
-        .unwrap_or_default();
-
-    match ext.as_str() {
-        "txt" => NovelaidDocumentType::Novel,
-        "md" => NovelaidDocumentType::Markdown,
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico" => {
-            NovelaidDocumentType::Image
-        }
-        "chat" => NovelaidDocumentType::Chat,
-        "css" => NovelaidDocumentType::Css,
-        _ => NovelaidDocumentType::Unknown,
-    }
+    app.novelaid_fs().attributes_manager.get_document_type(std::path::Path::new(&path))
 }
 
 #[command]
-pub(crate) fn get_directory_type(
+pub(crate) fn get_directory_type<R: Runtime>(
+    app: AppHandle<R>,
     path: String,
     parent_type: Option<NovelaidDocumentType>,
 ) -> NovelaidDocumentType {
-    let name = path.to_lowercase();
-
-    if name.contains("小説") || name.contains("novel") {
-        return NovelaidDocumentType::Novel;
-    }
-    if name.contains("設定")
-        || name.contains("プロット")
-        || name.contains("wiki")
-        || name.contains("markdown")
-    {
-        return NovelaidDocumentType::Markdown;
-    }
-    if name.contains("画像") || name.contains("image") {
-        return NovelaidDocumentType::Image;
-    }
-    parent_type.unwrap_or(NovelaidDocumentType::Novel)
+    app.novelaid_fs().attributes_manager.get_directory_type(std::path::Path::new(&path), parent_type)
 }
 
 #[command]

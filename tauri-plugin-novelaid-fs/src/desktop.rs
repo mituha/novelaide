@@ -3,6 +3,7 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use serde::de::DeserializeOwned;
 use tauri::{plugin::PluginApi, AppHandle, Runtime, Emitter};
 
+use crate::attributes::AttributesManager;
 use crate::models::*;
 
 #[derive(Debug, Clone)]
@@ -88,10 +89,13 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
     }
   });
 
+  let attributes_manager = Arc::new(AttributesManager::new());
+
   Ok(NovelaidFs {
     app: app.clone(),
     project_directory: Mutex::new(None),
     metadata_cache,
+    attributes_manager,
     queue_tx: tx,
     total_jobs,
     processed_jobs,
@@ -104,6 +108,7 @@ pub struct NovelaidFs<R: Runtime> {
   app: AppHandle<R>,
   project_directory: Mutex<Option<PathBuf>>,
   pub metadata_cache: Arc<Mutex<HashMap<String, CacheEntry>>>,
+  pub attributes_manager: Arc<AttributesManager>,
   pub queue_tx: tokio::sync::mpsc::UnboundedSender<PathBuf>,
   pub total_jobs: Arc<AtomicU32>,
   pub processed_jobs: Arc<AtomicU32>,
@@ -120,11 +125,12 @@ impl<R: Runtime> NovelaidFs<R> {
     let mut dir = self.project_directory.lock().unwrap();
     *dir = path;
     
-    // Clear cache if path is set
+    // Clear caches if path is set
     {
       let mut cache = self.metadata_cache.lock().unwrap();
       cache.clear();
     }
+    self.attributes_manager.clear();
   }
 
   pub fn get_project_directory(&self) -> Option<PathBuf> {
@@ -164,6 +170,9 @@ impl<R: Runtime> NovelaidFs<R> {
     let full_content = self.format_frontmatter(&document.metadata, &document.content);
     std::fs::write(path, full_content).map_err(crate::Error::Io)?;
     
+    // Invalidate attributes cache if modifying .novelaidattributes
+    self.attributes_manager.invalidate_if_attributes_file(path);
+
     // Update cache
     {
       let mut cache = self.metadata_cache.lock().unwrap();
@@ -189,20 +198,25 @@ impl<R: Runtime> NovelaidFs<R> {
       std::fs::create_dir_all(parent).map_err(crate::Error::Io)?;
     }
     std::fs::write(path, content.unwrap_or("")).map_err(crate::Error::Io)?;
+    self.attributes_manager.invalidate_if_attributes_file(path);
     Ok(())
   }
 
   pub fn remove(&self, path: &Path) -> crate::Result<()> {
     if path.is_dir() {
       std::fs::remove_dir_all(path).map_err(crate::Error::Io)?;
+      self.attributes_manager.invalidate_dir(path);
     } else if path.is_file() {
       std::fs::remove_file(path).map_err(crate::Error::Io)?;
+      self.attributes_manager.invalidate_if_attributes_file(path);
     }
     Ok(())
   }
 
   pub fn rename(&self, old_path: &Path, new_path: &Path) -> crate::Result<()> {
     std::fs::rename(old_path, new_path).map_err(crate::Error::Io)?;
+    self.attributes_manager.invalidate_if_attributes_file(old_path);
+    self.attributes_manager.invalidate_if_attributes_file(new_path);
     Ok(())
   }
 
@@ -231,21 +245,7 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   fn get_document_type_internal(&self, path: &Path) -> NovelaidDocumentType {
-    let ext = path.extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())
-        .unwrap_or_default();
-
-    match ext.as_str() {
-        "txt" => NovelaidDocumentType::Novel,
-        "md" => NovelaidDocumentType::Markdown,
-        "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico" => {
-            NovelaidDocumentType::Image
-        }
-        "chat" => NovelaidDocumentType::Chat,
-        "css" => NovelaidDocumentType::Css,
-        _ => NovelaidDocumentType::Unknown,
-    }
+    self.attributes_manager.get_document_type(path)
   }
 }
 
