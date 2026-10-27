@@ -59,48 +59,27 @@
   }
 }
 
-.inline-create-form {
-  padding: 8px 10px;
+.inline-create-row {
   background-color: var(--bg-hover);
-  border-bottom: 1px solid var(--border-color);
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  padding-right: 6px;
 }
 
-.inline-create-input {
-  width: 100%;
-  padding: 4px 8px;
+.inline-create-input-row {
+  flex: 1;
   background-color: var(--input-bg);
   border: 1px solid var(--accent-color);
   color: var(--input-text);
-  border-radius: 4px;
-  font-size: 0.85rem;
+  border-radius: 3px;
+  font-size: 0.84rem;
+  padding: 1px 6px;
+  height: 22px;
   outline: none;
+  box-shadow: 0 0 0 1px rgba(var(--accent-color-rgb, 59, 130, 246), 0.2);
 }
 
-.inline-create-actions {
-  display: flex;
-  justify-content: flex-end;
-  gap: 6px;
-}
-
-.inline-btn {
-  padding: 3px 10px;
-  border-radius: 4px;
+.inline-create-input-row::placeholder {
+  color: var(--text-muted);
   font-size: 0.78rem;
-  cursor: pointer;
-  border: none;
-}
-
-.inline-btn.save {
-  background-color: var(--accent-color);
-  color: #ffffff;
-}
-
-.inline-btn.cancel {
-  background-color: transparent;
-  color: var(--text-secondary);
 }
 
 .explorer-tree-container {
