@@ -1,7 +1,8 @@
 import { ExplorerRegistry } from './ExplorerRegistry';
 import { OpenDocumentsSection } from '../../components/Explorer/sections/OpenDocumentsSection';
-import { FileTreeSection } from '../../components/Explorer/sections/FileTreeSection';
+import { FileTreeSection, FileTreeHeaderActions } from '../../components/Explorer/sections/FileTreeSection';
 import { OutlineSection } from '../../components/Explorer/sections/OutlineSection';
+import { Folder } from 'lucide-react';
 
 export const explorerRegistry = new ExplorerRegistry();
 
@@ -14,12 +15,19 @@ explorerRegistry.register({
   component: OpenDocumentsSection,
 });
 
-// 2. 原稿ファイルツリー
+// 2. 原稿ファイルツリー（プロジェクトフォルダー統合）
 explorerRegistry.register({
   id: 'novelaid.explorer.fileTree',
-  title: '原稿ファイル',
+  title: ({ projectPath }) => {
+    if (!projectPath) return '作品フォルダー';
+    const norm = projectPath.replace(/\\/g, '/');
+    const parts = norm.split('/');
+    return parts[parts.length - 1] || '作品フォルダー';
+  },
+  icon: Folder,
   defaultExpanded: true,
   priority: 90,
+  headerActions: FileTreeHeaderActions,
   component: FileTreeSection,
 });
 

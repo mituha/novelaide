@@ -38,7 +38,7 @@
 .explorer-section-title-group {
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -47,12 +47,52 @@
 .explorer-section-chevron {
   opacity: 0.7;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+}
+
+.explorer-section-icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent-color, #3b82f6);
+  flex-shrink: 0;
 }
 
 .explorer-section-title {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.explorer-action-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 3px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.explorer-action-btn:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.explorer-action-btn.spinning svg {
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .explorer-section-badge {
