@@ -2,6 +2,7 @@ import React from 'react';
 import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { DirEntry } from '../../types/document';
 import { DocumentIcon } from './DocumentIcon';
+import { FileContextMenu } from './FileContextMenu';
 import { useFileExplorer } from '../../contexts/FileExplorerContext';
 import './FileExplorer.css';
 
@@ -31,6 +32,13 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     submitCreate,
     deleteItem,
     openFile,
+    renamingPath,
+    renamingName,
+    setRenamingName,
+    startRename,
+    cancelRename,
+    submitRename,
+    openContextMenu,
   } = useFileExplorer();
 
   if (!projectPath) {
@@ -112,6 +120,7 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     return items.map((item) => {
       const isExpanded = expandedFolders.has(item.path);
       const isSelected = selectedPath === item.path;
+      const isRenaming = renamingPath === item.path;
 
       if (item.isDirectory) {
         const isCreatingInside = creatingDir === item.path && creatingType !== null;
@@ -122,13 +131,47 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
               className={`tree-row folder-row ${isSelected ? 'selected' : ''}`}
               style={{ paddingLeft: `${depth * 14 + 8}px` }}
               onClick={(e) => handleFolderClick(e, item)}
+              onContextMenu={(e) => openContextMenu(e, item)}
+              onKeyDown={(e) => {
+                if (e.key === 'F2') {
+                  e.preventDefault();
+                  startRename(item);
+                } else if (e.key === 'Delete') {
+                  e.preventDefault();
+                  deleteItem(item);
+                }
+              }}
+              tabIndex={0}
               title={item.path}
             >
               <span className="folder-arrow">
                 {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               </span>
               <DocumentIcon type="directory" isOpen={isExpanded} size={15} />
-              <span className="entry-name folder-name">{item.name}</span>
+              
+              {isRenaming ? (
+                <input
+                  className="inline-rename-input"
+                  value={renamingName}
+                  onChange={(e) => setRenamingName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      submitRename();
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      cancelRename();
+                    }
+                  }}
+                  onBlur={() => submitRename()}
+                  onClick={(e) => e.stopPropagation()}
+                  autoFocus
+                  onFocus={(e) => e.target.select()}
+                />
+              ) : (
+                <span className="entry-name folder-name">{item.name}</span>
+              )}
+
               <button
                 type="button"
                 className="entry-action-btn delete-btn"
@@ -154,10 +197,52 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           className={`tree-row file-row ${isSelected ? 'selected' : ''}`}
           style={{ paddingLeft: `${depth * 14 + 22}px` }}
           onClick={(e) => handleFileClick(e, item)}
+          onContextMenu={(e) => openContextMenu(e, item)}
+          onKeyDown={(e) => {
+            if (e.key === 'F2') {
+              e.preventDefault();
+              startRename(item);
+            } else if (e.key === 'Delete') {
+              e.preventDefault();
+              deleteItem(item);
+            }
+          }}
+          tabIndex={0}
           title={item.path}
         >
           <DocumentIcon type={item.documentType} size={15} />
-          <span className="entry-name file-name">{item.name}</span>
+          
+          {isRenaming ? (
+            <input
+              className="inline-rename-input"
+              value={renamingName}
+              onChange={(e) => setRenamingName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  submitRename();
+                } else if (e.key === 'Escape') {
+                  e.preventDefault();
+                  cancelRename();
+                }
+              }}
+              onBlur={() => submitRename()}
+              onClick={(e) => e.stopPropagation()}
+              autoFocus
+              onFocus={(e) => {
+                const val = e.target.value;
+                const dotIdx = val.lastIndexOf('.');
+                if (dotIdx > 0) {
+                  e.target.setSelectionRange(0, dotIdx);
+                } else {
+                  e.target.select();
+                }
+              }}
+            />
+          ) : (
+            <span className="entry-name file-name">{item.name}</span>
+          )}
+
           <button
             type="button"
             className="entry-action-btn delete-btn"
@@ -189,6 +274,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           renderTree(entries)
         )}
       </div>
+
+      <FileContextMenu />
     </div>
   );
 };

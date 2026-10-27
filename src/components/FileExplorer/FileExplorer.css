@@ -82,6 +82,24 @@
   font-size: 0.78rem;
 }
 
+.inline-rename-input {
+  flex: 1;
+  background-color: var(--input-bg);
+  border: 1px solid var(--accent-color);
+  color: var(--input-text);
+  border-radius: 3px;
+  font-size: 0.84rem;
+  padding: 1px 6px;
+  height: 20px;
+  outline: none;
+  box-shadow: 0 0 0 1px rgba(var(--accent-color-rgb, 59, 130, 246), 0.25);
+}
+
+.tree-row:focus-visible {
+  outline: 1px solid var(--accent-color);
+  outline-offset: -1px;
+}
+
 .explorer-tree-container {
   flex: 1;
   overflow-y: auto;

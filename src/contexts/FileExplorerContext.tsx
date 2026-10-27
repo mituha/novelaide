@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { DirEntry } from '../types/document';
 import { fileService } from '../services/fileService';
 import { useProject } from './ProjectContext';
@@ -27,6 +28,12 @@ function isSubPathOrEqual(sub: string, parent: string): boolean {
   return nSub === nParent || nSub.startsWith(nParent.endsWith('/') ? nParent : `${nParent}/`);
 }
 
+export interface ContextMenuState {
+  x: number;
+  y: number;
+  entry: DirEntry;
+}
+
 interface FileExplorerContextType {
   entries: DirEntry[];
   expandedFolders: Set<string>;
@@ -38,6 +45,10 @@ interface FileExplorerContextType {
   isLoading: boolean;
   createTargetDescription: string;
   projectName: string;
+  renamingPath: string | null;
+  renamingName: string;
+  contextMenu: ContextMenuState | null;
+
   toggleFolder: (path: string) => void;
   expandFolder: (path: string) => void;
   selectItem: (path: string | null, isDir?: boolean) => void;
@@ -49,13 +60,25 @@ interface FileExplorerContextType {
   refreshDirectory: () => Promise<void>;
   deleteItem: (entry: DirEntry) => Promise<void>;
   openFile: (file: DirEntry) => void;
+
+  // リネーム関連
+  setRenamingName: (name: string) => void;
+  startRename: (entry: DirEntry) => void;
+  cancelRename: () => void;
+  submitRename: () => Promise<void>;
+
+  // コンテキストメニュー関連
+  openContextMenu: (e: React.MouseEvent, entry: DirEntry) => void;
+  closeContextMenu: () => void;
+  revealInExplorer: (entry: DirEntry) => Promise<void>;
+  copyPath: (entry: DirEntry, relative?: boolean) => Promise<void>;
 }
 
 const FileExplorerContext = createContext<FileExplorerContextType | null>(null);
 
 export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { projectPath } = useProject();
-  const { openDocument, activePath } = useDocument();
+  const { openDocument, closeTab, activePath, openDocuments } = useDocument();
 
   const [entries, setEntries] = useState<DirEntry[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -67,6 +90,13 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [creatingDir, setCreatingDir] = useState<string | null>(null);
   const [creatingType, setCreatingType] = useState<'file' | 'folder' | null>(null);
   const [newItemName, setNewItemName] = useState('');
+
+  // リネーム状態
+  const [renamingPath, setRenamingPath] = useState<string | null>(null);
+  const [renamingName, setRenamingName] = useState<string>('');
+
+  // コンテキストメニュー状態
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // プロジェクトディレクトリの読み込み
   const refreshDirectory = useCallback(async () => {
@@ -235,12 +265,16 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
           setSelectedPath(null);
           setSelectedIsDir(false);
         }
+        // 開かれていたタブがあれば閉じる
+        if (openDocuments.some((doc) => doc.path === entry.path)) {
+          await closeTab(entry.path);
+        }
         await refreshDirectory();
       } catch (err) {
         alert(`削除に失敗しました: ${err}`);
       }
     }
-  }, [selectedPath, refreshDirectory]);
+  }, [selectedPath, openDocuments, closeTab, refreshDirectory]);
 
   const openFile = useCallback((file: DirEntry) => {
     if (!file.isDirectory) {
@@ -249,6 +283,94 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       openDocument(file.path);
     }
   }, [openDocument]);
+
+  // --- リネーム機能 ---
+  const startRename = useCallback((entry: DirEntry) => {
+    setRenamingPath(entry.path);
+    setRenamingName(entry.name);
+    setSelectedPath(entry.path);
+    setSelectedIsDir(entry.isDirectory);
+  }, []);
+
+  const cancelRename = useCallback(() => {
+    setRenamingPath(null);
+    setRenamingName('');
+  }, []);
+
+  const submitRename = useCallback(async () => {
+    if (!renamingPath || !renamingName.trim()) {
+      cancelRename();
+      return;
+    }
+
+    const currentEntry = entries.find((e) => e.path === renamingPath);
+    if (currentEntry && currentEntry.name === renamingName.trim()) {
+      cancelRename();
+      return;
+    }
+
+    const parent = getParentDir(renamingPath);
+    const newPath = joinPath(parent, renamingName.trim());
+    const oldPath = renamingPath;
+
+    try {
+      await fileService.rename(oldPath, newPath);
+
+      // 開いていたタブがあればパスを追従（閉じてから開く）
+      const isOpen = openDocuments.some((doc) => doc.path === oldPath);
+      if (isOpen) {
+        await closeTab(oldPath);
+        await openDocument(newPath);
+      }
+
+      cancelRename();
+      await refreshDirectory();
+      setSelectedPath(newPath);
+    } catch (err) {
+      alert(`名前の変更に失敗しました: ${err}`);
+    }
+  }, [renamingPath, renamingName, entries, openDocuments, closeTab, openDocument, cancelRename, refreshDirectory]);
+
+  // --- コンテキストメニュー機能 ---
+  const openContextMenu = useCallback((e: React.MouseEvent, entry: DirEntry) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setSelectedPath(entry.path);
+    setSelectedIsDir(entry.isDirectory);
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      entry,
+    });
+  }, []);
+
+  const closeContextMenu = useCallback(() => {
+    setContextMenu(null);
+  }, []);
+
+  const revealInExplorer = useCallback(async (entry: DirEntry) => {
+    try {
+      await revealItemInDir(entry.path);
+    } catch (err) {
+      console.warn('revealItemInDir error:', err);
+    }
+  }, []);
+
+  const copyPath = useCallback(async (entry: DirEntry, relative = false) => {
+    let textToCopy = entry.path;
+    if (relative && projectPath) {
+      const normPath = normalizePath(entry.path);
+      const normProj = normalizePath(projectPath);
+      if (normPath.startsWith(normProj)) {
+        textToCopy = normPath.substring(normProj.length).replace(/^\//, '');
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(textToCopy);
+    } catch (err) {
+      console.warn('clipboard copy failed:', err);
+    }
+  }, [projectPath]);
 
   const value = {
     entries,
@@ -261,6 +383,10 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     isLoading,
     createTargetDescription,
     projectName,
+    renamingPath,
+    renamingName,
+    contextMenu,
+
     toggleFolder,
     expandFolder,
     selectItem,
@@ -272,6 +398,16 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     refreshDirectory,
     deleteItem,
     openFile,
+
+    setRenamingName,
+    startRename,
+    cancelRename,
+    submitRename,
+
+    openContextMenu,
+    closeContextMenu,
+    revealInExplorer,
+    copyPath,
   };
 
   return (

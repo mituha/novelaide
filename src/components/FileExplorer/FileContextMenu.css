@@ -1,0 +1,87 @@
+.file-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 190px;
+  background-color: var(--bg-side-pane, #1e1e1e);
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+  animation: contextMenuFadeIn 0.1s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.context-menu-header {
+  padding: 4px 8px 6px;
+  border-bottom: 1px solid var(--border-color, #333);
+  margin-bottom: 4px;
+}
+
+.context-menu-title {
+  font-size: 0.76rem;
+  font-weight: 600;
+  color: var(--text-muted, #888);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: block;
+}
+
+.context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  color: var(--text-primary, #ddd);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  text-align: left;
+  transition: background-color 0.1s ease, color 0.1s ease;
+}
+
+.context-menu-item:hover {
+  background-color: var(--accent-color, #3b82f6);
+  color: #ffffff;
+}
+
+.context-menu-item svg {
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+
+.context-menu-item:hover svg {
+  opacity: 1;
+}
+
+.context-menu-shortcut {
+  margin-left: auto;
+  font-size: 0.74rem;
+  opacity: 0.6;
+}
+
+.context-menu-separator {
+  height: 1px;
+  background-color: var(--border-color, #333);
+  margin: 3px 0;
+}
+
+.context-menu-item.danger:hover {
+  background-color: #ef4444;
+  color: #ffffff;
+}
