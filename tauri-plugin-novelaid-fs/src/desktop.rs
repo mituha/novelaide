@@ -202,6 +202,46 @@ impl<R: Runtime> NovelaidFs<R> {
     Ok(())
   }
 
+  pub fn create_next_file(&self, dir_path: &Path) -> crate::Result<NovelaidDirEntry> {
+    std::fs::create_dir_all(dir_path).map_err(crate::Error::Io)?;
+
+    let mut existing_files = Vec::new();
+    if let Ok(entries) = std::fs::read_dir(dir_path) {
+      for entry in entries.flatten() {
+        if let Ok(file_type) = entry.file_type() {
+          if file_type.is_file() {
+            let name = entry.file_name().to_string_lossy().to_string();
+            if !name.starts_with('.') {
+              existing_files.push(name);
+            }
+          }
+        }
+      }
+    }
+
+    let folder_name = dir_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let doc_type = self.attributes_manager.get_directory_type(dir_path, None);
+    let next_file_name = crate::predictor::predict_next_file_name(&existing_files, &folder_name, doc_type);
+    let target_path = dir_path.join(&next_file_name);
+
+    std::fs::write(&target_path, "").map_err(crate::Error::Io)?;
+    self.attributes_manager.invalidate_if_attributes_file(&target_path);
+
+    let file_doc_type = self.attributes_manager.get_document_type(&target_path);
+    let base_name = next_file_name.clone();
+    let file_title = target_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+
+    Ok(NovelaidDirEntry {
+      name: next_file_name,
+      path: target_path.to_string_lossy().to_string(),
+      base_name,
+      file_title,
+      is_directory: false,
+      document_type: file_doc_type,
+      children: None,
+    })
+  }
+
   pub fn remove(&self, path: &Path) -> crate::Result<()> {
     if path.is_dir() {
       std::fs::remove_dir_all(path).map_err(crate::Error::Io)?;

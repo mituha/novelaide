@@ -80,6 +80,12 @@ export async function createFile(path: string, content?: string): Promise<void> 
   });
 }
 
+export async function createNextFile(dirPath: string): Promise<NovelaidDirEntry> {
+  return await invoke<NovelaidDirEntry>('plugin:novelaid-fs|create_next_file', {
+    dirPath,
+  });
+}
+
 export async function remove(path: string): Promise<void> {
   await invoke('plugin:novelaid-fs|remove', {
     path,

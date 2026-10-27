@@ -14,6 +14,7 @@ Default permissions for the plugin
 - `allow-write-document`
 - `allow-create-directory`
 - `allow-create-file`
+- `allow-create-next-file`
 - `allow-remove`
 - `allow-rename`
 - `allow-get-metadata-cache`
@@ -76,6 +77,32 @@ Enables the create_file command without any pre-configured scope.
 <td>
 
 Denies the create_file command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:allow-create-next-file`
+
+</td>
+<td>
+
+Enables the create_next_file command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:deny-create-next-file`
+
+</td>
+<td>
+
+Denies the create_next_file command without any pre-configured scope.
 
 </td>
 </tr>

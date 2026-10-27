@@ -14,6 +14,7 @@ mod commands;
 mod error;
 mod models;
 pub mod attributes;
+pub mod predictor;
 
 pub use error::{Error, Result};
 
@@ -47,6 +48,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       commands::write_document,
       commands::create_directory,
       commands::create_file,
+      commands::create_next_file,
       commands::remove,
       commands::rename,
       commands::get_metadata_cache

@@ -183,6 +183,14 @@ pub(crate) async fn create_file<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn create_next_file<R: Runtime>(
+    app: AppHandle<R>,
+    dir_path: String,
+) -> Result<NovelaidDirEntry> {
+    app.novelaid_fs().create_next_file(std::path::Path::new(&dir_path))
+}
+
+#[command]
 pub(crate) async fn remove<R: Runtime>(
     app: AppHandle<R>,
     path: String,

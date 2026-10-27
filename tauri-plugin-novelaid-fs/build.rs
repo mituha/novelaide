@@ -9,6 +9,7 @@ const COMMANDS: &[&str] = &[
     "write_document",
     "create_directory",
     "create_file",
+    "create_next_file",
     "remove",
     "rename",
     "get_metadata_cache",

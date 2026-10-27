@@ -121,33 +121,56 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     setSelectedIsDir(false);
   };
 
-  // 新規作成の開始（ターゲット位置の自動判定）
-  const handleStartCreate = (type: "file" | "folder") => {
-    if (!projectPath) return;
-
-    let targetDir = projectPath;
+  // ターゲットディレクトリの解決
+  const resolveTargetDir = useCallback(() => {
+    if (!projectPath) return null;
     if (selectedPath) {
       if (selectedIsDir) {
-        targetDir = selectedPath;
-      } else {
-        const parent = getParentDir(selectedPath);
-        if (parent && isSubPathOrEqual(parent, projectPath)) {
-          targetDir = parent;
-        }
+        return selectedPath;
+      }
+      const parent = getParentDir(selectedPath);
+      if (parent && isSubPathOrEqual(parent, projectPath)) {
+        return parent;
       }
     }
+    return projectPath;
+  }, [projectPath, selectedPath, selectedIsDir]);
 
-    // ターゲットフォルダがプロジェクト直下以外の場合は展開する
+  // 新規ファイルの即時作成（推測エンジンによりファイル名を自動決定して即座に開く）
+  const handleCreateNextFile = async () => {
+    const targetDir = resolveTargetDir();
+    if (!targetDir) return;
+
+    try {
+      // バックエンド側で既存ファイル群から次のファイル名を推測し、一括作成
+      const newEntry = await fileService.createNextFile(targetDir);
+
+      if (targetDir !== projectPath) {
+        setExpandedFolders((prev) => new Set(prev).add(targetDir));
+      }
+
+      await loadDirectory();
+
+      // 作成されたファイルを選択状態にし、エディターで即座に開く
+      setSelectedPath(newEntry.path);
+      setSelectedIsDir(false);
+      onSelectFile?.(newEntry);
+    } catch (err) {
+      alert(`新規ファイルの作成に失敗しました: ${err}`);
+    }
+  };
+
+  // 新規フォルダー作成の開始（インライン入力）
+  const handleStartCreateFolder = () => {
+    const targetDir = resolveTargetDir();
+    if (!targetDir) return;
+
     if (targetDir !== projectPath) {
-      setExpandedFolders((prev) => {
-        const next = new Set(prev);
-        next.add(targetDir);
-        return next;
-      });
+      setExpandedFolders((prev) => new Set(prev).add(targetDir));
     }
 
     setCreatingDir(targetDir);
-    setCreatingType(type);
+    setCreatingType("folder");
     setNewItemName("");
   };
 
@@ -159,10 +182,10 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     const type = creatingType;
 
     try {
-      if (type === "file") {
-        await fileService.createFile(targetPath);
-      } else if (type === "folder") {
+      if (type === "folder") {
         await fileService.createDirectory(targetPath);
+      } else {
+        await fileService.createFile(targetPath);
       }
 
       setCreatingDir(null);
@@ -170,28 +193,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
       setNewItemName("");
       await loadDirectory();
 
-      // 作成されたアイテムを選択
       setSelectedPath(targetPath);
       setSelectedIsDir(type === "folder");
 
       if (type === "folder") {
-        setExpandedFolders((prev) => {
-          const next = new Set(prev);
-          next.add(targetPath);
-          return next;
-        });
-      } else {
-        // ファイルならエディタで開く
-        const name = newItemName.trim();
-        onSelectFile?.({
-          name,
-          path: targetPath,
-          baseName: name,
-          fileTitle: name.replace(/\.[^/.]+$/, ""),
-          isDirectory: false,
-          documentType: "novel",
-          children: null,
-        });
+        setExpandedFolders((prev) => new Set(prev).add(targetPath));
       }
     } catch (err) {
       alert(`作成に失敗しました: ${err}`);
@@ -360,15 +366,15 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
           <button
             type="button"
             className="tool-btn"
-            onClick={() => handleStartCreate("file")}
-            title={`新規ファイル作成 (${createTargetDescription})`}
+            onClick={handleCreateNextFile}
+            title={`新規ファイル作成 (${createTargetDescription} に自動推測作成して開く)`}
           >
             <FilePlus size={15} />
           </button>
           <button
             type="button"
             className="tool-btn"
-            onClick={() => handleStartCreate("folder")}
+            onClick={handleStartCreateFolder}
             title={`新規フォルダー作成 (${createTargetDescription})`}
           >
             <FolderPlus size={15} />

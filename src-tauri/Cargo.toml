@@ -1,6 +1,6 @@
 [package]
 name = "novelaide"
-version = "0.19.1"
+version = "0.20.0"
 description = "novelaide - 小説執筆用エディター"
 authors = ["Mizuki Mituha"]
 edition = "2024"

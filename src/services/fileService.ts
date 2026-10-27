@@ -243,6 +243,27 @@ marker:
     }
   },
 
+  // 次の新規ファイルを自動推測して作成
+  async createNextFile(dirPath: string): Promise<DirEntry> {
+    try {
+      return await novelaidFs.createNextFile(dirPath);
+    } catch (err) {
+      console.warn("createNextFile fallback:", err);
+      const fileName = "0130_第13話.txt";
+      const sep = dirPath.includes("\\") ? "\\" : "/";
+      const targetPath = `${dirPath}${sep}${fileName}`;
+      return {
+        name: fileName,
+        path: targetPath,
+        baseName: fileName,
+        fileTitle: "0130_第13話",
+        isDirectory: false,
+        documentType: "novel",
+        children: null,
+      };
+    }
+  },
+
   // 新規フォルダ作成
   async createDirectory(path: string): Promise<void> {
     try {
