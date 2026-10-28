@@ -1,18 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
-import { confirm as tauriConfirm, message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
+import { listen } from '@tauri-apps/api/event';
+import { FsChangeEvent } from 'tauri-plugin-novelaid-fs-api';
 import { DirEntry } from '../types/document';
 import { fileService } from '../services/fileService';
 import { useProject } from './ProjectContext';
 import { useDocument } from './DocumentContext';
-
-async function showConfirm(msg: string, title = '確認'): Promise<boolean> {
-  try {
-    return await tauriConfirm(msg, { title, kind: 'warning' });
-  } catch {
-    return window.confirm(msg);
-  }
-}
 
 async function showAlert(msg: string, title = 'エラー'): Promise<void> {
   try {
@@ -114,7 +108,7 @@ interface FileExplorerContextType {
   cancelCreate: () => void;
   submitCreate: () => Promise<void>;
   refreshDirectory: () => Promise<void>;
-  deleteItem: (entry: DirEntry) => Promise<void>;
+  deleteItem: (entry: DirEntry, force?: boolean) => Promise<void>;
   openFile: (file: DirEntry) => void;
 
   // リネーム関連
@@ -181,6 +175,56 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     refreshDirectory();
   }, [refreshDirectory]);
+
+  // バックエンドからのファイル変更イベント（fs:changed）の自律購読
+  useEffect(() => {
+    let unlisten: (() => void) | undefined;
+
+    listen<FsChangeEvent>('fs:changed', async (event) => {
+      const { action, path, newPath } = event.payload;
+
+      // 1. ディレクトリツリーの自律再読み込み
+      await refreshDirectory();
+
+      // 2. 削除時のタブクローズ & 選択解除
+      if (action === 'delete') {
+        setSelectedPath((current) => {
+          if (current && isSubPathOrEqual(current, path)) {
+            return null;
+          }
+          return current;
+        });
+
+        for (const doc of openDocuments) {
+          if (isSubPathOrEqual(doc.path, path)) {
+            await closeTab(doc.path);
+          }
+        }
+      }
+
+      // 3. リネーム時のタブ自動追従
+      if (action === 'rename' && newPath) {
+        for (const doc of openDocuments) {
+          if (doc.path === path) {
+            await closeTab(doc.path);
+            await openDocument(newPath);
+          } else if (isSubPathOrEqual(doc.path, path)) {
+            const sub = doc.path.substring(path.length);
+            const isBackslash = newPath.includes('\\');
+            const updated = `${newPath}${sub.replace(/\//g, isBackslash ? '\\' : '/')}`;
+            await closeTab(doc.path);
+            await openDocument(updated);
+          }
+        }
+      }
+    }).then((fn) => {
+      unlisten = fn;
+    });
+
+    return () => {
+      if (unlisten) unlisten();
+    };
+  }, [refreshDirectory, openDocuments, closeTab, openDocument]);
 
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders((prev) => {
@@ -312,25 +356,17 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [newItemName, creatingDir, creatingType, refreshDirectory, expandFolder]);
 
-  const deleteItem = useCallback(async (entry: DirEntry) => {
-    const isConfirmed = await showConfirm(`「${entry.name}」を削除してもよろしいですか？`, '削除の確認');
-    if (!isConfirmed) return;
-
+  const deleteItem = useCallback(async (entry: DirEntry, force = false) => {
     try {
-      await fileService.remove(entry.path);
-      if (selectedPath === entry.path) {
-        setSelectedPath(null);
-        setSelectedIsDir(false);
+      const success = await fileService.remove(entry.path, force);
+      if (!success) {
+        // キャンセルまたはファイル不存在
+        return;
       }
-      // 開かれていたタブがあれば閉じる
-      if (openDocuments.some((doc) => doc.path === entry.path)) {
-        await closeTab(entry.path);
-      }
-      await refreshDirectory();
     } catch (err) {
       await showAlert(`削除に失敗しました: ${err}`);
     }
-  }, [selectedPath, openDocuments, closeTab, refreshDirectory]);
+  }, []);
 
   const openFile = useCallback((file: DirEntry) => {
     if (!file.isDirectory) {

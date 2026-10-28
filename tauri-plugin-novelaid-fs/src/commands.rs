@@ -170,7 +170,14 @@ pub(crate) async fn create_directory<R: Runtime>(
     app: AppHandle<R>,
     path: String,
 ) -> Result<()> {
-    app.novelaid_fs().create_directory(std::path::Path::new(&path))
+    app.novelaid_fs().create_directory(std::path::Path::new(&path))?;
+    use tauri::Emitter;
+    let _ = app.emit("fs:changed", FsChangeEvent {
+        action: "create".into(),
+        path,
+        new_path: None,
+    });
+    Ok(())
 }
 
 #[command]
@@ -179,7 +186,14 @@ pub(crate) async fn create_file<R: Runtime>(
     path: String,
     content: Option<String>,
 ) -> Result<()> {
-    app.novelaid_fs().create_file(std::path::Path::new(&path), content.as_deref())
+    app.novelaid_fs().create_file(std::path::Path::new(&path), content.as_deref())?;
+    use tauri::Emitter;
+    let _ = app.emit("fs:changed", FsChangeEvent {
+        action: "create".into(),
+        path,
+        new_path: None,
+    });
+    Ok(())
 }
 
 #[command]
@@ -187,15 +201,60 @@ pub(crate) async fn create_next_file<R: Runtime>(
     app: AppHandle<R>,
     dir_path: String,
 ) -> Result<NovelaidDirEntry> {
-    app.novelaid_fs().create_next_file(std::path::Path::new(&dir_path))
+    let entry = app.novelaid_fs().create_next_file(std::path::Path::new(&dir_path))?;
+    use tauri::Emitter;
+    let _ = app.emit("fs:changed", FsChangeEvent {
+        action: "create".into(),
+        path: entry.path.clone(),
+        new_path: None,
+    });
+    Ok(entry)
 }
 
 #[command]
 pub(crate) async fn remove<R: Runtime>(
     app: AppHandle<R>,
     path: String,
-) -> Result<()> {
-    app.novelaid_fs().remove(std::path::Path::new(&path))
+    force: Option<bool>,
+) -> Result<bool> {
+    let target = std::path::Path::new(&path);
+    if !target.exists() {
+        return Ok(false);
+    }
+
+    let skip_confirm = force.unwrap_or(false);
+    if !skip_confirm {
+        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+        let file_name = target
+            .file_name()
+            .map(|n| n.to_string_lossy().to_string())
+            .unwrap_or_else(|| path.clone());
+
+        let confirmed = app
+            .dialog()
+            .message(format!("「{}」を削除してもよろしいですか？", file_name))
+            .title("削除の確認")
+            .buttons(MessageDialogButtons::OkCancel)
+            .blocking_show();
+
+        if !confirmed {
+            return Ok(false);
+        }
+    }
+
+    app.novelaid_fs().remove(target)?;
+
+    use tauri::Emitter;
+    let _ = app.emit(
+        "fs:changed",
+        FsChangeEvent {
+            action: "delete".into(),
+            path,
+            new_path: None,
+        },
+    );
+
+    Ok(true)
 }
 
 #[command]
@@ -204,7 +263,17 @@ pub(crate) async fn rename<R: Runtime>(
     old_path: String,
     new_path: String,
 ) -> Result<()> {
-    app.novelaid_fs().rename(std::path::Path::new(&old_path), std::path::Path::new(&new_path))
+    app.novelaid_fs().rename(std::path::Path::new(&old_path), std::path::Path::new(&new_path))?;
+    use tauri::Emitter;
+    let _ = app.emit(
+        "fs:changed",
+        FsChangeEvent {
+            action: "rename".into(),
+            path: old_path,
+            new_path: Some(new_path),
+        },
+    );
+    Ok(())
 }
 
 #[command]
@@ -213,7 +282,17 @@ pub(crate) async fn copy<R: Runtime>(
     source_path: String,
     target_path: String,
 ) -> Result<()> {
-    app.novelaid_fs().copy(std::path::Path::new(&source_path), std::path::Path::new(&target_path))
+    app.novelaid_fs().copy(std::path::Path::new(&source_path), std::path::Path::new(&target_path))?;
+    use tauri::Emitter;
+    let _ = app.emit(
+        "fs:changed",
+        FsChangeEvent {
+            action: "copy".into(),
+            path: source_path,
+            new_path: Some(target_path),
+        },
+    );
+    Ok(())
 }
 
 #[command]

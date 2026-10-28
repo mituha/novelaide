@@ -274,11 +274,12 @@ marker:
   },
 
   // ファイルまたはフォルダ削除
-  async remove(path: string): Promise<void> {
+  async remove(path: string, force: boolean = false): Promise<boolean> {
     try {
-      await novelaidFs.remove(path);
+      return await novelaidFs.remove(path, force);
     } catch (err) {
       console.warn("remove fallback:", err);
+      return false;
     }
   },
 

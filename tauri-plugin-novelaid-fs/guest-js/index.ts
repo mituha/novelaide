@@ -86,9 +86,10 @@ export async function createNextFile(dirPath: string): Promise<NovelaidDirEntry>
   });
 }
 
-export async function remove(path: string): Promise<void> {
-  await invoke('plugin:novelaid-fs|remove', {
+export async function remove(path: string, force: boolean = false): Promise<boolean> {
+  return await invoke<boolean>('plugin:novelaid-fs|remove', {
     path,
+    force,
   });
 }
 

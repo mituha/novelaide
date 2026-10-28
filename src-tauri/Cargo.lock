@@ -2101,7 +2101,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "novelaide"
-version = "0.21.1"
+version = "0.22.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -3602,6 +3602,7 @@ dependencies = [
  "serde_yaml",
  "tauri",
  "tauri-plugin",
+ "tauri-plugin-dialog",
  "thiserror 2.0.21",
  "tokio",
  "ts-rs",

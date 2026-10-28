@@ -5,3 +5,5 @@ export type NovelaidDirEntry = { name: string, path: string, baseName: string, f
 export type NovelaidDocument = { path: string, baseName: string, fileTitle: string, content: string, metadata: any, documentType: NovelaidDocumentType, };
 
 export type NovelaidDocumentType = "novel" | "markdown" | "image" | "chat" | "gitDiff" | "browser" | "css" | "unknown" | "external";
+
+export type FsChangeEvent = { action: "delete" | "create" | "rename" | "copy", path: string, newPath: string | null };

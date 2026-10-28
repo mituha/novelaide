@@ -70,3 +70,12 @@ pub struct PingRequest {
 pub struct PingResponse {
     pub value: Option<String>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../guest-js/models.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct FsChangeEvent {
+    pub action: String,
+    pub path: String,
+    pub new_path: Option<String>,
+}
