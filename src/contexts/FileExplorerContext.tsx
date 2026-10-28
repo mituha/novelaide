@@ -1,9 +1,26 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { confirm as tauriConfirm, message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { DirEntry } from '../types/document';
 import { fileService } from '../services/fileService';
 import { useProject } from './ProjectContext';
 import { useDocument } from './DocumentContext';
+
+async function showConfirm(msg: string, title = '確認'): Promise<boolean> {
+  try {
+    return await tauriConfirm(msg, { title, kind: 'warning' });
+  } catch {
+    return window.confirm(msg);
+  }
+}
+
+async function showAlert(msg: string, title = 'エラー'): Promise<void> {
+  try {
+    await tauriMessage(msg, { title, kind: 'error' });
+  } catch {
+    window.alert(msg);
+  }
+}
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
@@ -242,7 +259,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setSelectedIsDir(false);
       openDocument(newEntry.path);
     } catch (err) {
-      alert(`新規ファイルの作成に失敗しました: ${err}`);
+      await showAlert(`新規ファイルの作成に失敗しました: ${err}`);
     }
   }, [resolveTargetDir, projectPath, expandFolder, refreshDirectory, openDocument]);
 
@@ -291,26 +308,27 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
         expandFolder(targetPath);
       }
     } catch (err) {
-      alert(`作成に失敗しました: ${err}`);
+      await showAlert(`作成に失敗しました: ${err}`);
     }
   }, [newItemName, creatingDir, creatingType, refreshDirectory, expandFolder]);
 
   const deleteItem = useCallback(async (entry: DirEntry) => {
-    if (confirm(`「${entry.name}」を削除してもよろしいですか？`)) {
-      try {
-        await fileService.remove(entry.path);
-        if (selectedPath === entry.path) {
-          setSelectedPath(null);
-          setSelectedIsDir(false);
-        }
-        // 開かれていたタブがあれば閉じる
-        if (openDocuments.some((doc) => doc.path === entry.path)) {
-          await closeTab(entry.path);
-        }
-        await refreshDirectory();
-      } catch (err) {
-        alert(`削除に失敗しました: ${err}`);
+    const isConfirmed = await showConfirm(`「${entry.name}」を削除してもよろしいですか？`, '削除の確認');
+    if (!isConfirmed) return;
+
+    try {
+      await fileService.remove(entry.path);
+      if (selectedPath === entry.path) {
+        setSelectedPath(null);
+        setSelectedIsDir(false);
       }
+      // 開かれていたタブがあれば閉じる
+      if (openDocuments.some((doc) => doc.path === entry.path)) {
+        await closeTab(entry.path);
+      }
+      await refreshDirectory();
+    } catch (err) {
+      await showAlert(`削除に失敗しました: ${err}`);
     }
   }, [selectedPath, openDocuments, closeTab, refreshDirectory]);
 
@@ -365,7 +383,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       await refreshDirectory();
       setSelectedPath(newPath);
     } catch (err) {
-      alert(`名前の変更に失敗しました: ${err}`);
+      await showAlert(`名前の変更に失敗しました: ${err}`);
     }
   }, [renamingPath, renamingName, entries, openDocuments, closeTab, openDocument, cancelRename, refreshDirectory]);
 
@@ -428,7 +446,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       // ガード2: フォルダ自身、または自身の子孫フォルダへの移動・コピーは禁止
       if (isDir && isSubPathOrEqual(targetDir, sourcePath)) {
-        alert('自身またはその配下のフォルダーには移動・コピーできません。');
+        await showAlert('自身またはその配下のフォルダーには移動・コピーできません。');
         return;
       }
 
@@ -450,7 +468,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       } else {
         destPath = targetDir.endsWith(sep) ? `${targetDir}${originalName}` : `${targetDir}${sep}${originalName}`;
         if (findEntryByPath(entries, destPath)) {
-          alert(`移動先に同名のアイテム「${originalName}」が既に存在します。`);
+          await showAlert(`移動先に同名のアイテム「${originalName}」が既に存在します。`);
           return;
         }
       }
@@ -487,7 +505,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setSelectedPath(destPath);
         setSelectedIsDir(isDir);
       } catch (err) {
-        alert(`${isCopy ? 'コピー' : '移動'}に失敗しました: ${err}`);
+        await showAlert(`${isCopy ? 'コピー' : '移動'}に失敗しました: ${err}`);
       }
     },
     [projectPath, entries, openDocuments, closeTab, openDocument, expandFolder, refreshDirectory]
