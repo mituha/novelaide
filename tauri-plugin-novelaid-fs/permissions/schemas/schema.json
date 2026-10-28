@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the copy command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-copy",
+          "markdownDescription": "Enables the copy command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the copy command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-copy",
+          "markdownDescription": "Denies the copy command without any pre-configured scope."
+        },
+        {
           "description": "Enables the create_directory command without any pre-configured scope.",
           "type": "string",
           "const": "allow-create-directory",
@@ -475,10 +487,10 @@
           "markdownDescription": "Denies the write_document command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-get-document-type`\n- `allow-get-directory-type`\n- `allow-read-directory`\n- `allow-set-project-directory`\n- `allow-get-project-directory`\n- `allow-read-document`\n- `allow-write-document`\n- `allow-create-directory`\n- `allow-create-file`\n- `allow-create-next-file`\n- `allow-remove`\n- `allow-rename`\n- `allow-get-metadata-cache`\n- `allow-scan-project-metadata`",
+          "description": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-get-document-type`\n- `allow-get-directory-type`\n- `allow-read-directory`\n- `allow-set-project-directory`\n- `allow-get-project-directory`\n- `allow-read-document`\n- `allow-write-document`\n- `allow-create-directory`\n- `allow-create-file`\n- `allow-create-next-file`\n- `allow-remove`\n- `allow-rename`\n- `allow-copy`\n- `allow-get-metadata-cache`\n- `allow-scan-project-metadata`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-get-document-type`\n- `allow-get-directory-type`\n- `allow-read-directory`\n- `allow-set-project-directory`\n- `allow-get-project-directory`\n- `allow-read-document`\n- `allow-write-document`\n- `allow-create-directory`\n- `allow-create-file`\n- `allow-create-next-file`\n- `allow-remove`\n- `allow-rename`\n- `allow-get-metadata-cache`\n- `allow-scan-project-metadata`"
+          "markdownDescription": "Default permissions for the plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-get-document-type`\n- `allow-get-directory-type`\n- `allow-read-directory`\n- `allow-set-project-directory`\n- `allow-get-project-directory`\n- `allow-read-document`\n- `allow-write-document`\n- `allow-create-directory`\n- `allow-create-file`\n- `allow-create-next-file`\n- `allow-remove`\n- `allow-rename`\n- `allow-copy`\n- `allow-get-metadata-cache`\n- `allow-scan-project-metadata`"
         }
       ]
     }

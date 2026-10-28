@@ -14,6 +14,7 @@ permissions = [
     "allow-create-next-file",
     "allow-remove",
     "allow-rename",
+    "allow-copy",
     "allow-get-metadata-cache",
     "allow-scan-project-metadata",
 ]

@@ -260,6 +260,19 @@ impl<R: Runtime> NovelaidFs<R> {
     Ok(())
   }
 
+  pub fn copy(&self, source_path: &Path, target_path: &Path) -> crate::Result<()> {
+    if source_path.is_dir() {
+      copy_dir_recursive(source_path, target_path).map_err(crate::Error::Io)?;
+    } else {
+      if let Some(parent) = target_path.parent() {
+        std::fs::create_dir_all(parent).map_err(crate::Error::Io)?;
+      }
+      std::fs::copy(source_path, target_path).map_err(crate::Error::Io)?;
+    }
+    self.attributes_manager.invalidate_if_attributes_file(target_path);
+    Ok(())
+  }
+
   pub fn get_metadata_cache(&self) -> HashMap<String, serde_json::Value> {
     let cache = self.metadata_cache.lock().unwrap();
     cache.iter()
@@ -310,4 +323,19 @@ fn extract_frontmatter_static(content: &str) -> (serde_json::Value, &str) {
     Ok(metadata) => (metadata, body),
     Err(_) => (serde_json::json!({}), content),
   }
+}
+
+fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
+  std::fs::create_dir_all(dest)?;
+  for entry in std::fs::read_dir(src)? {
+    let entry = entry?;
+    let entry_path = entry.path();
+    let target_path = dest.join(entry.file_name());
+    if entry_path.is_dir() {
+      copy_dir_recursive(&entry_path, &target_path)?;
+    } else {
+      std::fs::copy(&entry_path, &target_path)?;
+    }
+  }
+  Ok(())
 }

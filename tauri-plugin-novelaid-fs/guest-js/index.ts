@@ -99,6 +99,13 @@ export async function rename(oldPath: string, newPath: string): Promise<void> {
   });
 }
 
+export async function copy(sourcePath: string, targetPath: string): Promise<void> {
+  await invoke('plugin:novelaid-fs|copy', {
+    sourcePath,
+    targetPath,
+  });
+}
+
 export async function getMetadataCache(): Promise<Record<string, any>> {
   return await invoke<Record<string, any>>('plugin:novelaid-fs|get_metadata_cache');
 }

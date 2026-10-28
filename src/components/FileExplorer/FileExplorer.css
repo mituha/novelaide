@@ -183,3 +183,20 @@
   font-size: 0.85rem;
   color: var(--text-muted);
 }
+
+/* ドラッグ＆ドロップ用スタイル */
+.tree-row.dragging {
+  opacity: 0.4;
+}
+
+.tree-row.folder-row.drag-over {
+  background-color: var(--bg-hover);
+  outline: 1px dashed var(--accent-color);
+  outline-offset: -1px;
+}
+
+.explorer-tree-container.drag-over-root {
+  background-color: rgba(var(--accent-color-rgb, 59, 130, 246), 0.05);
+  outline: 1px dashed var(--accent-color);
+  outline-offset: -2px;
+}

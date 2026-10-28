@@ -208,6 +208,15 @@ pub(crate) async fn rename<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn copy<R: Runtime>(
+    app: AppHandle<R>,
+    source_path: String,
+    target_path: String,
+) -> Result<()> {
+    app.novelaid_fs().copy(std::path::Path::new(&source_path), std::path::Path::new(&target_path))
+}
+
+#[command]
 pub(crate) async fn get_metadata_cache<R: Runtime>(
     app: AppHandle<R>,
 ) -> Result<std::collections::HashMap<String, serde_json::Value>> {

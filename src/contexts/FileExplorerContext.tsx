@@ -28,6 +28,45 @@ function isSubPathOrEqual(sub: string, parent: string): boolean {
   return nSub === nParent || nSub.startsWith(nParent.endsWith('/') ? nParent : `${nParent}/`);
 }
 
+function findEntryByPath(items: DirEntry[], targetPath: string): DirEntry | null {
+  const normTarget = normalizePath(targetPath);
+  for (const item of items) {
+    if (normalizePath(item.path) === normTarget) return item;
+    if (item.children) {
+      const found = findEntryByPath(item.children, targetPath);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function getUniqueCopyPath(items: DirEntry[], targetDir: string, originalName: string, isDir: boolean): string {
+  const isBackslash = targetDir.includes('\\');
+  const sep = isBackslash ? '\\' : '/';
+
+  let baseName = originalName;
+  let ext = '';
+  if (!isDir) {
+    const dotIdx = originalName.lastIndexOf('.');
+    if (dotIdx > 0) {
+      baseName = originalName.substring(0, dotIdx);
+      ext = originalName.substring(dotIdx);
+    }
+  }
+
+  let candidateName = `${baseName} - コピー${ext}`;
+  let candidatePath = targetDir.endsWith(sep) ? `${targetDir}${candidateName}` : `${targetDir}${sep}${candidateName}`;
+  let counter = 2;
+
+  while (findEntryByPath(items, candidatePath)) {
+    candidateName = `${baseName} - コピー (${counter})${ext}`;
+    candidatePath = targetDir.endsWith(sep) ? `${targetDir}${candidateName}` : `${targetDir}${sep}${candidateName}`;
+    counter++;
+  }
+
+  return candidatePath;
+}
+
 export interface ContextMenuState {
   x: number;
   y: number;
@@ -72,6 +111,13 @@ interface FileExplorerContextType {
   closeContextMenu: () => void;
   revealInExplorer: (entry: DirEntry) => Promise<void>;
   copyPath: (entry: DirEntry, relative?: boolean) => Promise<void>;
+
+  // D&D 移動・コピー
+  moveOrCopyItem: (sourcePath: string, targetDir: string, isCopy: boolean) => Promise<void>;
+
+  // 手動アクティブファイル追従（同期）
+  revealActiveFile: () => void;
+  activePath: string | null;
 }
 
 const FileExplorerContext = createContext<FileExplorerContextType | null>(null);
@@ -118,14 +164,6 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   useEffect(() => {
     refreshDirectory();
   }, [refreshDirectory]);
-
-  // アクティブドキュメントの同期
-  useEffect(() => {
-    if (activePath) {
-      setSelectedPath(activePath);
-      setSelectedIsDir(false);
-    }
-  }, [activePath]);
 
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders((prev) => {
@@ -372,6 +410,130 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, [projectPath]);
 
+  // --- D&D 移動・コピー ---
+  const moveOrCopyItem = useCallback(
+    async (sourcePath: string, targetDir: string, isCopy: boolean) => {
+      if (!projectPath || !sourcePath || !targetDir) return;
+
+      const normSource = normalizePath(sourcePath);
+      const normTarget = normalizePath(targetDir);
+
+      const sourceEntry = findEntryByPath(entries, sourcePath);
+      const isDir = sourceEntry ? sourceEntry.isDirectory : false;
+
+      // ガード1: 自身への操作
+      if (normSource === normTarget) {
+        return;
+      }
+
+      // ガード2: フォルダ自身、または自身の子孫フォルダへの移動・コピーは禁止
+      if (isDir && isSubPathOrEqual(targetDir, sourcePath)) {
+        alert('自身またはその配下のフォルダーには移動・コピーできません。');
+        return;
+      }
+
+      // ガード3: 移動で、移動先がすでに現在の親フォルダである場合は何もしない
+      const currentParent = normalizePath(getParentDir(sourcePath));
+      if (!isCopy && currentParent === normTarget) {
+        return;
+      }
+
+      const originalName = sourcePath.split(/[/\\]/).pop() || '';
+      if (!originalName) return;
+
+      const isBackslash = targetDir.includes('\\');
+      const sep = isBackslash ? '\\' : '/';
+
+      let destPath: string;
+      if (isCopy) {
+        destPath = getUniqueCopyPath(entries, targetDir, originalName, isDir);
+      } else {
+        destPath = targetDir.endsWith(sep) ? `${targetDir}${originalName}` : `${targetDir}${sep}${originalName}`;
+        if (findEntryByPath(entries, destPath)) {
+          alert(`移動先に同名のアイテム「${originalName}」が既に存在します。`);
+          return;
+        }
+      }
+
+      try {
+        if (isCopy) {
+          await fileService.copy(sourcePath, destPath);
+        } else {
+          await fileService.rename(sourcePath, destPath);
+
+          // 開いているエディタタブの追従
+          for (const doc of openDocuments) {
+            const normDoc = normalizePath(doc.path);
+            if (isDir) {
+              if (isSubPathOrEqual(doc.path, sourcePath)) {
+                const sub = normDoc.substring(normSource.length);
+                const updatedDocPath = `${destPath}${sub.replace(/\//g, isBackslash ? '\\' : '/')}`;
+                await closeTab(doc.path);
+                await openDocument(updatedDocPath);
+              }
+            } else if (normDoc === normSource) {
+              await closeTab(doc.path);
+              await openDocument(destPath);
+            }
+          }
+        }
+
+        // 移動・コピー先を展開
+        if (targetDir !== projectPath) {
+          expandFolder(targetDir);
+        }
+
+        await refreshDirectory();
+        setSelectedPath(destPath);
+        setSelectedIsDir(isDir);
+      } catch (err) {
+        alert(`${isCopy ? 'コピー' : '移動'}に失敗しました: ${err}`);
+      }
+    },
+    [projectPath, entries, openDocuments, closeTab, openDocument, expandFolder, refreshDirectory]
+  );
+
+  // --- 手動アクティブファイル追従（同期） ---
+  const revealActiveFile = useCallback(() => {
+    if (!activePath || !projectPath) return;
+
+    const normActive = normalizePath(activePath);
+    const normProj = normalizePath(projectPath);
+
+    if (normActive.startsWith(normProj)) {
+      const relative = normActive.substring(normProj.length).replace(/^\//, '');
+      const parts = relative.split('/');
+      parts.pop(); // ファイル名を除く
+
+      let current = normProj;
+      const foldersToExpand: string[] = [];
+      for (const part of parts) {
+        current = `${current}/${part}`;
+        foldersToExpand.push(current);
+      }
+
+      setExpandedFolders((prev) => {
+        const next = new Set(prev);
+        foldersToExpand.forEach((f) => {
+          next.add(f);
+          next.add(f.replace(/\//g, '\\'));
+        });
+        return next;
+      });
+    }
+
+    setSelectedPath(activePath);
+    setSelectedIsDir(false);
+
+    setTimeout(() => {
+      // 該当ツリー行のスクロール
+      const targetElement = document.querySelector(`[data-tree-path="${CSS.escape(activePath)}"]`);
+      if (targetElement) {
+        targetElement.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+    }, 60);
+  }, [activePath, projectPath]);
+
   const value = {
     entries,
     expandedFolders,
@@ -386,6 +548,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     renamingPath,
     renamingName,
     contextMenu,
+    activePath,
 
     toggleFolder,
     expandFolder,
@@ -408,6 +571,9 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     closeContextMenu,
     revealInExplorer,
     copyPath,
+
+    moveOrCopyItem,
+    revealActiveFile,
   };
 
   return (

@@ -51,6 +51,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       commands::create_next_file,
       commands::remove,
       commands::rename,
+      commands::copy,
       commands::get_metadata_cache
     ])
     .setup(|app, api| {

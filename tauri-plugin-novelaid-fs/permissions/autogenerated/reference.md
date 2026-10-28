@@ -17,6 +17,7 @@ Default permissions for the plugin
 - `allow-create-next-file`
 - `allow-remove`
 - `allow-rename`
+- `allow-copy`
 - `allow-get-metadata-cache`
 - `allow-scan-project-metadata`
 
@@ -28,6 +29,32 @@ Default permissions for the plugin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`novelaid-fs:allow-copy`
+
+</td>
+<td>
+
+Enables the copy command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:deny-copy`
+
+</td>
+<td>
+
+Denies the copy command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

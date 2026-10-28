@@ -1,10 +1,17 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, ChevronDown, Trash2 } from 'lucide-react';
 import { DirEntry } from '../../types/document';
 import { DocumentIcon } from './DocumentIcon';
 import { FileContextMenu } from './FileContextMenu';
 import { useFileExplorer } from '../../contexts/FileExplorerContext';
 import './FileExplorer.css';
+
+function getParentDir(p: string): string {
+  const norm = p.replace(/\\/g, '/');
+  const lastSlash = norm.lastIndexOf('/');
+  if (lastSlash === -1) return p;
+  return p.substring(0, lastSlash);
+}
 
 interface FileExplorerProps {
   projectPath: string | null;
@@ -39,7 +46,11 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     cancelRename,
     submitRename,
     openContextMenu,
+    moveOrCopyItem,
   } = useFileExplorer();
+
+  const [draggedItem, setDraggedItem] = useState<{ path: string; isDir: boolean } | null>(null);
+  const [dragOverPath, setDragOverPath] = useState<string | null>(null);
 
   if (!projectPath) {
     return (
@@ -48,6 +59,89 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
       </div>
     );
   }
+
+  // --- ドラッグ＆ドロップ処理 ---
+  const handleDragStart = (e: React.DragEvent, item: DirEntry) => {
+    e.stopPropagation();
+    setDraggedItem({ path: item.path, isDir: item.isDirectory });
+    e.dataTransfer.setData('text/plain', item.path);
+    e.dataTransfer.effectAllowed = 'copyMove';
+  };
+
+  const handleDragEnd = () => {
+    setDraggedItem(null);
+    setDragOverPath(null);
+  };
+
+  const handleDragOverItem = (e: React.DragEvent, targetDir: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (!draggedItem) return;
+
+    const isCopy = e.ctrlKey;
+    const normSource = draggedItem.path.replace(/\\/g, '/').toLowerCase();
+    const normTarget = targetDir.replace(/\\/g, '/').toLowerCase();
+
+    // 自身へのドロップ不可
+    if (normSource === normTarget) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+
+    // 自身配下の子孫フォルダへのドロップ不可
+    if (draggedItem.isDir && (normTarget === normSource || normTarget.startsWith(normSource.endsWith('/') ? normSource : `${normSource}/`))) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+
+    // 移動の場合、同一親フォルダへの移動は不可
+    const currentParent = draggedItem.path.replace(/\\/g, '/').substring(0, draggedItem.path.replace(/\\/g, '/').lastIndexOf('/')).toLowerCase();
+    if (!isCopy && currentParent === normTarget) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+
+    e.dataTransfer.dropEffect = isCopy ? 'copy' : 'move';
+    if (dragOverPath !== targetDir) {
+      setDragOverPath(targetDir);
+    }
+  };
+
+  const handleDropItem = (e: React.DragEvent, targetDir: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDragOverPath(null);
+
+    if (!draggedItem) return;
+    const isCopy = e.ctrlKey;
+    moveOrCopyItem(draggedItem.path, targetDir, isCopy);
+    setDraggedItem(null);
+  };
+
+  const handleDragOverBackground = (e: React.DragEvent) => {
+    if (!projectPath || !draggedItem) return;
+    e.preventDefault();
+    const isCopy = e.ctrlKey;
+    const currentParent = draggedItem.path.replace(/\\/g, '/').substring(0, draggedItem.path.replace(/\\/g, '/').lastIndexOf('/')).toLowerCase();
+    const normProj = projectPath.replace(/\\/g, '/').toLowerCase();
+    if (!isCopy && currentParent === normProj) {
+      e.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    e.dataTransfer.dropEffect = isCopy ? 'copy' : 'move';
+    if (dragOverPath !== projectPath) {
+      setDragOverPath(projectPath);
+    }
+  };
+
+  const handleDropBackground = (e: React.DragEvent) => {
+    if (!projectPath || !draggedItem) return;
+    e.preventDefault();
+    setDragOverPath(null);
+    moveOrCopyItem(draggedItem.path, projectPath, e.ctrlKey);
+    setDraggedItem(null);
+  };
 
   // フォルダクリック時（開閉 ＋ 選択）
   const handleFolderClick = (e: React.MouseEvent, item: DirEntry) => {
@@ -121,6 +215,8 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
       const isExpanded = expandedFolders.has(item.path);
       const isSelected = selectedPath === item.path;
       const isRenaming = renamingPath === item.path;
+      const isDragging = draggedItem?.path === item.path;
+      const isDragOver = dragOverPath === item.path;
 
       if (item.isDirectory) {
         const isCreatingInside = creatingDir === item.path && creatingType !== null;
@@ -128,10 +224,16 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
         return (
           <div key={item.path} className="tree-node">
             <div
-              className={`tree-row folder-row ${isSelected ? 'selected' : ''}`}
+              className={`tree-row folder-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''} ${isDragOver ? 'drag-over' : ''}`}
               style={{ paddingLeft: `${depth * 14 + 8}px` }}
               onClick={(e) => handleFolderClick(e, item)}
               onContextMenu={(e) => openContextMenu(e, item)}
+              draggable={!isRenaming}
+              onDragStart={(e) => handleDragStart(e, item)}
+              onDragEnd={handleDragEnd}
+              onDragOver={(e) => handleDragOverItem(e, item.path)}
+              onDrop={(e) => handleDropItem(e, item.path)}
+              data-tree-path={item.path}
               onKeyDown={(e) => {
                 if (e.key === 'F2') {
                   e.preventDefault();
@@ -194,10 +296,16 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
       return (
         <div
           key={item.path}
-          className={`tree-row file-row ${isSelected ? 'selected' : ''}`}
+          className={`tree-row file-row ${isSelected ? 'selected' : ''} ${isDragging ? 'dragging' : ''}`}
           style={{ paddingLeft: `${depth * 14 + 22}px` }}
           onClick={(e) => handleFileClick(e, item)}
           onContextMenu={(e) => openContextMenu(e, item)}
+          draggable={!isRenaming}
+          onDragStart={(e) => handleDragStart(e, item)}
+          onDragEnd={handleDragEnd}
+          onDragOver={(e) => handleDragOverItem(e, getParentDir(item.path))}
+          onDrop={(e) => handleDropItem(e, getParentDir(item.path))}
+          data-tree-path={item.path}
           onKeyDown={(e) => {
             if (e.key === 'F2') {
               e.preventDefault();
@@ -266,7 +374,12 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
         </div>
       )}
 
-      <div className="explorer-tree-container" onClick={handleBackgroundClick}>
+      <div
+        className={`explorer-tree-container ${dragOverPath === projectPath ? 'drag-over-root' : ''}`}
+        onClick={handleBackgroundClick}
+        onDragOver={handleDragOverBackground}
+        onDrop={handleDropBackground}
+      >
         {isCreatingInRoot && renderInlineCreateInput(0)}
         {entries.length === 0 && !isLoading && !isCreatingInRoot ? (
           <p className="no-files-text">ファイルがありません</p>

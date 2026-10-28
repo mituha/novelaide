@@ -1,5 +1,5 @@
 import React from 'react';
-import { FilePlus, FolderPlus, RefreshCw } from 'lucide-react';
+import { FilePlus, FolderPlus, RefreshCw, Locate } from 'lucide-react';
 import { ExplorerSectionProps } from '../../../types/explorerPlugin';
 import { FileExplorer } from '../../FileExplorer/FileExplorer';
 import { useFileExplorer } from '../../../contexts/FileExplorerContext';
@@ -11,6 +11,8 @@ export const FileTreeHeaderActions: React.FC<{ sectionId: string }> = () => {
     refreshDirectory,
     isLoading,
     createTargetDescription,
+    revealActiveFile,
+    activePath,
   } = useFileExplorer();
 
   return (
@@ -41,6 +43,16 @@ export const FileTreeHeaderActions: React.FC<{ sectionId: string }> = () => {
         title="ファイル一覧の再読み込み"
       >
         <RefreshCw size={13} />
+      </button>
+      <button
+        type="button"
+        className="explorer-action-btn"
+        onClick={revealActiveFile}
+        title="編集中ファイルをエクスプローラーで表示 (同期)"
+        disabled={!activePath}
+        style={{ opacity: activePath ? 1 : 0.4 }}
+      >
+        <Locate size={13} />
       </button>
     </div>
   );

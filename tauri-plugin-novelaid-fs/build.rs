@@ -12,6 +12,7 @@ const COMMANDS: &[&str] = &[
     "create_next_file",
     "remove",
     "rename",
+    "copy",
     "get_metadata_cache",
     "scan_project_metadata",
 ];

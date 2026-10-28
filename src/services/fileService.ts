@@ -291,6 +291,15 @@ marker:
     }
   },
 
+  // コピー
+  async copy(sourcePath: string, targetPath: string): Promise<void> {
+    try {
+      await novelaidFs.copy(sourcePath, targetPath);
+    } catch (err) {
+      console.warn("copy fallback:", err);
+    }
+  },
+
   // メタデータキャッシュ取得
   async getMetadataCache(): Promise<Record<string, any>> {
     try {
