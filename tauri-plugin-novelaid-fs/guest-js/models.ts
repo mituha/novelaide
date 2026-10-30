@@ -7,3 +7,8 @@ export type NovelaidDocument = { path: string, baseName: string, fileTitle: stri
 export type NovelaidDocumentType = "novel" | "markdown" | "image" | "chat" | "gitDiff" | "browser" | "css" | "unknown" | "external";
 
 export type FsChangeEvent = { action: "delete" | "create" | "rename" | "copy", path: string, newPath: string | null };
+
+export type RemoveResult =
+  | { status: "success" }
+  | { status: "needConfirm"; fileName: string; isDirectory: boolean }
+  | { status: "notFound" };

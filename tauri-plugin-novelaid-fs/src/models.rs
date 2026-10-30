@@ -73,6 +73,18 @@ pub struct PingResponse {
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export, export_to = "../guest-js/models.ts")]
+#[serde(tag = "status", rename_all = "camelCase")]
+pub enum RemoveResult {
+    Success,
+    NeedConfirm {
+        file_name: String,
+        is_directory: bool,
+    },
+    NotFound,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../guest-js/models.ts")]
 #[serde(rename_all = "camelCase")]
 pub struct FsChangeEvent {
     pub action: String,

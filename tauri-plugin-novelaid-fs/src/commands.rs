@@ -216,30 +216,24 @@ pub(crate) async fn remove<R: Runtime>(
     app: AppHandle<R>,
     path: String,
     force: Option<bool>,
-) -> Result<bool> {
+) -> Result<RemoveResult> {
     let target = std::path::Path::new(&path);
     if !target.exists() {
-        return Ok(false);
+        return Ok(RemoveResult::NotFound);
     }
 
     let skip_confirm = force.unwrap_or(false);
     if !skip_confirm {
-        use tauri_plugin_dialog::{DialogExt, MessageDialogButtons};
+        let is_directory = target.is_dir();
         let file_name = target
             .file_name()
             .map(|n| n.to_string_lossy().to_string())
             .unwrap_or_else(|| path.clone());
 
-        let confirmed = app
-            .dialog()
-            .message(format!("「{}」を削除してもよろしいですか？", file_name))
-            .title("削除の確認")
-            .buttons(MessageDialogButtons::OkCancel)
-            .blocking_show();
-
-        if !confirmed {
-            return Ok(false);
-        }
+        return Ok(RemoveResult::NeedConfirm {
+            file_name,
+            is_directory,
+        });
     }
 
     app.novelaid_fs().remove(target)?;
@@ -254,7 +248,7 @@ pub(crate) async fn remove<R: Runtime>(
         },
     );
 
-    Ok(true)
+    Ok(RemoveResult::Success)
 }
 
 #[command]

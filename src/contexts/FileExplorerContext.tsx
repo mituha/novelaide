@@ -1,6 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
-import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
 import { FsChangeEvent } from 'tauri-plugin-novelaid-fs-api';
 import { DirEntry } from '../types/document';
@@ -8,14 +7,6 @@ import { fileService } from '../services/fileService';
 import { useProject } from './ProjectContext';
 import { useDocument } from './DocumentContext';
 import { useNotification } from './NotificationContext';
-
-async function showAlert(msg: string, title = 'エラー'): Promise<void> {
-  try {
-    await tauriMessage(msg, { title, kind: 'error' });
-  } catch {
-    window.alert(msg);
-  }
-}
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
@@ -155,7 +146,7 @@ const FileExplorerContext = createContext<FileExplorerContextType | null>(null);
 export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { projectPath } = useProject();
   const { openDocument, closeTab, activePath, openDocuments } = useDocument();
-  const { showStatusMessage } = useNotification();
+  const { showStatusMessage, confirmDialog, alertDialog } = useNotification();
   const isInitialScanRef = useRef(true);
 
   const [entries, setEntries] = useState<DirEntry[]>([]);
@@ -338,9 +329,9 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setSelectedIsDir(false);
       openDocument(newEntry.path);
     } catch (err) {
-      await showAlert(`新規ファイルの作成に失敗しました: ${err}`);
+      await alertDialog(`新規ファイルの作成に失敗しました: ${err}`);
     }
-  }, [resolveTargetDir, projectPath, expandFolder, refreshDirectory, openDocument]);
+  }, [resolveTargetDir, projectPath, expandFolder, refreshDirectory, openDocument, alertDialog]);
 
   // 新規フォルダ作成の開始
   const startCreateFolder = useCallback(() => {
@@ -387,21 +378,46 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
         expandFolder(targetPath);
       }
     } catch (err) {
-      await showAlert(`作成に失敗しました: ${err}`);
+      await alertDialog(`作成に失敗しました: ${err}`);
     }
-  }, [newItemName, creatingDir, creatingType, refreshDirectory, expandFolder]);
+  }, [newItemName, creatingDir, creatingType, refreshDirectory, expandFolder, alertDialog]);
 
   const deleteItem = useCallback(async (entry: DirEntry, force = false) => {
     try {
-      const success = await fileService.remove(entry.path, force);
-      if (!success) {
-        // キャンセルまたはファイル不存在
-        return;
+      // 1. バックエンドに削除を要求（バックエンドで存在確認・要確認判定を一元管理）
+      const result = await fileService.remove(entry.path, force);
+
+      // 2. バックエンドが確認必要と判定した場合
+      if (result.status === 'needConfirm') {
+        const itemType = result.isDirectory ? 'フォルダ' : 'ファイル';
+        // 3. フロントエンドの NotificationContext を経由して Rust OS ダイアログを起動
+        const confirmed = await confirmDialog({
+          title: `${itemType}の削除確認`,
+          message: `「${result.fileName}」を削除してもよろしいですか？\nこの操作は取り消せません。`,
+          kind: 'warning',
+          okLabel: '削除',
+          cancelLabel: 'キャンセル',
+        });
+
+        if (!confirmed) {
+          // ユーザーがキャンセル
+          return;
+        }
+
+        // 4. 承認された場合、force=true で確定削除を実行
+        const finalResult = await fileService.remove(entry.path, true);
+        if (finalResult.status === 'success') {
+          showStatusMessage(`「${result.fileName}」を削除しました`);
+        }
+      } else if (result.status === 'success') {
+        showStatusMessage(`「${entry.name}」を削除しました`);
+      } else if (result.status === 'notFound') {
+        await alertDialog(`対象のファイルまたはフォルダが見つかりません: ${entry.path}`);
       }
     } catch (err) {
-      await showAlert(`削除に失敗しました: ${err}`);
+      await alertDialog(`削除に失敗しました: ${err}`);
     }
-  }, []);
+  }, [confirmDialog, showStatusMessage, alertDialog]);
 
   const openFile = useCallback((file: DirEntry) => {
     if (!file.isDirectory) {
@@ -454,9 +470,9 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       await refreshDirectory();
       setSelectedPath(newPath);
     } catch (err) {
-      await showAlert(`名前の変更に失敗しました: ${err}`);
+      await alertDialog(`名前の変更に失敗しました: ${err}`);
     }
-  }, [renamingPath, renamingName, entries, openDocuments, closeTab, openDocument, cancelRename, refreshDirectory]);
+  }, [renamingPath, renamingName, entries, openDocuments, closeTab, openDocument, cancelRename, refreshDirectory, alertDialog]);
 
   // --- コンテキストメニュー機能 ---
   const openContextMenu = useCallback((e: React.MouseEvent, entry: DirEntry) => {
@@ -517,7 +533,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
       // ガード2: フォルダ自身、または自身の子孫フォルダへの移動・コピーは禁止
       if (isDir && isSubPathOrEqual(targetDir, sourcePath)) {
-        await showAlert('自身またはその配下のフォルダーには移動・コピーできません。');
+        await alertDialog('自身またはその配下のフォルダーには移動・コピーできません。');
         return;
       }
 
@@ -539,7 +555,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       } else {
         destPath = targetDir.endsWith(sep) ? `${targetDir}${originalName}` : `${targetDir}${sep}${originalName}`;
         if (findEntryByPath(entries, destPath)) {
-          await showAlert(`移動先に同名のアイテム「${originalName}」が既に存在します。`);
+          await alertDialog(`移動先に同名のアイテム「${originalName}」が既に存在します。`);
           return;
         }
       }
@@ -576,10 +592,10 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
         setSelectedPath(destPath);
         setSelectedIsDir(isDir);
       } catch (err) {
-        await showAlert(`${isCopy ? 'コピー' : '移動'}に失敗しました: ${err}`);
+        await alertDialog(`${isCopy ? 'コピー' : '移動'}に失敗しました: ${err}`);
       }
     },
-    [projectPath, entries, openDocuments, closeTab, openDocument, expandFolder, refreshDirectory]
+    [projectPath, entries, openDocuments, closeTab, openDocument, expandFolder, refreshDirectory, alertDialog]
   );
 
   // --- 手動アクティブファイル追従（同期） ---

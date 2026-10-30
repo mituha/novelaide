@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { NovelaidDocumentType, NovelaidDirEntry, NovelaidDocument } from './models'
+import { NovelaidDocumentType, NovelaidDirEntry, NovelaidDocument, RemoveResult } from './models'
 
 export * from './models'
 
@@ -86,8 +86,8 @@ export async function createNextFile(dirPath: string): Promise<NovelaidDirEntry>
   });
 }
 
-export async function remove(path: string, force: boolean = false): Promise<boolean> {
-  return await invoke<boolean>('plugin:novelaid-fs|remove', {
+export async function remove(path: string, force: boolean = false): Promise<RemoveResult> {
+  return await invoke<RemoveResult>('plugin:novelaid-fs|remove', {
     path,
     force,
   });
