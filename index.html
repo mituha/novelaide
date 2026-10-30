@@ -29,10 +29,102 @@
     <link rel="alternate icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>novelaide</title>
+    <style>
+      html, body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #1e1e1e;
+        color: #d4d4d4;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        overflow: hidden;
+        user-select: none;
+      }
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+      .boot-splash-container {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 100%;
+        height: 100%;
+        background-color: #1e1e1e;
+      }
+      .boot-splash-avatar-wrapper {
+        position: relative;
+        width: 104px;
+        height: 104px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .boot-splash-avatar {
+        width: 88px;
+        height: 88px;
+        border-radius: 20px;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+        animation: boot-pulse 2s ease-in-out infinite;
+      }
+      .boot-splash-title {
+        margin-top: 18px;
+        font-size: 18px;
+        font-weight: 600;
+        letter-spacing: 0.05em;
+        color: #e0e0e0;
+      }
+      .boot-splash-subtitle {
+        margin-top: 6px;
+        font-size: 12px;
+        color: #888888;
+        display: flex;
+        align-items: center;
+        gap: 6px;
+      }
+      .boot-splash-dot {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background-color: #3b82f6;
+        animation: boot-dot-pulse 1.2s ease-in-out infinite;
+      }
+      @keyframes boot-pulse {
+        0%, 100% {
+          transform: scale(1);
+        }
+        50% {
+          transform: scale(1.05);
+        }
+      }
+      @keyframes boot-dot-pulse {
+        0%, 100% {
+          opacity: 0.3;
+          transform: scale(0.8);
+        }
+        50% {
+          opacity: 1;
+          transform: scale(1.2);
+        }
+      }
+    </style>
   </head>
 
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="boot-splash-container">
+        <div class="boot-splash-avatar-wrapper">
+          <img src="/icon.png" alt="novelaide icon" class="boot-splash-avatar" />
+        </div>
+        <div class="boot-splash-title">novelaide</div>
+        <div class="boot-splash-subtitle">
+          <span class="boot-splash-dot"></span>
+          <span>執筆環境を準備中...</span>
+        </div>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

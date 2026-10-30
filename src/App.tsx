@@ -8,8 +8,6 @@ import { ToastContainer } from "./components/Notification/ToastContainer";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
-import { AIContextProvider } from "tauri-plugin-novelaid-ai-api";
-import "tauri-plugin-novelaid-ai-api/styles.css";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
 import { bootLog } from "./utils/bootLogger";
@@ -58,11 +56,9 @@ function SettingsBoundApp() {
         <ProjectProvider>
           <GitProvider>
             <DocumentProvider>
-              <AIContextProvider>
-                <AppContent />
-                <SettingsModal />
-                <ToastContainer />
-              </AIContextProvider>
+              <AppContent />
+              <SettingsModal />
+              <ToastContainer />
             </DocumentProvider>
           </GitProvider>
         </ProjectProvider>
