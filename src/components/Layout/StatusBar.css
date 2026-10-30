@@ -49,6 +49,41 @@
   gap: 0.35rem;
 }
 
+.status-message-flash {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-color, #3b82f6);
+  font-weight: 500;
+  animation: status-flash-in 0.2s ease-out;
+}
+
+.status-message-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--accent-color, #3b82f6);
+  box-shadow: 0 0 6px var(--accent-color, #3b82f6);
+}
+
+.status-message-text {
+  max-width: 280px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes status-flash-in {
+  from {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
 .status-file-name {
   font-weight: 500;
   color: var(--text-primary);

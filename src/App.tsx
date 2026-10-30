@@ -3,6 +3,8 @@ import { ThemeProvider, useTheme, type Theme } from "./contexts/ThemeContext";
 import { SettingsProvider, SettingsModal } from "restar-app-settings";
 import "restar-app-settings/styles.css";
 import "./core/settingsRegistry";
+import { NotificationProvider } from "./contexts/NotificationContext";
+import { ToastContainer } from "./components/Notification/ToastContainer";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
@@ -42,16 +44,19 @@ function SettingsBoundApp() {
         }
       }}
     >
-      <ProjectProvider>
-        <GitProvider>
-          <DocumentProvider>
-            <AIContextProvider>
-              <AppContent />
-              <SettingsModal />
-            </AIContextProvider>
-          </DocumentProvider>
-        </GitProvider>
-      </ProjectProvider>
+      <NotificationProvider>
+        <ProjectProvider>
+          <GitProvider>
+            <DocumentProvider>
+              <AIContextProvider>
+                <AppContent />
+                <SettingsModal />
+                <ToastContainer />
+              </AIContextProvider>
+            </DocumentProvider>
+          </GitProvider>
+        </ProjectProvider>
+      </NotificationProvider>
     </SettingsProvider>
   );
 }

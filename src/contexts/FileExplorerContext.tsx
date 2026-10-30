@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
 import { message as tauriMessage } from '@tauri-apps/plugin-dialog';
 import { listen } from '@tauri-apps/api/event';
@@ -7,6 +7,7 @@ import { DirEntry } from '../types/document';
 import { fileService } from '../services/fileService';
 import { useProject } from './ProjectContext';
 import { useDocument } from './DocumentContext';
+import { useNotification } from './NotificationContext';
 
 async function showAlert(msg: string, title = 'エラー'): Promise<void> {
   try {
@@ -49,6 +50,24 @@ function findEntryByPath(items: DirEntry[], targetPath: string): DirEntry | null
     }
   }
   return null;
+}
+
+function countEntries(items: DirEntry[]): { files: number; folders: number } {
+  let files = 0;
+  let folders = 0;
+  for (const item of items) {
+    if (item.isDirectory) {
+      folders++;
+      if (item.children) {
+        const sub = countEntries(item.children);
+        files += sub.files;
+        folders += sub.folders;
+      }
+    } else {
+      files++;
+    }
+  }
+  return { files, folders };
 }
 
 function getUniqueCopyPath(items: DirEntry[], targetDir: string, originalName: string, isDir: boolean): string {
@@ -136,6 +155,8 @@ const FileExplorerContext = createContext<FileExplorerContextType | null>(null);
 export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { projectPath } = useProject();
   const { openDocument, closeTab, activePath, openDocuments } = useDocument();
+  const { showStatusMessage } = useNotification();
+  const isInitialScanRef = useRef(true);
 
   const [entries, setEntries] = useState<DirEntry[]>([]);
   const [expandedFolders, setExpandedFolders] = useState<Set<string>>(new Set());
@@ -156,24 +177,38 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
 
   // プロジェクトディレクトリの読み込み
-  const refreshDirectory = useCallback(async () => {
+  const refreshDirectory = useCallback(async (notify = false) => {
     if (!projectPath) {
       setEntries([]);
       return;
     }
     setIsLoading(true);
+    if (notify) {
+      showStatusMessage('フォルダをスキャン中...');
+    }
     try {
       const data = await fileService.readDirectory(projectPath, true);
       setEntries(data);
+      if (notify) {
+        const { files, folders } = countEntries(data);
+        showStatusMessage(`スキャン完了 (${files} ファイル / ${folders} フォルダ)`, 3000);
+      }
     } catch (err) {
       console.error('ディレクトリ読み込みエラー:', err);
+      if (notify) {
+        showStatusMessage('フォルダのスキャンに失敗しました', 4000);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [projectPath]);
+  }, [projectPath, showStatusMessage]);
 
   useEffect(() => {
-    refreshDirectory();
+    const isInitial = isInitialScanRef.current;
+    if (isInitial) {
+      isInitialScanRef.current = false;
+    }
+    refreshDirectory(true);
   }, [refreshDirectory]);
 
   // バックエンドからのファイル変更イベント（fs:changed）の自律購読

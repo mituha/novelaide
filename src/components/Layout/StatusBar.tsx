@@ -9,6 +9,7 @@ import { DetailedCountResult } from "novelaid-ruby";
 import { NovelaidDocumentType } from "tauri-plugin-novelaid-fs-api";
 import { DocumentIcon } from "../FileExplorer/DocumentIcon";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useNotification } from "../../contexts/NotificationContext";
 import "./StatusBar.css";
 
 interface StatusBarProps {
@@ -35,6 +36,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   isRightPaneVisible = false,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const { statusMessage } = useNotification();
   const [showPopup, setShowPopup] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLDivElement>(null);
@@ -101,7 +103,12 @@ export const StatusBar: React.FC<StatusBarProps> = ({
           <PanelLeft size={13} />
         </button>
 
-        {activePath ? (
+        {statusMessage ? (
+          <div className="status-message-flash" title={statusMessage}>
+            <span className="status-message-dot" />
+            <span className="status-message-text">{statusMessage}</span>
+          </div>
+        ) : activePath ? (
           <div className="status-file-info" title={activePath}>
             <DocumentIcon type={documentType} size={13} />
             <span className="status-file-name">{fileName}</span>

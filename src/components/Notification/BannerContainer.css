@@ -1,0 +1,111 @@
+.banner-container {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  z-index: 100;
+}
+
+.banner-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-bottom: 1px solid var(--border-color);
+  animation: banner-slide-down 0.2s ease-out;
+}
+
+@keyframes banner-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.banner-item.warning {
+  background-color: rgba(245, 158, 11, 0.12);
+  border-bottom-color: rgba(245, 158, 11, 0.3);
+  color: #fbbf24;
+}
+
+.banner-item.error {
+  background-color: rgba(239, 68, 68, 0.12);
+  border-bottom-color: rgba(239, 68, 68, 0.3);
+  color: #f87171;
+}
+
+.banner-item.info {
+  background-color: rgba(59, 130, 246, 0.12);
+  border-bottom-color: rgba(59, 130, 246, 0.3);
+  color: #60a5fa;
+}
+
+.banner-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+}
+
+.banner-message {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.banner-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: 12px;
+  flex-shrink: 0;
+}
+
+.banner-btn {
+  background-color: var(--bg-card, rgba(255, 255, 255, 0.1));
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.banner-btn:hover {
+  background-color: var(--bg-hover);
+}
+
+.banner-btn.primary {
+  background-color: var(--accent-color, #2563eb);
+  border-color: var(--accent-color, #2563eb);
+  color: #fff;
+}
+
+.banner-btn.primary:hover {
+  filter: brightness(1.1);
+}
+
+.banner-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.banner-close-btn:hover {
+  color: var(--text-primary);
+}

@@ -11,6 +11,7 @@ import { EditorTabs } from "../Editor/EditorTabs";
 import { DocumentPane } from "../DocumentPane/DocumentPane";
 import { DiffEditorView } from "../Diff/DiffEditorView";
 import { Feather, FolderOpen, PlusCircle } from "lucide-react";
+import { BannerContainer } from "../Notification/BannerContainer";
 import "./MainLayout.css";
 
 interface MainLayoutProps {
@@ -132,6 +133,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
 
         {/* メイン執筆領域 / ワークスペース */}
         <main className="main-content-area">
+          <BannerContainer />
           {activeDiff ? (
             <div className="editor-workspace-view">
               <div className="diff-view-header-bar" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', background: 'var(--bg-secondary, #252526)', borderBottom: '1px solid var(--border-color, #333)' }}>

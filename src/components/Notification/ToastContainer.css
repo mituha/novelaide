@@ -1,0 +1,164 @@
+.toast-container {
+  position: fixed;
+  bottom: 34px; /* StatusBarの上 */
+  right: 16px;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 380px;
+  width: calc(100vw - 32px);
+  pointer-events: none; /* コンテナ自体はクリックを透過 */
+}
+
+.toast-item {
+  pointer-events: auto;
+  position: relative;
+  overflow: hidden;
+  background-color: var(--bg-card, var(--bg-side-pane, #1e1e1e));
+  border: 1px solid var(--border-color, #333);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.28);
+  color: var(--text-primary, #e0e0e0);
+  font-size: 0.85rem;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: toast-slide-in 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes toast-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.toast-content-wrapper {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+}
+
+.toast-icon-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1px;
+}
+
+.toast-icon.info {
+  color: #3b82f6;
+}
+
+.toast-icon.success {
+  color: #10b981;
+}
+
+.toast-icon.warning {
+  color: #f59e0b;
+}
+
+.toast-icon.error {
+  color: #ef4444;
+}
+
+.toast-text-area {
+  flex: 1;
+  min-width: 0;
+}
+
+.toast-title {
+  font-weight: 600;
+  font-size: 0.82rem;
+  margin-bottom: 2px;
+  color: var(--text-primary, #fff);
+}
+
+.toast-message {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #ccc);
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+.toast-action-btn {
+  background-color: var(--bg-hover, rgba(255, 255, 255, 0.08));
+  border: 1px solid var(--border-color, #444);
+  color: var(--text-primary, #fff);
+  padding: 3px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  align-self: center;
+  transition: background-color 0.15s ease;
+}
+
+.toast-action-btn:hover {
+  background-color: var(--accent-color, #2563eb);
+  border-color: var(--accent-color, #2563eb);
+  color: #fff;
+}
+
+.toast-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted, #888);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+  margin-left: 2px;
+}
+
+.toast-close-btn:hover {
+  color: var(--text-primary, #fff);
+}
+
+/* プログレスバー */
+.toast-progress-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  height: 2px;
+  width: 100%;
+  background-color: rgba(255, 255, 255, 0.25);
+  animation: toast-progress linear forwards;
+}
+
+.toast-item.info .toast-progress-bar {
+  background-color: #3b82f6;
+}
+
+.toast-item.success .toast-progress-bar {
+  background-color: #10b981;
+}
+
+.toast-item.warning .toast-progress-bar {
+  background-color: #f59e0b;
+}
+
+.toast-item.error .toast-progress-bar {
+  background-color: #ef4444;
+}
+
+.toast-progress-bar.paused {
+  animation-play-state: paused;
+}
+
+@keyframes toast-progress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
