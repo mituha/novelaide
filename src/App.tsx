@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ThemeProvider, useTheme, type Theme } from "./contexts/ThemeContext";
 import { SettingsProvider, SettingsModal } from "restar-app-settings";
 import "restar-app-settings/styles.css";
@@ -12,6 +12,7 @@ import { AIContextProvider } from "tauri-plugin-novelaid-ai-api";
 import "tauri-plugin-novelaid-ai-api/styles.css";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
+import { bootLog } from "./utils/bootLogger";
 import "./styles/theme.css";
 import "./App.css";
 
@@ -19,6 +20,10 @@ function AppContent() {
   const { projectPath } = useProject();
   // プロジェクトが開かれていない場合はランチャーを表示
   const [showLauncher, setShowLauncher] = useState<boolean>(!projectPath);
+
+  useEffect(() => {
+    bootLog(`AppContent mounted. Target view: ${showLauncher ? "ProjectLauncher" : "MainLayout"}`, { projectPath });
+  }, [showLauncher, projectPath]);
 
   if (showLauncher) {
     return (
@@ -36,9 +41,14 @@ function AppContent() {
 function SettingsBoundApp() {
   const { setTheme } = useTheme();
 
+  useEffect(() => {
+    bootLog("SettingsBoundApp mounted");
+  }, []);
+
   return (
     <SettingsProvider
       onSettingChange={(key, value) => {
+        bootLog(`Setting changed: ${key} = ${value}`);
         if (key === "theme") {
           setTheme(value as Theme);
         }
@@ -62,6 +72,10 @@ function SettingsBoundApp() {
 }
 
 function App() {
+  useEffect(() => {
+    bootLog("App root mounted");
+  }, []);
+
   return (
     <ThemeProvider>
       <SettingsBoundApp />

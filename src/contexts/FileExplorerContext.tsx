@@ -7,6 +7,7 @@ import { fileService } from '../services/fileService';
 import { useProject } from './ProjectContext';
 import { useDocument } from './DocumentContext';
 import { useNotification } from './NotificationContext';
+import { bootLog, bootTimeStart } from '../utils/bootLogger';
 
 function normalizePath(p: string): string {
   return p.replace(/\\/g, '/');
@@ -173,6 +174,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       setEntries([]);
       return;
     }
+    const endTimer = bootTimeStart(`FileExplorer readDirectory (${projectPath})`);
     setIsLoading(true);
     if (notify) {
       showStatusMessage('フォルダをスキャン中...');
@@ -180,8 +182,9 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       const data = await fileService.readDirectory(projectPath, true);
       setEntries(data);
+      const { files, folders } = countEntries(data);
+      bootLog(`FileExplorer readDirectory completed: ${files} files, ${folders} folders`);
       if (notify) {
-        const { files, folders } = countEntries(data);
         showStatusMessage(`スキャン完了 (${files} ファイル / ${folders} フォルダ)`, 3000);
       }
     } catch (err) {
@@ -191,6 +194,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
     } finally {
       setIsLoading(false);
+      endTimer();
     }
   }, [projectPath, showStatusMessage]);
 

@@ -8,6 +8,7 @@ import React, {
 } from 'react';
 import { gitClient, type GitFileStatus, type GitCommitLog, type GitDiffResult } from 'restar-app-git';
 import { useProject } from './ProjectContext';
+import { bootLog, bootTimeStart } from '../utils/bootLogger';
 
 interface GitContextType {
   isRepo: boolean;
@@ -50,9 +51,11 @@ export const GitProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       return;
     }
 
+    const endTimer = bootTimeStart(`Git refresh (${projectPath})`);
     setIsLoading(true);
     try {
       const hasRepo = await gitClient.isRepo(projectPath);
+      bootLog(`Git isRepo check: ${hasRepo}`);
       setIsRepo(hasRepo);
 
       if (hasRepo) {
@@ -61,6 +64,7 @@ export const GitProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
           gitClient.log(projectPath, 50),
         ]);
 
+        bootLog(`Git status fetched: branch=${repoStatus.currentBranch}, staged=${repoStatus.staged.length}, unstaged=${repoStatus.unstaged.length}, logs=${logs.length}`);
         setCurrentBranch(repoStatus.currentBranch);
         setStaged(repoStatus.staged);
         setUnstaged(repoStatus.unstaged);
@@ -76,6 +80,7 @@ export const GitProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       console.warn('[GitContext] Refresh failed:', e);
     } finally {
       setIsLoading(false);
+      endTimer();
     }
   }, [projectPath]);
 

@@ -3,6 +3,17 @@
   <head>
     <meta charset="UTF-8" />
     <script>
+      window.__novelaide_boot_start = performance.now();
+      console.log('%c[Boot +   0.0ms] index.html inline script executed', 'color: #3b82f6; font-weight: bold;');
+      window.addEventListener('DOMContentLoaded', () => {
+        const ms = (performance.now() - window.__novelaide_boot_start).toFixed(1);
+        console.log(`%c[Boot +${ms.padStart(6, ' ')}ms] DOMContentLoaded fired`, 'color: #3b82f6; font-weight: bold;');
+      });
+      window.addEventListener('load', () => {
+        const ms = (performance.now() - window.__novelaide_boot_start).toFixed(1);
+        console.log(`%c[Boot +${ms.padStart(6, ' ')}ms] window.load fired`, 'color: #3b82f6; font-weight: bold;');
+      });
+
       // Node.js globals polyfill for browser compatibility
       window.global = window;
       window.process = {

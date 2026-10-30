@@ -12,6 +12,7 @@ import { DocumentPane } from "../DocumentPane/DocumentPane";
 import { DiffEditorView } from "../Diff/DiffEditorView";
 import { Feather, FolderOpen, PlusCircle } from "lucide-react";
 import { BannerContainer } from "../Notification/BannerContainer";
+import { bootLog } from "../../utils/bootLogger";
 import "./MainLayout.css";
 
 interface MainLayoutProps {
@@ -48,6 +49,14 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
     setActivePane,
     updateContent,
   } = useDocument();
+
+  useEffect(() => {
+    bootLog("MainLayout mounted. Editor is ready on screen!", {
+      projectName,
+      projectPath,
+      openDocsCount: openDocuments.length,
+    });
+  }, []);
 
   // 選択テキスト変更イベントの受信
   useEffect(() => {

@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import type { ProjectItem } from "restar-app";
+import { bootLog } from "../utils/bootLogger";
 
 interface ProjectContextType {
   projectPath: string | null;
@@ -18,7 +19,9 @@ const CURRENT_PROJECT_KEY = "novelaide-current-project";
 
 export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [projectPath, setProjectPath] = useState<string | null>(() => {
-    return localStorage.getItem(CURRENT_PROJECT_KEY);
+    const val = localStorage.getItem(CURRENT_PROJECT_KEY);
+    bootLog("ProjectProvider initial projectPath from localStorage:", val);
+    return val;
   });
 
   const [projectName, setProjectName] = useState<string | null>(() => {
@@ -36,6 +39,10 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       return [];
     }
   });
+
+  useEffect(() => {
+    bootLog("ProjectProvider mounted", { projectPath, projectName });
+  }, []);
 
   // 最近のプロジェクト追加
   const addRecentProject = async (name: string, path: string) => {
@@ -61,6 +68,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     const parts = path.split(/[\\/]/).filter(Boolean);
     const name = customName || parts[parts.length - 1] || "Untitled";
 
+    bootLog("openProject called:", { path, name });
     setProjectPath(path);
     setProjectName(name);
     localStorage.setItem(CURRENT_PROJECT_KEY, path);
@@ -70,6 +78,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
 
   // プロジェクトを閉じる（ランチャーへ戻る）
   const closeProject = () => {
+    bootLog("closeProject called");
     setProjectPath(null);
     setProjectName(null);
     localStorage.removeItem(CURRENT_PROJECT_KEY);
