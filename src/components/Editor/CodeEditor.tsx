@@ -10,15 +10,32 @@ import { RubyDialog } from './RubyDialog';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';
 
-// Monaco Editor をローカル配信アセット (/monaco/vs) からロードし、公式日本語言語パックを適用
+// Monaco Editor 公式日本語パック (_VSCODE_NLS_MESSAGES) の先行読み込み
+let nlsPromise: Promise<void> | null = null;
+const loadJapaneseNLS = (): Promise<void> => {
+  if (typeof (globalThis as any)._VSCODE_NLS_MESSAGES !== 'undefined') {
+    return Promise.resolve();
+  }
+  if (!nlsPromise) {
+    nlsPromise = new Promise((resolve) => {
+      const script = document.createElement('script');
+      script.src = '/monaco/vs/nls/lang/ja.js';
+      script.onload = () => resolve();
+      script.onerror = () => {
+        console.warn('Monaco 日本語 NLS のロードに失敗しました。英語で起動します。');
+        resolve();
+      };
+      document.head.appendChild(script);
+    });
+  }
+  return nlsPromise;
+};
+
+// Monaco Editor をローカル配信アセット (/monaco/vs) からロード
+// ※ 'vs/nls' の availableLanguages を渡すと、AMDローダーが define のない ja.js を require してハングするため渡さない
 loader.config({
   paths: {
     vs: '/monaco/vs',
-  },
-  'vs/nls': {
-    availableLanguages: {
-      '*': 'ja',
-    },
   },
 });
 
@@ -45,6 +62,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const saveDocumentRef = useRef(saveDocument);
+
+  // 日本語 NLS のロード状態
+  const [isNlsReady, setIsNlsReady] = useState(() => typeof (globalThis as any)._VSCODE_NLS_MESSAGES !== 'undefined');
+
+  useEffect(() => {
+    if (!isNlsReady) {
+      loadJapaneseNLS().then(() => setIsNlsReady(true));
+    }
+  }, [isNlsReady]);
 
   // ルビダイアログ用ステート
   const [isRubyDialogOpen, setIsRubyDialogOpen] = useState(false);
@@ -319,6 +345,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     if (effectiveTheme === 'light') return 'novel-light';
     return 'novel-dark';
   };
+
+  if (!isNlsReady) {
+    return (
+      <div className="code-editor-container" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ color: 'var(--text-secondary, #888)' }}>エディターを読み込み中...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="code-editor-container">
