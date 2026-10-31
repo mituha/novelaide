@@ -1,5 +1,6 @@
-use crate::models::{CalibrationIssue, CalibrationRange};
+use crate::models::CalibrationIssue;
 use crate::rules::context::CalibrationContext;
+use crate::rules::even_symbol::EvenSymbolRule;
 use crate::rules::CalibrationRule;
 
 /// ダッシュ文字かどうかを判定（全角ダッシュ U+2015, EMダッシュ U+2014, 罫線 U+2500）
@@ -9,94 +10,38 @@ pub fn is_dash_char(c: char) -> bool {
 
 /// ダッシュ偶数（2マス `――`）ルール
 ///
-/// 小説作法では、ダッシュは2マス（偶数マス）で用いるのが原則です。
-/// 単独（1マス）のダッシュを検知し、2マス（`――`）への修正を提案します。
+/// 共通の `EvenSymbolRule` を利用してダッシュ（`―`）の2マス（偶数マス）使用を検証します。
 pub struct DashLeaderRule {
-    pub default_enabled: bool,
+    inner: EvenSymbolRule,
 }
 
 impl Default for DashLeaderRule {
     fn default() -> Self {
         Self {
-            default_enabled: true,
+            inner: EvenSymbolRule::dash_leader(),
         }
     }
 }
 
 impl CalibrationRule for DashLeaderRule {
     fn id(&self) -> &'static str {
-        "novel-dash-leader"
+        self.inner.id()
     }
 
     fn name(&self) -> &'static str {
-        "ダッシュ（2マス）"
+        self.inner.name()
     }
 
     fn rule_type(&self) -> &'static str {
-        "novel_style"
+        self.inner.rule_type()
     }
 
     fn default_enabled(&self) -> bool {
-        self.default_enabled
+        self.inner.default_enabled()
     }
 
     fn check(&self, ctx: &CalibrationContext) -> Vec<CalibrationIssue> {
-        let mut issues = Vec::new();
-
-        for (line_idx, line) in ctx.lines.iter().enumerate() {
-            let line_num = (line_idx + 1) as u32;
-            let chars: Vec<char> = line.chars().collect();
-            let mut i = 0;
-
-            while i < chars.len() {
-                if is_dash_char(chars[i]) {
-                    let start_col = (i + 1) as u32;
-                    let mut count = 0;
-                    while i < chars.len() && is_dash_char(chars[i]) {
-                        count += 1;
-                        i += 1;
-                    }
-                    let end_col = (i + 1) as u32;
-
-                    // 1マス単独のダッシュ、または奇数個のダッシュの場合に指摘
-                    if count == 1 {
-                        issues.push(CalibrationIssue {
-                            id: format!("single-dash-{}-{}", line_num, start_col),
-                            rule_id: self.id().to_string(),
-                            rule_type: self.rule_type().to_string(),
-                            message: "ダッシュは2マス（偶数「――」）で使用するのが作法です".into(),
-                            range: CalibrationRange {
-                                start_line: line_num,
-                                start_column: start_col,
-                                end_line: line_num,
-                                end_column: end_col,
-                            },
-                            suggestion: Some("――".into()),
-                        });
-                    } else if count % 2 != 0 {
-                        // 3マスなどの奇数の場合は偶数への修正提案
-                        let suggested = "―".repeat(count + 1);
-                        issues.push(CalibrationIssue {
-                            id: format!("odd-dash-{}-{}", line_num, start_col),
-                            rule_id: self.id().to_string(),
-                            rule_type: self.rule_type().to_string(),
-                            message: format!("ダッシュが奇数（{}マス）使われています。偶数マスで使用するのが作法です", count),
-                            range: CalibrationRange {
-                                start_line: line_num,
-                                start_column: start_col,
-                                end_line: line_num,
-                                end_column: end_col,
-                            },
-                            suggestion: Some(suggested),
-                        });
-                    }
-                } else {
-                    i += 1;
-                }
-            }
-        }
-
-        issues
+        self.inner.check(ctx)
     }
 }
 

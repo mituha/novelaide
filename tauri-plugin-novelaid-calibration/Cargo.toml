@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-novelaid-calibration"
-version = "0.7.0"
+version = "0.7.1"
 authors = [ "Mizuki Mituha" ]
 description = "novelaide calibration and proofreading plugin"
 edition = "2021"

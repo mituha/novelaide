@@ -1,5 +1,6 @@
 pub mod context;
 pub mod prohibited_char;
+pub mod even_symbol;
 pub mod closing_period;
 pub mod three_dots_leader;
 pub mod dash_leader;
@@ -17,6 +18,7 @@ use std::collections::HashMap;
 use crate::models::CalibrationIssue;
 use self::context::CalibrationContext;
 pub use self::prohibited_char::ProhibitedCharRule;
+pub use self::even_symbol::EvenSymbolRule;
 pub use self::closing_period::ClosingPeriodRule;
 pub use self::three_dots_leader::ThreeDotsLeaderRule;
 pub use self::dash_leader::DashLeaderRule;
