@@ -13,6 +13,7 @@ pub fn run() {
         .plugin(tauri_plugin_restar_settings::init())
         .plugin(tauri_plugin_restar_git::init())
         .plugin(tauri_plugin_novelaid_ai::init())
+        .plugin(tauri_plugin_novelaid_calibration::init())
         .invoke_handler(tauri::generate_handler![
             greet,
         ])

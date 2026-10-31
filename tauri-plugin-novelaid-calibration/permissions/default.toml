@@ -1,0 +1,8 @@
+[default]
+description = "Default permissions for novelaid-calibration plugin"
+permissions = [
+    "allow-ping",
+    "allow-check-text",
+    "allow-tokenize-text",
+    "allow-get-ruby-candidates",
+]

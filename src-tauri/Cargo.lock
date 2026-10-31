@@ -2101,7 +2101,7 @@ checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
 
 [[package]]
 name = "novelaide"
-version = "0.22.8"
+version = "0.23.0"
 dependencies = [
  "serde",
  "serde_json",
@@ -2109,6 +2109,7 @@ dependencies = [
  "tauri-build",
  "tauri-plugin-dialog",
  "tauri-plugin-novelaid-ai",
+ "tauri-plugin-novelaid-calibration",
  "tauri-plugin-novelaid-fs",
  "tauri-plugin-opener",
  "tauri-plugin-restar-git",
@@ -3591,6 +3592,18 @@ dependencies = [
  "tauri",
  "tauri-plugin",
  "thiserror 2.0.21",
+]
+
+[[package]]
+name = "tauri-plugin-novelaid-calibration"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
+ "ts-rs",
 ]
 
 [[package]]

@@ -10,6 +10,7 @@
     "novelaid-fs:default",
     "restar-settings:default",
     "restar-git:default",
-    "novelaid-ai:default"
+    "novelaid-ai:default",
+    "novelaid-calibration:default"
   ]
 }

@@ -1,7 +1,7 @@
 {
   "name": "novelaide",
   "private": true,
-  "version": "0.22.8",
+  "version": "0.23.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -12,7 +12,8 @@
     "build:plugin:ai": "npm run build --prefix tauri-plugin-novelaid-ai",
     "build:plugin:git": "npm run build --prefix tauri-plugin-restar-git",
     "build:plugin:settings": "npm run build --prefix tauri-plugin-restar-settings",
-    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai && npm run build:plugin:git && npm run build:plugin:settings",
+    "build:plugin:calibration": "npm run build --prefix tauri-plugin-novelaid-calibration",
+    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai && npm run build:plugin:git && npm run build:plugin:settings && npm run build:plugin:calibration",
     "build:plugin": "npm run build:plugins",
     "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin",
     "release": "node scripts/release.mjs"
@@ -38,6 +39,7 @@
     "restar-app-git": "file:tauri-plugin-restar-git",
     "restar-app-settings": "file:tauri-plugin-restar-settings",
     "tauri-plugin-novelaid-ai-api": "file:tauri-plugin-novelaid-ai",
+    "tauri-plugin-novelaid-calibration-api": "file:tauri-plugin-novelaid-calibration",
     "tauri-plugin-novelaid-fs-api": "file:tauri-plugin-novelaid-fs"
   },
   "devDependencies": {
