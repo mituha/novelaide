@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
-import MonacoEditor, { OnMount, BeforeMount, loader } from '@monaco-editor/react';
+import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDocument } from '../../contexts/DocumentContext';
 import { useProject } from '../../contexts/ProjectContext';
@@ -10,14 +10,20 @@ import { RubyDialog } from './RubyDialog';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';
 
-// Monaco Editor 標準UI（コンテキストメニュー、コマンドパレット、組み込みメッセージ等）の日本語ローカライズ
-loader.config({
-  'vs/nls': {
-    availableLanguages: {
-      '*': 'ja',
-    },
-  },
-});
+// Monaco Editor 標準コンテキストメニューの日本語ローカライズ辞書（完全ローカル）
+const CONTEXT_MENU_TRANSLATIONS: Record<string, string> = {
+  'Change All Occurrences': 'すべての出現箇所を変更',
+  'Command Palette': 'コマンド パレット',
+  'Cut': '切り取り',
+  'Copy': 'コピー',
+  'Paste': '貼り付け',
+  'Select All': 'すべて選択',
+  'Undo': '元に戻す',
+  'Redo': 'やり直し',
+  'Format Document': 'ドキュメントのフォーマット',
+  'Go to Definition': '定義へ移動',
+  'Peek Definition': '定義をここに表示',
+};
 
 interface CodeEditorProps extends Partial<DocumentViewProps> {
   value?: string;
@@ -293,10 +299,48 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     window.addEventListener('calibration-issues-update', handleCalibrationIssues);
     window.addEventListener('editor-jump-to', handleEditorJumpTo);
 
+    // コンテキストメニューが開かれた際にDOM要素のラベルを日本語にローカライズ
+    const localizeMenu = (root: ParentNode = document) => {
+      const labels = root.querySelectorAll<HTMLElement>('.monaco-menu .action-label');
+      labels.forEach((label) => {
+        const text = label.textContent?.trim();
+        if (text && CONTEXT_MENU_TRANSLATIONS[text]) {
+          label.textContent = CONTEXT_MENU_TRANSLATIONS[text];
+        }
+      });
+    };
+
+    const menuObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.type === 'childList') {
+          m.addedNodes.forEach((node) => {
+            if (node instanceof HTMLElement) {
+              if (
+                node.classList.contains('context-view') ||
+                node.classList.contains('monaco-menu-container') ||
+                node.querySelector('.monaco-menu')
+              ) {
+                localizeMenu(node);
+              }
+            }
+          });
+        }
+      }
+    });
+
+    menuObserver.observe(document.body, { childList: true, subtree: true });
+
+    const handleContextMenu = () => {
+      requestAnimationFrame(() => localizeMenu(document.body));
+    };
+    window.addEventListener('contextmenu', handleContextMenu);
+
     // クリーンアップ
     editor.onDidDispose(() => {
       window.removeEventListener('calibration-issues-update', handleCalibrationIssues);
       window.removeEventListener('editor-jump-to', handleEditorJumpTo);
+      menuObserver.disconnect();
+      window.removeEventListener('contextmenu', handleContextMenu);
     });
   };
 
