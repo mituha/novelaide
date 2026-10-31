@@ -45,6 +45,8 @@ export interface DocumentState {
   metadata: Record<string, any>;
   documentType: NovelaidDocumentType;
   isDirty: boolean;
+  /** ファイルシステムの最終更新日時（Unixミリ秒） */
+  mtime?: number;
 
   /** 現在このドキュメントを参照・表示している View 一覧（参照カウント式） */
   views: DocumentViewRef[];

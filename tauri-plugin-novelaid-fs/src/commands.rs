@@ -149,6 +149,14 @@ pub(crate) async fn get_project_directory<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn get_document_stat<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+) -> Result<DocumentStat> {
+    app.novelaid_fs().get_document_stat(std::path::Path::new(&path))
+}
+
+#[command]
 pub(crate) async fn read_document<R: Runtime>(
     app: AppHandle<R>,
     path: String,
@@ -161,7 +169,7 @@ pub(crate) async fn write_document<R: Runtime>(
     app: AppHandle<R>,
     path: String,
     document: NovelaidDocument,
-) -> Result<()> {
+) -> Result<u64> {
     app.novelaid_fs().write_document(std::path::Path::new(&path), document)
 }
 

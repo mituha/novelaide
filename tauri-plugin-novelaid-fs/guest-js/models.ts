@@ -2,7 +2,9 @@
 
 export type NovelaidDirEntry = { name: string, path: string, baseName: string, fileTitle: string, isDirectory: boolean, documentType: NovelaidDocumentType, children: Array<NovelaidDirEntry> | null, };
 
-export type NovelaidDocument = { path: string, baseName: string, fileTitle: string, content: string, metadata: any, documentType: NovelaidDocumentType, };
+export type NovelaidDocument = { path: string, baseName: string, fileTitle: string, content: string, metadata: any, documentType: NovelaidDocumentType, mtimeMs: number, };
+
+export type DocumentStat = { path: string, exists: boolean, mtimeMs: number, size: number, };
 
 export type NovelaidDocumentType = "novel" | "markdown" | "image" | "chat" | "gitDiff" | "browser" | "css" | "unknown" | "external";
 

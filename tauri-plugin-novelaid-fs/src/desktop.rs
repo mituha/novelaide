@@ -114,6 +114,12 @@ pub struct NovelaidFs<R: Runtime> {
   pub processed_jobs: Arc<AtomicU32>,
 }
 
+fn system_time_to_ms(time: SystemTime) -> u64 {
+  time.duration_since(SystemTime::UNIX_EPOCH)
+    .map(|d| d.as_millis() as u64)
+    .unwrap_or(0)
+}
+
 impl<R: Runtime> NovelaidFs<R> {
   pub fn ping(&self, payload: PingRequest) -> crate::Result<PingResponse> {
     Ok(PingResponse {
@@ -138,18 +144,41 @@ impl<R: Runtime> NovelaidFs<R> {
     dir.clone()
   }
 
+  pub fn get_document_stat(&self, path: &Path) -> crate::Result<DocumentStat> {
+    let path_str = path.to_string_lossy().to_string();
+    match std::fs::metadata(path) {
+      Ok(meta) => {
+        let mtime = meta.modified().unwrap_or_else(|_| SystemTime::now());
+        Ok(DocumentStat {
+          path: path_str,
+          exists: true,
+          mtime_ms: system_time_to_ms(mtime),
+          size: meta.len(),
+        })
+      }
+      Err(_) => Ok(DocumentStat {
+        path: path_str,
+        exists: false,
+        mtime_ms: 0,
+        size: 0,
+      }),
+    }
+  }
+
   pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
     let content = std::fs::read_to_string(path).map_err(crate::Error::Io)?;
     let (metadata, body) = self.extract_frontmatter(&content);
     
     let document_type = self.get_document_type_internal(path);
     
+    let mtime = std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .unwrap_or_else(|_| SystemTime::now());
+    let mtime_ms = system_time_to_ms(mtime);
+
     // Update cache
     {
       let mut cache = self.metadata_cache.lock().unwrap();
-      let mtime = std::fs::metadata(path)
-          .and_then(|m| m.modified())
-          .unwrap_or_else(|_| SystemTime::now());
       cache.insert(path.to_string_lossy().to_string(), CacheEntry {
           metadata: metadata.clone(),
           mtime,
@@ -163,29 +192,32 @@ impl<R: Runtime> NovelaidFs<R> {
       content: body.to_string(),
       metadata,
       document_type,
+      mtime_ms,
     })
   }
 
-  pub fn write_document(&self, path: &Path, document: NovelaidDocument) -> crate::Result<()> {
+  pub fn write_document(&self, path: &Path, document: NovelaidDocument) -> crate::Result<u64> {
     let full_content = self.format_frontmatter(&document.metadata, &document.content);
     std::fs::write(path, full_content).map_err(crate::Error::Io)?;
     
     // Invalidate attributes cache if modifying .novelaidattributes
     self.attributes_manager.invalidate_if_attributes_file(path);
 
+    let mtime = std::fs::metadata(path)
+        .and_then(|m| m.modified())
+        .unwrap_or_else(|_| SystemTime::now());
+    let mtime_ms = system_time_to_ms(mtime);
+
     // Update cache
     {
       let mut cache = self.metadata_cache.lock().unwrap();
-      let mtime = std::fs::metadata(path)
-          .and_then(|m| m.modified())
-          .unwrap_or_else(|_| SystemTime::now());
       cache.insert(path.to_string_lossy().to_string(), CacheEntry {
           metadata: document.metadata,
           mtime,
       });
     }
     
-    Ok(())
+    Ok(mtime_ms)
   }
 
   pub fn create_directory(&self, path: &Path) -> crate::Result<()> {

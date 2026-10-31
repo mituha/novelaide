@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core'
-import { NovelaidDocumentType, NovelaidDirEntry, NovelaidDocument, RemoveResult } from './models'
+import { NovelaidDocumentType, NovelaidDirEntry, NovelaidDocument, DocumentStat, RemoveResult } from './models'
 
 export * from './models'
 
@@ -51,6 +51,12 @@ export async function readDirectory(
   });
 }
 
+export async function getDocumentStat(path: string): Promise<DocumentStat> {
+  return await invoke<DocumentStat>('plugin:novelaid-fs|get_document_stat', {
+    path,
+  });
+}
+
 export async function readDocument(path: string): Promise<NovelaidDocument> {
   return await invoke<NovelaidDocument>('plugin:novelaid-fs|read_document', {
     path,
@@ -60,8 +66,8 @@ export async function readDocument(path: string): Promise<NovelaidDocument> {
 export async function writeDocument(
   path: string,
   document: NovelaidDocument,
-): Promise<void> {
-  await invoke('plugin:novelaid-fs|write_document', {
+): Promise<number> {
+  return await invoke<number>('plugin:novelaid-fs|write_document', {
     path,
     document,
   });

@@ -57,6 +57,17 @@ pub struct NovelaidDocument {
     #[ts(type = "any")]
     pub metadata: serde_json::Value,
     pub document_type: NovelaidDocumentType,
+    pub mtime_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../guest-js/models.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct DocumentStat {
+    pub path: String,
+    pub exists: bool,
+    pub mtime_ms: u64,
+    pub size: u64,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

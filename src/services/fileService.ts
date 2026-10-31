@@ -128,6 +128,21 @@ export const fileService = {
     }
   },
 
+  // ファイルステータス取得（軽量mtime確認）
+  async getDocumentStat(path: string): Promise<novelaidFs.DocumentStat> {
+    try {
+      return await novelaidFs.getDocumentStat(path);
+    } catch (err) {
+      console.warn("getDocumentStat fallback:", err);
+      return {
+        path,
+        exists: true,
+        mtimeMs: Date.now(),
+        size: 0,
+      };
+    }
+  },
+
   // ファイル読み込み（フロントマター付きMarkdownやテキスト）
   async readFile(path: string): Promise<FileDocument> {
     try {
@@ -143,6 +158,7 @@ export const fileService = {
           fileTitle: "魔女_ルナ",
           documentType: "markdown",
           metadata: { role: "ヒロイン", age: 17 },
+          mtimeMs: Date.now(),
           content: `# キャラクター設定：|魔女《まじょ》ルナ・アルテミス
 
 月光の力を操る《《銀髪の天才少女》》。
@@ -202,6 +218,7 @@ marker:
         path,
         baseName: "01_プロローグ.md",
         fileTitle: "01_プロローグ",
+        mtimeMs: Date.now(),
         content: `# プロローグ：運命の邂逅
 
 　青い空の彼方から、一羽の鳥が舞い降りてきた。
@@ -218,7 +235,7 @@ marker:
   },
 
   // ファイル保存
-  async writeFile(path: string, content: string, metadata: any = {}): Promise<void> {
+  async writeFile(path: string, content: string, metadata: any = {}): Promise<number> {
     try {
       const doc: FileDocument = {
         path,
@@ -227,10 +244,12 @@ marker:
         content,
         metadata,
         documentType: "novel",
+        mtimeMs: Date.now(),
       };
-      await novelaidFs.writeDocument(path, doc);
+      return await novelaidFs.writeDocument(path, doc);
     } catch (err) {
       console.warn("writeDocument fallback:", err);
+      return Date.now();
     }
   },
 

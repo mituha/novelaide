@@ -251,8 +251,15 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       unlisten = fn;
     });
 
+    // フォーカス復帰時などのプロジェクト全体走査リクエストを受信
+    const handleProjectRefresh = () => {
+      refreshDirectory();
+    };
+    window.addEventListener('novelaide:project-refresh-needed', handleProjectRefresh);
+
     return () => {
       if (unlisten) unlisten();
+      window.removeEventListener('novelaide:project-refresh-needed', handleProjectRefresh);
     };
   }, [refreshDirectory, openDocuments, closeTab, openDocument]);
 

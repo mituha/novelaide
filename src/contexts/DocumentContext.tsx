@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { fileService } from '../services/fileService';
 import { DocumentState, DocumentViewMode, PaneId, DocumentViewRef } from '../types/document';
 import { getInitialViewMode } from '../utils/documentSupport';
+import { useNotification } from './NotificationContext';
 
 export type { DocumentState, PaneId, DocumentViewRef };
 
@@ -66,6 +67,7 @@ interface DocumentContextType {
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
 
 export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { showToast, showBanner, dismissBanner } = useNotification();
   const [openDocuments, setOpenDocuments] = useState<DocumentState[]>([]);
   const [activePane, setActivePane] = useState<PaneId>('editor.left');
   const [activePathByPane, setActivePathByPane] = useState<Record<PaneId, string | null>>({
@@ -74,6 +76,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
   const [isSplit, setIsSplit] = useState<boolean>(false);
   const [splitRatio, setSplitRatio] = useState<number>(0.5);
+
+  const openDocumentsRef = useRef<DocumentState[]>(openDocuments);
+  useEffect(() => {
+    openDocumentsRef.current = openDocuments;
+  }, [openDocuments]);
 
   // 指定ペインに属するタブ一覧を導出
   const getTabsForPane = useCallback(
@@ -115,6 +122,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const activePath = useMemo(() => {
     return activePathByPane[activePane];
   }, [activePathByPane, activePane]);
+
+  const activePathRef = useRef<string | null>(activePath);
+  useEffect(() => {
+    activePathRef.current = activePath;
+  }, [activePath]);
 
   // 左ペイン・右ペインのアクティブ TabItem
   const activeLeftItem = useMemo<TabItem | null>(() => {
@@ -159,11 +171,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (!docToSave) return;
 
       try {
-        await fileService.writeFile(docToSave.path, docToSave.content, docToSave.metadata);
+        const mtime = await fileService.writeFile(docToSave.path, docToSave.content, docToSave.metadata);
         setOpenDocuments((prev) =>
           prev.map((doc) => {
             if (doc.path === targetPath) {
-              return { ...doc, isDirty: false };
+              return { ...doc, isDirty: false, mtime };
             }
             return doc;
           })
@@ -213,6 +225,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             metadata: fileData.metadata || {},
             documentType: fileData.documentType,
             isDirty: false,
+            mtime: fileData.mtimeMs,
             views: [{ viewId: targetPane, viewMode: mode }],
             leftViewMode: targetPane === 'editor.left' ? mode : 'none',
             rightViewMode: targetPane === 'editor.right' ? mode : 'none',
@@ -549,6 +562,167 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
   }, [isSplit, closePane, activePath, activePathByPane, openPreviewInOtherPane]);
+
+  // ウィンドウフォーカス復帰時の3段階オンデマンド検証パイプライン
+  const lastFocusCheckRef = useRef<number>(0);
+
+  const checkExternalChanges = useCallback(async () => {
+    const now = Date.now();
+    if (now - lastFocusCheckRef.current < 500) return;
+    lastFocusCheckRef.current = now;
+
+    const docs = openDocumentsRef.current;
+    if (docs.length === 0) {
+      window.dispatchEvent(new CustomEvent('novelaide:project-refresh-needed'));
+      return;
+    }
+
+    const activeP = activePathRef.current;
+
+    const checkDoc = async (doc: DocumentState, isActive: boolean) => {
+      try {
+        const stat = await fileService.getDocumentStat(doc.path);
+        if (!stat.exists) {
+          if (!doc.isDirty) {
+            showToast({
+              type: 'warning',
+              message: `${doc.baseName} は外部で削除されたため閉じられました`,
+              duration: 4000,
+            });
+            await closeDocument(doc.path);
+          } else {
+            const bannerId = `external-deleted-${doc.path}`;
+            showBanner({
+              id: bannerId,
+              type: 'warning',
+              message: `${doc.baseName} は外部で削除されましたが、未保存の編集内容があります。`,
+              actions: [
+                {
+                  label: '破棄して閉じる',
+                  onClick: () => {
+                    dismissBanner(bannerId);
+                    closeDocument(doc.path);
+                  },
+                },
+                {
+                  label: '再保存する',
+                  primary: true,
+                  onClick: async () => {
+                    dismissBanner(bannerId);
+                    await saveDocument(doc.path);
+                  },
+                },
+              ],
+            });
+          }
+          return;
+        }
+
+        // mtime 比較による外部更新検知
+        if (doc.mtime && stat.mtimeMs > doc.mtime) {
+          if (!doc.isDirty) {
+            // 未編集（isDirty: false）: 自動再読み込み
+            const fresh = await fileService.readFile(doc.path);
+            setOpenDocuments((prev) =>
+              prev.map((d) =>
+                d.path === doc.path
+                  ? {
+                      ...d,
+                      content: fresh.content,
+                      metadata: fresh.metadata || {},
+                      mtime: fresh.mtimeMs,
+                      isDirty: false,
+                    }
+                  : d
+              )
+            );
+            if (isActive) {
+              showToast({
+                type: 'info',
+                message: `${doc.baseName} を外部の変更に合わせて再読み込みしました`,
+                duration: 3500,
+              });
+            }
+          } else {
+            // 編集中（isDirty: true）: メモリ内容保護、L3エディタバナーで選択提示
+            const bannerId = `external-conflict-${doc.path}`;
+            showBanner({
+              id: bannerId,
+              type: 'warning',
+              message: `${doc.baseName} は外部で変更されました。現在の編集内容を保持しますか、それとも最新を取り込みますか？`,
+              actions: [
+                {
+                  label: '最新を取り込む',
+                  onClick: async () => {
+                    dismissBanner(bannerId);
+                    const fresh = await fileService.readFile(doc.path);
+                    setOpenDocuments((prev) =>
+                      prev.map((d) =>
+                        d.path === doc.path
+                          ? {
+                              ...d,
+                              content: fresh.content,
+                              metadata: fresh.metadata || {},
+                              mtime: fresh.mtimeMs,
+                              isDirty: false,
+                            }
+                          : d
+                      )
+                    );
+                    showToast({
+                      type: 'success',
+                      message: `${doc.baseName} を最新の内容に更新しました`,
+                      duration: 3500,
+                    });
+                  },
+                },
+                {
+                  label: '現在の編集を保持',
+                  primary: true,
+                  onClick: () => {
+                    dismissBanner(bannerId);
+                    setOpenDocuments((prev) =>
+                      prev.map((d) =>
+                        d.path === doc.path ? { ...d, mtime: stat.mtimeMs } : d
+                      )
+                    );
+                  },
+                },
+              ],
+            });
+          }
+        }
+      } catch (err) {
+        console.warn(`Failed to check external changes for ${doc.path}:`, err);
+      }
+    };
+
+    // 第1優先: アクティブ表示中タブの検証
+    const activeDoc = docs.find((d) => d.path === activeP);
+    if (activeDoc) {
+      await checkDoc(activeDoc, true);
+    }
+
+    // 第2優先: 非アクティブタブの順次検証
+    const backgroundDocs = docs.filter((d) => d.path !== activeP);
+    for (const bgDoc of backgroundDocs) {
+      await checkDoc(bgDoc, false);
+    }
+
+    // 第3優先: プロジェクト全体のディレクトリ走査通知
+    window.dispatchEvent(new CustomEvent('novelaide:project-refresh-needed'));
+  }, [closeDocument, showBanner, showToast, dismissBanner, saveDocument]);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      checkExternalChanges();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [checkExternalChanges]);
 
   return (
     <DocumentContext.Provider
