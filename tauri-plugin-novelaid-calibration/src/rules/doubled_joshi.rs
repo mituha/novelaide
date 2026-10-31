@@ -4,8 +4,10 @@ use crate::rules::CalibrationRule;
 
 /// 助詞連続・重複ルール
 ///
-/// 同一行内で同一助詞（デフォルトは「の」）が許容回数を超えて出現した場合に警告
+/// 同一行内で同一助詞（「の」「が」「を」等）が許容回数を超えて出現した場合に警告
 pub struct DoubledJoshiRule {
+    pub rule_id: &'static str,
+    pub name: &'static str,
     pub target_char: char,
     pub max_allowed: usize, // 許容回数（これを超えると指摘）
     pub default_enabled: bool,
@@ -14,6 +16,8 @@ pub struct DoubledJoshiRule {
 impl Default for DoubledJoshiRule {
     fn default() -> Self {
         Self {
+            rule_id: "no-doubled-joshi",
+            name: "助詞「の」の連続・多用",
             target_char: 'の',
             max_allowed: 2, // 3回以上で指摘
             default_enabled: true,
@@ -22,8 +26,10 @@ impl Default for DoubledJoshiRule {
 }
 
 impl DoubledJoshiRule {
-    pub fn new(target_char: char, max_allowed: usize) -> Self {
+    pub fn new(rule_id: &'static str, name: &'static str, target_char: char, max_allowed: usize) -> Self {
         Self {
+            rule_id,
+            name,
             target_char,
             max_allowed,
             default_enabled: true,
@@ -33,11 +39,11 @@ impl DoubledJoshiRule {
 
 impl CalibrationRule for DoubledJoshiRule {
     fn id(&self) -> &'static str {
-        "no-doubled-joshi"
+        self.rule_id
     }
 
     fn name(&self) -> &'static str {
-        "助詞の連続・多用"
+        self.name
     }
 
     fn rule_type(&self) -> &'static str {

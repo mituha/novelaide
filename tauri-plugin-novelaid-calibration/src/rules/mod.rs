@@ -8,6 +8,7 @@ pub mod exclamation_space;
 pub mod exclamation_normalization;
 pub mod indent_first_line;
 pub mod dropping_ra;
+pub mod double_negative;
 pub mod doubled_joshi;
 pub mod kanji_open_close;
 
@@ -23,6 +24,7 @@ pub use self::exclamation_space::ExclamationSpaceRule;
 pub use self::exclamation_normalization::ExclamationNormalizationRule;
 pub use self::indent_first_line::IndentFirstLineRule;
 pub use self::dropping_ra::DroppingRaRule;
+pub use self::double_negative::DoubleNegativeRule;
 pub use self::doubled_joshi::DoubledJoshiRule;
 pub use self::kanji_open_close::KanjiOpenCloseRule;
 
@@ -116,7 +118,18 @@ impl RuleRegistry {
         // 11. 助詞「の」連続チェック
         registry.register(DoubledJoshiRule::default());
 
-        // 12. 形式名詞・漢字の開きチェック
+        // 12. 助詞「が」連続・多用チェック（1文中に3回以上）
+        registry.register(DoubledJoshiRule::new(
+            "no-doubled-joshi-ga",
+            "助詞「が」の連続・多用",
+            'が',
+            2,
+        ));
+
+        // 13. 二重否定チェック（〜なくはない、〜ないわけではない等）
+        registry.register(DoubleNegativeRule::default());
+
+        // 14. 形式名詞・漢字の開きチェック
         registry.register(KanjiOpenCloseRule::default());
 
         registry

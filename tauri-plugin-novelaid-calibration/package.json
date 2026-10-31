@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-novelaid-calibration-api",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "author": "Mizuki Mituha",
   "description": "Japanese text proofreading and morphological analysis plugin for Novelaid",
   "type": "module",
