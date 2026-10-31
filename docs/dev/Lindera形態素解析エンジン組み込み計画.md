@@ -74,32 +74,20 @@ flowchart TD
 ```
 
 ### 4.1. トークン情報のマッピング仕様
-Lindera の `token.details`（IPADIC）から novelaide 共通の `TokenInfo` への変換：
-* `surface`: `token.text`
-* `pos`: `token.details[0..4]` をカンマ結合（例: `名詞,固有名詞,人名,一般`）
-* `base_form`: `token.details[6]`
-* `reading`: `token.details[7]`（カタカナ）
-  - ルビ用途には、カタカナをひらがなに変換する高速ユーティリティ（`kana_to_hira`）を適用。
+Lindera の `token.details()`（IPADIC）から novelaide 共通の `TokenInfo` への変換：
+* `surface`: `token.surface`
+* `pos`: `details[0..4]` をカンマ結合（例: `名詞,固有名詞,組織`）
+* `base_form`: `details[6]`
+* `reading`: `details[7]`（カタカナ）
+  - ルビ用途には、カタカナをひらがなに変換する高速ユーティリティ（`katakana_to_hiragana`）を適用。
 
 ---
 
-## 5. 段階的導入計画（Implementation Roadmap）
+## 5. 段階的導入計画と進捗実績
 
-安全性を最大化するため、以下の3段階でステップ・バイ・ステップに進める。
-
-### フェーズ 1: 単体クレートでのコンパイル＆動作検証
-1. `tauri-plugin-novelaid-calibration/Cargo.toml` に `lindera = { version = "6", features = ["embed-ipadic"] }` を追加。
-2. プラグイン単体で `cargo check` および単体テスト（`Segmenter` による形態素解析テストコード）を実行。
-3. IPADIC 辞書の展開と基本トークン分割が正常に完了することを確認。
-
-### フェーズ 2: プラグイン本体（`desktop.rs`）へのエンジン組み込み
-1. `NovelaidCalibration` に `Arc<RwLock<Segmenter>>` を導入。
-2. `tokenize_text` をモックから Lindera 実装へ切り替え。
-3. `get_ruby_candidates` を本実装（本文中の漢字語句＋Lindera読みからひらがなルビを生成）。
-4. フロントエンド校正パネルの「ルビ支援」「文体・比率」タブで実データ表示を疎通確認。
-
-### フェーズ 3: 形態素解析ベースの小説校正ルール本実装
-1. 助詞連続検出（トークン列中の助詞「の」の出現間隔判定）。
-2. ら抜き言葉検出（動詞形態素の活用形パターン判定）。
-3. 形式名詞・漢字の開き判定（「事」「時」「物」等の品詞が形式名詞・非自立である場合の検出）。
-4. フロントエンドでの各指摘の適用（Monaco Editor 連動）テスト。
+| フェーズ | 内容 | 状態 | 備考 |
+| :--- | :--- | :--- | :--- |
+| **フェーズ 1** | 単体クレートでのコンパイル＆動作検証 | **完了** | `Cargo.toml` に Lindera v6 (`embed-ipadic`) を導入し、単体テスト（8件、0.30秒）で辞書ロードと形態素抽出を検証成功。 |
+| **フェーズ 2** | プラグイン本体（`desktop.rs`）へのエンジン組み込み | **完了** | `Arc<RwLock<Segmenter>>` 常駐化、`tokenize_text`、`get_ruby_candidates`、および漢字開き・頻出語抽出の本実装完了。 |
+| **フェーズ 3** | 形態素解析ベースの小説特化ルール拡充 | 予定 | ら抜き言葉、二重否定、助詞重複の詳細活用形判定。 |
+| **フェーズ 4** | ユーザー辞書（設定資料CSV）の動的追加 | 予定 | 登場人物名・固有名詞の動的読み込みとリロード機能。 |

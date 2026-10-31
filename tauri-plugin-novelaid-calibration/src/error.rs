@@ -6,6 +6,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
+    #[error("Lindera error: {0}")]
+    Lindera(String),
     #[error("{0}")]
     Other(String),
 }
