@@ -11,6 +11,70 @@ import { invoke } from '@tauri-apps/api/core';
 function formatRuby(surface, ruby) {
     return `|${surface}《${ruby}》`;
 }
+const isHiraganaChar = (c) => c >= '\u3040' && c <= '\u309F';
+const isKanjiChar = (c) => (c >= '\u4E00' && c <= '\u9FFF') || c === '々' || c === '〇';
+/**
+ * 送り仮名（ひらがな）を自動検知して分離し、漢字部分にのみルビを振るスマート記法を生成します。
+ * 本文への確定・適用段階で呼び出します。
+ *
+ * @example
+ * formatSmartRuby('見下ろす', 'みおろす') // => '|見下《みお》ろす'
+ * formatSmartRuby('見下ろす', 'みお')     // => '|見下《みお》ろす'
+ * formatSmartRuby('お見舞い', 'おみまい') // => 'お|見舞《みま》い'
+ * formatSmartRuby('見下ろす', 'ルックダウン') // => '|見下ろす《ルックダウン》'
+ */
+function formatSmartRuby(surface, ruby) {
+    if (!surface || !ruby)
+        return '';
+    const sChars = Array.from(surface);
+    const rChars = Array.from(ruby);
+    if (!sChars.some(isKanjiChar)) {
+        return formatRuby(surface, ruby);
+    }
+    // 1. 先頭の一致するひらがな（接頭辞）
+    let prefixLen = 0;
+    while (prefixLen < sChars.length &&
+        prefixLen < rChars.length &&
+        isHiraganaChar(sChars[prefixLen]) &&
+        sChars[prefixLen] === rChars[prefixLen]) {
+        prefixLen++;
+    }
+    // 2. 末尾の一致するひらがな（送り仮名）
+    let sEnd = sChars.length;
+    let rEnd = rChars.length;
+    const suffixChars = [];
+    while (sEnd > prefixLen &&
+        rEnd > prefixLen &&
+        isHiraganaChar(sChars[sEnd - 1]) &&
+        sChars[sEnd - 1] === rChars[rEnd - 1]) {
+        suffixChars.push(sChars[sEnd - 1]);
+        sEnd--;
+        rEnd--;
+    }
+    suffixChars.reverse();
+    // 3. ルビ側がすでに短縮されている場合（例: surface="見下ろす", ruby="みお"）
+    if (suffixChars.length === 0 && rChars.every(isHiraganaChar)) {
+        let tempEnd = sEnd;
+        const okuri = [];
+        while (tempEnd > prefixLen && isHiraganaChar(sChars[tempEnd - 1])) {
+            okuri.push(sChars[tempEnd - 1]);
+            tempEnd--;
+        }
+        if (tempEnd > prefixLen && sChars.slice(prefixLen, tempEnd).some(isKanjiChar)) {
+            okuri.reverse();
+            suffixChars.push(...okuri);
+            sEnd = tempEnd;
+        }
+    }
+    const coreSurface = sChars.slice(prefixLen, sEnd).join('');
+    const coreRuby = rChars.slice(prefixLen, rEnd).join('');
+    if (coreSurface && coreRuby && Array.from(coreSurface).some(isKanjiChar)) {
+        const prefix = sChars.slice(0, prefixLen).join('');
+        const suffix = suffixChars.join('');
+        return `${prefix}|${coreSurface}《${coreRuby}》${suffix}`;
+    }
+    return formatRuby(surface, ruby);
+}
 /**
  * 小説記法（ルビ・傍点）をHTMLタグに変換します。
  *
@@ -58,4 +122,4 @@ async function countCharacters(text, options) {
     });
 }
 
-export { countCharacters, extractRubyText, formatRuby, stripRuby, transformToHtml };
+export { countCharacters, extractRubyText, formatRuby, formatSmartRuby, stripRuby, transformToHtml };

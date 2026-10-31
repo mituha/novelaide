@@ -331,6 +331,18 @@
           "markdownDescription": "Denies the format_ruby command without any pre-configured scope."
         },
         {
+          "description": "Enables the format_smart_ruby command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-format-smart-ruby",
+          "markdownDescription": "Enables the format_smart_ruby command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the format_smart_ruby command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-format-smart-ruby",
+          "markdownDescription": "Denies the format_smart_ruby command without any pre-configured scope."
+        },
+        {
           "description": "Enables the strip_ruby command without any pre-configured scope.",
           "type": "string",
           "const": "allow-strip-ruby",
@@ -355,10 +367,10 @@
           "markdownDescription": "Denies the transform_to_html command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for novelaid-ruby plugin\n#### This default permission set includes:\n\n- `allow-format-ruby`\n- `allow-transform-to-html`\n- `allow-strip-ruby`\n- `allow-extract-ruby-text`\n- `allow-count-characters`",
+          "description": "Default permissions for novelaid-ruby plugin\n#### This default permission set includes:\n\n- `allow-format-ruby`\n- `allow-format-smart-ruby`\n- `allow-transform-to-html`\n- `allow-strip-ruby`\n- `allow-extract-ruby-text`\n- `allow-count-characters`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for novelaid-ruby plugin\n#### This default permission set includes:\n\n- `allow-format-ruby`\n- `allow-transform-to-html`\n- `allow-strip-ruby`\n- `allow-extract-ruby-text`\n- `allow-count-characters`"
+          "markdownDescription": "Default permissions for novelaid-ruby plugin\n#### This default permission set includes:\n\n- `allow-format-ruby`\n- `allow-format-smart-ruby`\n- `allow-transform-to-html`\n- `allow-strip-ruby`\n- `allow-extract-ruby-text`\n- `allow-count-characters`"
         }
       ]
     }

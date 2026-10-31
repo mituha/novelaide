@@ -10,6 +10,17 @@ export * from './models';
  */
 export declare function formatRuby(surface: string, ruby: string): string;
 /**
+ * 送り仮名（ひらがな）を自動検知して分離し、漢字部分にのみルビを振るスマート記法を生成します。
+ * 本文への確定・適用段階で呼び出します。
+ *
+ * @example
+ * formatSmartRuby('見下ろす', 'みおろす') // => '|見下《みお》ろす'
+ * formatSmartRuby('見下ろす', 'みお')     // => '|見下《みお》ろす'
+ * formatSmartRuby('お見舞い', 'おみまい') // => 'お|見舞《みま》い'
+ * formatSmartRuby('見下ろす', 'ルックダウン') // => '|見下ろす《ルックダウン》'
+ */
+export declare function formatSmartRuby(surface: string, ruby: string): string;
+/**
  * 小説記法（ルビ・傍点）をHTMLタグに変換します。
  *
  * @param text 対象テキスト

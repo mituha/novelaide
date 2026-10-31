@@ -1,5 +1,6 @@
 const COMMANDS: &[&str] = &[
     "format_ruby",
+    "format_smart_ruby",
     "transform_to_html",
     "strip_ruby",
     "extract_ruby_text",

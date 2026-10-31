@@ -2,6 +2,7 @@
 description = "Default permissions for novelaid-ruby plugin"
 permissions = [
     "allow-format-ruby",
+    "allow-format-smart-ruby",
     "allow-transform-to-html",
     "allow-strip-ruby",
     "allow-extract-ruby-text",

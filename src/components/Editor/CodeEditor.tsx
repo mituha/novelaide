@@ -8,7 +8,7 @@ import { fileService } from '../../services/fileService';
 import { EditorSupport } from './EditorSupport';
 import { RubyDialog } from './RubyDialog';
 import { DocumentViewProps } from '../../types/viewPlugin';
-import { formatRuby } from 'tauri-plugin-novelaid-ruby-api';
+import { formatSmartRuby } from 'tauri-plugin-novelaid-ruby-api';
 import './CodeEditor.css';
 
 // Monaco Editor 公式日本語パック (_VSCODE_NLS_MESSAGES) の先行読み込み
@@ -173,7 +173,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           const op = {
             identifier: { major: 1, minor: 1 },
             range,
-            text: formatRuby(selectedText, ruby),
+            text: formatSmartRuby(selectedText, ruby),
             forceMoveMarkers: true,
           };
           editorRef.current.executeEdits('ruby-insertion', [op]);

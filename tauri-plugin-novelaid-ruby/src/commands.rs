@@ -9,6 +9,11 @@ pub fn format_ruby(surface: String, ruby: String) -> String {
 }
 
 #[command]
+pub fn format_smart_ruby(surface: String, ruby: String) -> String {
+    formatter::format_smart_ruby(&surface, &ruby)
+}
+
+#[command]
 pub fn transform_to_html(text: String) -> String {
     formatter::transform_to_html(&text)
 }

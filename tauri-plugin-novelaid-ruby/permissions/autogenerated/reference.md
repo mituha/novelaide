@@ -5,6 +5,7 @@ Default permissions for novelaid-ruby plugin
 #### This default permission set includes the following:
 
 - `allow-format-ruby`
+- `allow-format-smart-ruby`
 - `allow-transform-to-html`
 - `allow-strip-ruby`
 - `allow-extract-ruby-text`
@@ -93,6 +94,32 @@ Enables the format_ruby command without any pre-configured scope.
 <td>
 
 Denies the format_ruby command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-ruby:allow-format-smart-ruby`
+
+</td>
+<td>
+
+Enables the format_smart_ruby command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-ruby:deny-format-smart-ruby`
+
+</td>
+<td>
+
+Denies the format_smart_ruby command without any pre-configured scope.
 
 </td>
 </tr>
