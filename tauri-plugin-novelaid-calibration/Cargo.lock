@@ -3609,7 +3609,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-novelaid-calibration"
-version = "0.9.0"
+version = "0.10.1"
 dependencies = [
  "lindera",
  "serde",
