@@ -2,6 +2,8 @@ pub mod context;
 pub mod prohibited_char;
 pub mod closing_period;
 pub mod three_dots_leader;
+pub mod dash_leader;
+pub mod bracket_trailing_space;
 pub mod exclamation_space;
 pub mod doubled_joshi;
 pub mod kanji_open_close;
@@ -12,6 +14,8 @@ use self::context::CalibrationContext;
 pub use self::prohibited_char::ProhibitedCharRule;
 pub use self::closing_period::ClosingPeriodRule;
 pub use self::three_dots_leader::ThreeDotsLeaderRule;
+pub use self::dash_leader::DashLeaderRule;
+pub use self::bracket_trailing_space::BracketTrailingSpaceRule;
 pub use self::exclamation_space::ExclamationSpaceRule;
 pub use self::doubled_joshi::DoubledJoshiRule;
 pub use self::kanji_open_close::KanjiOpenCloseRule;
@@ -85,13 +89,19 @@ impl RuleRegistry {
         // 4. 三点リーダー（2マス）チェック
         registry.register(ThreeDotsLeaderRule::default());
 
-        // 5. 感嘆符・疑問符後の全角空白チェック
+        // 5. ダッシュ（2マス）チェック
+        registry.register(DashLeaderRule::default());
+
+        // 6. 括弧直前の不要な空白除去チェック
+        registry.register(BracketTrailingSpaceRule::default());
+
+        // 7. 感嘆符・疑問符後の全角空白チェック
         registry.register(ExclamationSpaceRule::default());
 
-        // 6. 助詞「の」連続チェック
+        // 8. 助詞「の」連続チェック
         registry.register(DoubledJoshiRule::default());
 
-        // 7. 形式名詞・漢字の開きチェック
+        // 9. 形式名詞・漢字の開きチェック
         registry.register(KanjiOpenCloseRule::default());
 
         registry
