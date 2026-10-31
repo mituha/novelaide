@@ -395,7 +395,7 @@ mod tests {
     #[test]
     fn test_rule_registry_defaults_integration() {
         let registry = super::RuleRegistry::new_with_defaults();
-        let text = "これは 半角空白 と ｜全角パイプ です。「句点。」";
+        let text = "　これは 半角空白 と ｜全角パイプ です。「句点。」";
         let lines: Vec<&str> = text.lines().collect();
         let ctx = super::CalibrationContext {
             text,

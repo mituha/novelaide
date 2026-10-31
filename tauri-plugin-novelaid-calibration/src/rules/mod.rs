@@ -5,6 +5,8 @@ pub mod three_dots_leader;
 pub mod dash_leader;
 pub mod bracket_trailing_space;
 pub mod exclamation_space;
+pub mod exclamation_normalization;
+pub mod indent_first_line;
 pub mod doubled_joshi;
 pub mod kanji_open_close;
 
@@ -17,6 +19,8 @@ pub use self::three_dots_leader::ThreeDotsLeaderRule;
 pub use self::dash_leader::DashLeaderRule;
 pub use self::bracket_trailing_space::BracketTrailingSpaceRule;
 pub use self::exclamation_space::ExclamationSpaceRule;
+pub use self::exclamation_normalization::ExclamationNormalizationRule;
+pub use self::indent_first_line::IndentFirstLineRule;
 pub use self::doubled_joshi::DoubledJoshiRule;
 pub use self::kanji_open_close::KanjiOpenCloseRule;
 
@@ -98,10 +102,16 @@ impl RuleRegistry {
         // 7. 感嘆符・疑問符後の全角空白チェック
         registry.register(ExclamationSpaceRule::default());
 
-        // 8. 助詞「の」連続チェック
+        // 8. 感嘆符・疑問符の全角正規化チェック（半角 ! ? 混入防止）
+        registry.register(ExclamationNormalizationRule::default());
+
+        // 9. 段落冒頭の字下げチェック（地の文の先頭全角1マス）
+        registry.register(IndentFirstLineRule::default());
+
+        // 10. 助詞「の」連続チェック
         registry.register(DoubledJoshiRule::default());
 
-        // 9. 形式名詞・漢字の開きチェック
+        // 11. 形式名詞・漢字の開きチェック
         registry.register(KanjiOpenCloseRule::default());
 
         registry
@@ -147,9 +157,9 @@ mod tests {
     #[test]
     fn test_registry_with_settings() {
         let registry = RuleRegistry::new_with_defaults();
-        let lines = vec!["これは 半角空白 と ｜全角パイプ です。"];
+        let lines = vec!["　これは 半角空白 と ｜全角パイプ です。"];
         let ctx = CalibrationContext {
-            text: "これは 半角空白 と ｜全角パイプ です。",
+            text: "　これは 半角空白 と ｜全角パイプ です。",
             lines: &lines,
             tokens: &[],
         };
