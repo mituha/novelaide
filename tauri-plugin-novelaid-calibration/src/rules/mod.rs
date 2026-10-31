@@ -7,6 +7,7 @@ pub mod bracket_trailing_space;
 pub mod exclamation_space;
 pub mod exclamation_normalization;
 pub mod indent_first_line;
+pub mod sentence_end_repetition;
 pub mod dropping_ra;
 pub mod double_negative;
 pub mod doubled_joshi;
@@ -23,6 +24,7 @@ pub use self::bracket_trailing_space::BracketTrailingSpaceRule;
 pub use self::exclamation_space::ExclamationSpaceRule;
 pub use self::exclamation_normalization::ExclamationNormalizationRule;
 pub use self::indent_first_line::IndentFirstLineRule;
+pub use self::sentence_end_repetition::SentenceEndRepetitionRule;
 pub use self::dropping_ra::DroppingRaRule;
 pub use self::double_negative::DoubleNegativeRule;
 pub use self::doubled_joshi::DoubledJoshiRule;
@@ -112,7 +114,10 @@ impl RuleRegistry {
         // 9. 段落冒頭の字下げチェック（地の文の先頭全角1マス）
         registry.register(IndentFirstLineRule::default());
 
-        // 10. ら抜き言葉チェック（見れる、食べれる等）
+        // 10. 文末助動詞の連続重複チェック（「〜た。」の3連続以上等）
+        registry.register(SentenceEndRepetitionRule::default());
+
+        // 11. ら抜き言葉チェック（見れる、食べれる等）
         registry.register(DroppingRaRule::default());
 
         // 11. 助詞「の」連続チェック
