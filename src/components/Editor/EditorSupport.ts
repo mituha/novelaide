@@ -2,7 +2,7 @@ import { Monaco } from '@monaco-editor/react';
 import {
   NOVEL_MONARCH_PATTERNS,
   NOVEL_PATTERNS,
-} from 'novelaid-ruby';
+} from 'tauri-plugin-novelaid-ruby-api';
 
 /**
  * 小説エディターのドキュメントタイプ別の機能およびMonaco設定を管理するクラス

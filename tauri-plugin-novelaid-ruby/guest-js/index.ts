@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { CountOptions, DetailedCountResult } from './models';
 
 export * from './models';
+export * from './patterns';
 
 /**
  * ルビ記法（半角パイプ統一）を組み立てます。

@@ -1,5 +1,6 @@
 import { CountOptions, DetailedCountResult } from './models';
 export * from './models';
+export * from './patterns';
 /**
  * ルビ記法（半角パイプ統一）を組み立てます。
  * 同期処理のため、エディタ挿入時などに即時呼び出しが可能です。

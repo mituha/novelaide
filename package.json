@@ -1,7 +1,7 @@
 {
   "name": "novelaide",
   "private": true,
-  "version": "0.34.1",
+  "version": "0.34.2",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,7 +13,8 @@
     "build:plugin:git": "npm run build --prefix tauri-plugin-restar-git",
     "build:plugin:settings": "npm run build --prefix tauri-plugin-restar-settings",
     "build:plugin:calibration": "npm run build --prefix tauri-plugin-novelaid-calibration",
-    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai && npm run build:plugin:git && npm run build:plugin:settings && npm run build:plugin:calibration",
+    "build:plugin:ruby": "npm run build --prefix tauri-plugin-novelaid-ruby",
+    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai && npm run build:plugin:git && npm run build:plugin:settings && npm run build:plugin:calibration && npm run build:plugin:ruby",
     "build:plugin": "npm run build:plugins",
     "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin",
     "release": "node scripts/release.mjs"
@@ -30,7 +31,6 @@
     "@tauri-apps/plugin-opener": "^2",
     "lucide-react": "^1.61.0",
     "novelaid-markdown": "^0.7.0",
-    "novelaid-ruby": "^0.3.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-markdown": "^10.1.0",

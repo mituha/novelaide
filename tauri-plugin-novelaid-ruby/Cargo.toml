@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-novelaid-ruby"
-version = "0.2.0"
+version = "0.3.0"
 authors = [ "Mizuki Mituha" ]
 description = "novelaide novel ruby and character count plugin"
 edition = "2021"
