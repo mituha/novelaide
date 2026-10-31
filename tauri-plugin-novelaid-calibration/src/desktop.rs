@@ -8,6 +8,8 @@ use lindera::mode::Mode;
 use lindera::segmenter::Segmenter;
 
 use crate::models::*;
+use crate::rules::context::{AnalyzedToken, CalibrationContext};
+use crate::rules::RuleRegistry;
 use crate::{Error, Result};
 
 pub fn init<R: Runtime, C: DeserializeOwned>(
@@ -20,6 +22,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 pub struct NovelaidCalibration<R: Runtime> {
     _app: AppHandle<R>,
     segmenter: Arc<RwLock<Segmenter>>,
+    rule_registry: Arc<RuleRegistry>,
 }
 
 /// カタカナ文字列をひらがなに変換する
@@ -60,33 +63,17 @@ pub fn byte_offset_to_line_col(text: &str, byte_offset: usize) -> (u32, u32) {
     (line, col)
 }
 
-/// 閉じ括弧文字かどうかを判定する
-pub fn is_closing_bracket(c: char) -> bool {
-    matches!(
-        c,
-        '」' | '』' | '）' | ')' | '】' | '］' | ']' | '｝' | '}' | '〉' | '》' | '〕' | '”' | '"' | '’' | '\''
-    )
-}
-
-/// 感嘆符・疑問符かどうかを判定する
-pub fn is_exclamation_question(c: char) -> bool {
-    matches!(c, '！' | '？' | '!' | '?')
-}
-
-/// 空白文字（全角・半角・タブ）かどうかを判定する
-pub fn is_space(c: char) -> bool {
-    c == '　' || c == ' ' || c == '\t'
-}
-
 impl<R: Runtime> NovelaidCalibration<R> {
     pub fn new(app: AppHandle<R>) -> Result<Self> {
         let dictionary = load_dictionary("embedded://ipadic")
             .map_err(|e| Error::Lindera(e.to_string()))?;
         let segmenter = Segmenter::new(Mode::Normal, dictionary, None);
+        let rule_registry = RuleRegistry::new_with_defaults();
 
         Ok(Self {
             _app: app,
             segmenter: Arc::new(RwLock::new(segmenter)),
+            rule_registry: Arc::new(rule_registry),
         })
     }
 
@@ -189,16 +176,13 @@ impl<R: Runtime> NovelaidCalibration<R> {
 
     /// 文章校正チェックおよび文体比率集計の本実装
     pub fn check_text(&self, text: &str) -> Result<CheckTextResult> {
-        let mut issues = Vec::new();
         let mut kanji_count = 0;
         let mut hiragana_count = 0;
         let mut total_chars = 0;
 
-        // 1. 文字種比率および行単位の簡易小説作法チェック
+        // 1. 文字種比率の集計
         let lines: Vec<&str> = text.lines().collect();
-        for (line_idx, line) in lines.iter().enumerate() {
-            let line_num = (line_idx + 1) as u32;
-
+        for line in &lines {
             for c in line.chars() {
                 total_chars += 1;
                 if ('\u{4E00}'..='\u{9FFF}').contains(&c) {
@@ -207,129 +191,11 @@ impl<R: Runtime> NovelaidCalibration<R> {
                     hiragana_count += 1;
                 }
             }
-
-            // 作法チェック1: 会話文末の句点 (「〜〜。」)
-            if line.contains("。」") {
-                if let Some(col) = line.find("。」") {
-                    issues.push(CalibrationIssue {
-                        id: format!("closing-period-{}-{}", line_num, col),
-                        rule_id: "novel-closing-period".into(),
-                        rule_type: "novel_style".into(),
-                        message: "かぎ括弧末尾の句点「。」は原則として省略します".into(),
-                        range: CalibrationRange {
-                            start_line: line_num,
-                            start_column: (col + 1) as u32,
-                            end_line: line_num,
-                            end_column: (col + 3) as u32,
-                        },
-                        suggestion: Some("」".into()),
-                    });
-                }
-            }
-
-            // 作法チェック2: 三点リーダー1マス (単独の …)
-            if line.contains('…') && !line.contains("……") {
-                if let Some(col) = line.find('…') {
-                    issues.push(CalibrationIssue {
-                        id: format!("single-leader-{}-{}", line_num, col),
-                        rule_id: "novel-three-dots-leader".into(),
-                        rule_type: "novel_style".into(),
-                        message: "三点リーダーは2マス（偶数「……」）で使用するのが作法です".into(),
-                        range: CalibrationRange {
-                            start_line: line_num,
-                            start_column: (col + 1) as u32,
-                            end_line: line_num,
-                            end_column: (col + 2) as u32,
-                        },
-                        suggestion: Some("……".into()),
-                    });
-                }
-            }
-
-            // 作法チェック3: 文字単位の走査（半角空白・全角パイプ・感嘆符疑問符直後の空白）
-            let chars: Vec<char> = line.chars().collect();
-            for (ci, &c) in chars.iter().enumerate() {
-                let col = (ci + 1) as u32;
-
-                // 半角空白禁止チェック (小説では半角空白を使用せず全角空白に統一)
-                if c == ' ' {
-                    issues.push(CalibrationIssue {
-                        id: format!("no-half-width-space-{}-{}", line_num, ci),
-                        rule_id: "novel-no-half-width-space".into(),
-                        rule_type: "novel_style".into(),
-                        message: "小説執筆では原則として半角空白は使用しません。全角空白への置換を推奨します".into(),
-                        range: CalibrationRange {
-                            start_line: line_num,
-                            start_column: col,
-                            end_line: line_num,
-                            end_column: col + 1,
-                        },
-                        suggestion: Some("　".into()),
-                    });
-                }
-
-                // 全角パイプ禁止チェック (ルビ開始記号には半角パイプ | を使用)
-                if c == '｜' {
-                    issues.push(CalibrationIssue {
-                        id: format!("no-full-width-pipe-{}-{}", line_num, ci),
-                        rule_id: "novel-no-full-width-pipe".into(),
-                        rule_type: "novel_style".into(),
-                        message: "ルビ開始記号には半角パイプ「|」を使用します。全角「｜」は使用しません".into(),
-                        range: CalibrationRange {
-                            start_line: line_num,
-                            start_column: col,
-                            end_line: line_num,
-                            end_column: col + 1,
-                        },
-                        suggestion: Some("|".into()),
-                    });
-                }
-
-                // 感嘆符・疑問符の直後の空白チェック
-                // ※「本当？」のように閉じ括弧が続く場合や行末、別の！？が連続する場合は空白不要。
-                // ※ 直後に文章（文字）が続く場合のみ全角空白を要求する。
-                if is_exclamation_question(c) && ci + 1 < chars.len() {
-                    let next = chars[ci + 1];
-                    // 空白、閉じ括弧、または別の感嘆符・疑問符が続く場合は正常（空白要求不要）
-                    if !is_space(next) && !is_closing_bracket(next) && !is_exclamation_question(next) {
-                        issues.push(CalibrationIssue {
-                            id: format!("exclamation-space-{}-{}", line_num, ci),
-                            rule_id: "novel-exclamation-space".into(),
-                            rule_type: "novel_style".into(),
-                            message: "感嘆符・疑問符の直後に文章が続く場合は全角空白を空けるのが通例です".into(),
-                            range: CalibrationRange {
-                                start_line: line_num,
-                                start_column: col,
-                                end_line: line_num,
-                                end_column: col + 1,
-                            },
-                            suggestion: Some(format!("{}　", c)),
-                        });
-                    }
-                }
-            }
-
-            // 助詞「の」連続チェック（同一行で3回以上出現）
-            let no_count = line.matches('の').count();
-            if no_count >= 3 {
-                issues.push(CalibrationIssue {
-                    id: format!("doubled-joshi-no-{}", line_num),
-                    rule_id: "no-doubled-joshi".into(),
-                    rule_type: "particle_repetition".into(),
-                    message: format!("同一行内で助詞「の」が{}回使われています。修飾の連続に注意してください", no_count),
-                    range: CalibrationRange {
-                        start_line: line_num,
-                        start_column: 1,
-                        end_line: line_num,
-                        end_column: line.chars().count() as u32,
-                    },
-                    suggestion: None,
-                });
-            }
         }
 
-        // 2. Lindera 形態素解析による高度な校正＆頻出語集計
+        // 2. Lindera 形態素解析によるトークン情報解決および頻出語集計
         let mut word_counts: HashMap<String, (u32, String)> = HashMap::new();
+        let mut analyzed_tokens = Vec::new();
 
         let segmenter = self.segmenter.read().map_err(|e| Error::Other(e.to_string()))?;
         let mut tokens = segmenter
@@ -341,46 +207,39 @@ impl<R: Runtime> NovelaidCalibration<R> {
             let byte_start = t.byte_start;
             let byte_end = t.byte_end;
             let details = t.details();
-            let pos_main = details.get(0).copied().unwrap_or("*");
-            let pos_sub1 = details.get(1).copied().unwrap_or("*");
-            let (start_line, start_col) = byte_offset_to_line_col(text, byte_start);
-            let (end_line, end_col) = byte_offset_to_line_col(text, byte_end);
+            let pos_main = details.get(0).copied().unwrap_or("*").to_string();
+            let pos_sub1 = details.get(1).copied().unwrap_or("*").to_string();
+            let reading = details.get(7).and_then(|&s| if s == "*" { None } else { Some(s.to_string()) });
+            let (start_line, start_column) = byte_offset_to_line_col(text, byte_start);
+            let (end_line, end_column) = byte_offset_to_line_col(text, byte_end);
 
-            // 漢字の開きチェック: 「事」「時」「物」「所」が形式名詞・非自立として使われている場合
-            if pos_main == "名詞" && (pos_sub1 == "非自立" || pos_sub1 == "形式名詞") {
-                let (open_word, msg) = match surface.as_str() {
-                    "事" => ("こと", "形式名詞「事」は平仮名「こと」で開くことが推奨されます"),
-                    "時" => ("とき", "形式名詞「時」は平仮名「とき」で開くことが推奨されます"),
-                    "物" => ("もの", "形式名詞「物」は平仮名「もの」で開くことが推奨されます"),
-                    "所" => ("ところ", "形式名詞「所」は平仮名「ところ」で開くことが推奨されます"),
-                    _ => ("", ""),
-                };
-
-                if !open_word.is_empty() {
-                    issues.push(CalibrationIssue {
-                        id: format!("kanji-open-{}-{}", start_line, start_col),
-                        rule_id: "kanji-open-close".into(),
-                        rule_type: "kanji_open_close".into(),
-                        message: msg.into(),
-                        range: CalibrationRange {
-                            start_line,
-                            start_column: start_col,
-                            end_line,
-                            end_column: end_col,
-                        },
-                        suggestion: Some(open_word.into()),
-                    });
-                }
-            }
+            analyzed_tokens.push(AnalyzedToken {
+                surface: surface.clone(),
+                pos_main: pos_main.clone(),
+                pos_sub1: pos_sub1.clone(),
+                reading,
+                start_line,
+                start_column,
+                end_line,
+                end_column,
+            });
 
             // 頻出語集計: 名詞（自立・固有名詞等）で2文字以上
             if pos_main == "名詞" && pos_sub1 != "代名詞" && pos_sub1 != "非自立" && pos_sub1 != "数" {
                 if surface.chars().count() >= 2 {
-                    let entry = word_counts.entry(surface).or_insert((0, pos_sub1.to_string()));
+                    let entry = word_counts.entry(surface).or_insert((0, pos_sub1));
                     entry.0 += 1;
                 }
             }
         }
+
+        // 3. ルールエンジン（RuleRegistry）による一括校正チェック
+        let ctx = CalibrationContext {
+            text,
+            lines: &lines,
+            tokens: &analyzed_tokens,
+        };
+        let issues = self.rule_registry.check_all(&ctx, None);
 
         // 頻出語ランキングのソート（上位15件）
         let mut freq_list: Vec<(String, u32, String)> = word_counts
@@ -427,6 +286,7 @@ mod tests {
     use lindera::dictionary::load_dictionary;
     use lindera::mode::Mode;
     use lindera::segmenter::Segmenter;
+    use crate::rules::exclamation_space::{is_closing_bracket, is_exclamation_question, is_space};
 
     #[test]
     fn test_lindera_ipadic() {
@@ -450,24 +310,24 @@ mod tests {
 
     #[test]
     fn test_is_closing_bracket_and_helpers() {
-        assert!(super::is_closing_bracket('」'));
-        assert!(super::is_closing_bracket('』'));
-        assert!(super::is_closing_bracket('）'));
-        assert!(super::is_closing_bracket(')'));
-        assert!(super::is_closing_bracket('】'));
-        assert!(super::is_closing_bracket('》'));
-        assert!(!super::is_closing_bracket('あ'));
+        assert!(is_closing_bracket('」'));
+        assert!(is_closing_bracket('』'));
+        assert!(is_closing_bracket('）'));
+        assert!(is_closing_bracket(')'));
+        assert!(is_closing_bracket('】'));
+        assert!(is_closing_bracket('》'));
+        assert!(!is_closing_bracket('あ'));
 
-        assert!(super::is_exclamation_question('！'));
-        assert!(super::is_exclamation_question('？'));
-        assert!(super::is_exclamation_question('!'));
-        assert!(super::is_exclamation_question('?'));
-        assert!(!super::is_exclamation_question('。'));
+        assert!(is_exclamation_question('！'));
+        assert!(is_exclamation_question('？'));
+        assert!(is_exclamation_question('!'));
+        assert!(is_exclamation_question('?'));
+        assert!(!is_exclamation_question('。'));
 
-        assert!(super::is_space('　'));
-        assert!(super::is_space(' '));
-        assert!(super::is_space('\t'));
-        assert!(!super::is_space('a'));
+        assert!(is_space('　'));
+        assert!(is_space(' '));
+        assert!(is_space('\t'));
+        assert!(!is_space('a'));
     }
 
     #[test]
@@ -477,9 +337,9 @@ mod tests {
             let mut issues = Vec::new();
             let chars: Vec<char> = text.chars().collect();
             for (ci, &c) in chars.iter().enumerate() {
-                if super::is_exclamation_question(c) && ci + 1 < chars.len() {
+                if is_exclamation_question(c) && ci + 1 < chars.len() {
                     let next = chars[ci + 1];
-                    if !super::is_space(next) && !super::is_closing_bracket(next) && !super::is_exclamation_question(next) {
+                    if !is_space(next) && !is_closing_bracket(next) && !is_exclamation_question(next) {
                         issues.push(format!("{}:{}->{}", ci, c, next));
                     }
                 }
@@ -530,5 +390,23 @@ mod tests {
 
         assert_eq!(space_issues.len(), 4);
         assert_eq!(pipe_issues.len(), 1);
+    }
+
+    #[test]
+    fn test_rule_registry_defaults_integration() {
+        let registry = super::RuleRegistry::new_with_defaults();
+        let text = "これは 半角空白 と ｜全角パイプ です。「句点。」";
+        let lines: Vec<&str> = text.lines().collect();
+        let ctx = super::CalibrationContext {
+            text,
+            lines: &lines,
+            tokens: &[],
+        };
+
+        let issues = registry.check_all(&ctx, None);
+        // 半角空白4箇所 + 全角パイプ1箇所 + 会話文末句点1箇所 = 計6件
+        assert_eq!(issues.len(), 6);
+        assert_eq!(issues[0].rule_id, "novel-no-half-width-space");
+        assert_eq!(issues[issues.len() - 1].rule_id, "novel-closing-period");
     }
 }
