@@ -2342,6 +2342,7 @@ dependencies = [
  "tauri-plugin-novelaid-ai",
  "tauri-plugin-novelaid-calibration",
  "tauri-plugin-novelaid-fs",
+ "tauri-plugin-novelaid-ruby",
  "tauri-plugin-opener",
  "tauri-plugin-restar-git",
  "tauri-plugin-restar-settings",
@@ -4046,6 +4047,19 @@ dependencies = [
  "tauri-plugin-dialog",
  "thiserror 2.0.21",
  "tokio",
+ "ts-rs",
+]
+
+[[package]]
+name = "tauri-plugin-novelaid-ruby"
+version = "0.1.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
+ "thiserror 2.0.21",
  "ts-rs",
 ]
 

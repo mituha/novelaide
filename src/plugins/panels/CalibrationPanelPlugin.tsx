@@ -23,6 +23,7 @@ import {
   CalibrationIssue,
   CalibrationRange,
 } from 'tauri-plugin-novelaid-calibration-api';
+import { formatRuby } from 'tauri-plugin-novelaid-ruby-api';
 
 type TabType = 'issues' | 'metrics' | 'ruby';
 
@@ -134,7 +135,7 @@ export const CalibrationPanel: React.FC = () => {
   const handleApplyRuby = (ruby: RubyCandidate) => {
     if (!activeDocument) return;
 
-    const rubyFormatted = `|${ruby.surface}《${ruby.ruby}》`;
+    const rubyFormatted = formatRuby(ruby.surface, ruby.ruby);
     // 最初の出現箇所を置換、または行番号から置換
     const lines = activeDocument.content.split('\n');
     const lineIndex = ruby.range.startLine - 1;

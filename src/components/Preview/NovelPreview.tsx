@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from 'react';
-import { transformToHtml } from 'novelaid-ruby';
+import React, { useState, useEffect } from 'react';
+import { transformToHtml } from 'tauri-plugin-novelaid-ruby-api';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import { useSettings } from 'restar-app-settings';
 import { BookOpen, AlignLeft, ZoomIn, ZoomOut } from 'lucide-react';
@@ -18,10 +18,23 @@ export const NovelPreview: React.FC<NovelPreviewProps> = ({
   const [isVertical, setIsVertical] = useState<boolean>(defaultVertical);
   const [fontSize, setFontSize] = useState<number>(settings.previewFontSize ?? 17);
 
-  // novelaid-ruby によるルビ・傍点HTML変換
-  const formattedHtml = useMemo(() => {
-    if (!content) return '';
-    return transformToHtml(content);
+  // tauri-plugin-novelaid-ruby によるルビ・傍点HTML変換（Rust並行処理）
+  const [formattedHtml, setFormattedHtml] = useState<string>('');
+
+  useEffect(() => {
+    let isMounted = true;
+    if (!content) {
+      setFormattedHtml('');
+      return;
+    }
+    transformToHtml(content).then((html) => {
+      if (isMounted) {
+        setFormattedHtml(html);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
   }, [content]);
 
   const handleZoomIn = () => {

@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-strip-ruby"
+description = "Enables the strip_ruby command without any pre-configured scope."
+commands.allow = ["strip_ruby"]
+
+[[permission]]
+identifier = "deny-strip-ruby"
+description = "Denies the strip_ruby command without any pre-configured scope."
+commands.deny = ["strip_ruby"]

@@ -5,7 +5,7 @@ import {
   PanelRight,
   Globe,
 } from "lucide-react";
-import { DetailedCountResult } from "novelaid-ruby";
+import { DetailedCountResult } from "tauri-plugin-novelaid-ruby-api";
 import { NovelaidDocumentType } from "tauri-plugin-novelaid-fs-api";
 import { DocumentIcon } from "../FileExplorer/DocumentIcon";
 import { useTheme } from "../../contexts/ThemeContext";

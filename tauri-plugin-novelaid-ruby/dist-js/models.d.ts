@@ -1,0 +1,46 @@
+export type CountOptions = {
+    manuscriptCharsPerLine: number | null;
+    manuscriptLinesPerSheet: number | null;
+};
+export type DetailedCountResult = {
+    /**
+     * 単純な chars().count() (ルビ記号や改行、空白すべてを含む)
+     */
+    rawLength: number;
+    /**
+     * ルビ・記号・空白類を除外した文字数（基本文字数）
+     */
+    charCount: number;
+    /**
+     * ルビ・記号を除外し、空白類を含めた文字数（改行含む）
+     */
+    charCountWithSpaces: number;
+    /**
+     * 総行数
+     */
+    lineCount: number;
+    /**
+     * 空白・改行の内訳
+     */
+    spaces: SpaceBreakdown;
+    newlines: number;
+    /**
+     * セリフと地の文
+     */
+    dialogue: TextSegmentMetrics;
+    narrative: TextSegmentMetrics;
+    /**
+     * 原稿用紙換算枚数 (400字詰等、小数)
+     */
+    manuscriptSheets: number;
+};
+export type SpaceBreakdown = {
+    halfWidth: number;
+    fullWidth: number;
+    total: number;
+};
+export type TextSegmentMetrics = {
+    charCount: number;
+    charCountWithSpaces: number;
+    lineCount: number;
+};

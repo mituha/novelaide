@@ -1,0 +1,20 @@
+[package]
+name = "tauri-plugin-novelaid-ruby"
+version = "0.1.0"
+authors = [ "Mizuki Mituha" ]
+description = "novelaide novel ruby and character count plugin"
+edition = "2021"
+rust-version = "1.88"
+exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
+links = "tauri-plugin-novelaid-ruby"
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "2"
+ts-rs = "12.0"
+regex = "1.10"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }

@@ -1,7 +1,7 @@
 {
   "name": "novelaide",
   "private": true,
-  "version": "0.24.5",
+  "version": "0.25.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -40,7 +40,8 @@
     "restar-app-settings": "file:tauri-plugin-restar-settings",
     "tauri-plugin-novelaid-ai-api": "file:tauri-plugin-novelaid-ai",
     "tauri-plugin-novelaid-calibration-api": "file:tauri-plugin-novelaid-calibration",
-    "tauri-plugin-novelaid-fs-api": "file:tauri-plugin-novelaid-fs"
+    "tauri-plugin-novelaid-fs-api": "file:tauri-plugin-novelaid-fs",
+    "tauri-plugin-novelaid-ruby-api": "file:tauri-plugin-novelaid-ruby"
   },
   "devDependencies": {
     "@tauri-apps/cli": "^2",
