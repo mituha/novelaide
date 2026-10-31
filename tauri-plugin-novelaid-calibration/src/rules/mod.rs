@@ -6,6 +6,7 @@ pub mod closing_period;
 pub mod three_dots_leader;
 pub mod dash_leader;
 pub mod bracket_trailing_space;
+pub mod unclosed_bracket;
 pub mod exclamation_space;
 pub mod exclamation_normalization;
 pub mod indent_first_line;
@@ -24,6 +25,7 @@ pub use self::closing_period::ClosingPeriodRule;
 pub use self::three_dots_leader::ThreeDotsLeaderRule;
 pub use self::dash_leader::DashLeaderRule;
 pub use self::bracket_trailing_space::BracketTrailingSpaceRule;
+pub use self::unclosed_bracket::UnclosedBracketRule;
 pub use self::exclamation_space::ExclamationSpaceRule;
 pub use self::exclamation_normalization::ExclamationNormalizationRule;
 pub use self::indent_first_line::IndentFirstLineRule;
@@ -108,25 +110,28 @@ impl RuleRegistry {
         // 6. 括弧直前の不要な空白除去チェック
         registry.register(BracketTrailingSpaceRule::default());
 
-        // 7. 感嘆符・疑問符後の全角空白チェック
+        // 7. 対応する括弧の未閉じ・不整合チェック
+        registry.register(UnclosedBracketRule::default());
+
+        // 8. 感嘆符・疑問符後の全角空白チェック
         registry.register(ExclamationSpaceRule::default());
 
-        // 8. 感嘆符・疑問符の全角正規化チェック（半角 ! ? 混入防止）
+        // 9. 感嘆符・疑問符の全角正規化チェック（半角 ! ? 混入防止）
         registry.register(ExclamationNormalizationRule::default());
 
-        // 9. 段落冒頭の字下げチェック（地の文の先頭全角1マス）
+        // 10. 段落冒頭の字下げチェック（地の文の先頭全角1マス）
         registry.register(IndentFirstLineRule::default());
 
-        // 10. 文末助動詞の連続重複チェック（「〜た。」の3連続以上等）
+        // 11. 文末助動詞の連続重複チェック（「〜た。」の3連続以上等）
         registry.register(SentenceEndRepetitionRule::default());
 
-        // 11. ら抜き言葉チェック（見れる、食べれる等）
+        // 12. ら抜き言葉チェック（見れる、食べれる等）
         registry.register(DroppingRaRule::default());
 
-        // 11. 助詞「の」連続チェック
+        // 13. 助詞「の」連続チェック
         registry.register(DoubledJoshiRule::default());
 
-        // 12. 助詞「が」連続・多用チェック（1文中に3回以上）
+        // 14. 助詞「が」連続・多用チェック（1文中に3回以上）
         registry.register(DoubledJoshiRule::new(
             "no-doubled-joshi-ga",
             "助詞「が」の連続・多用",
@@ -134,10 +139,10 @@ impl RuleRegistry {
             2,
         ));
 
-        // 13. 二重否定チェック（〜なくはない、〜ないわけではない等）
+        // 15. 二重否定チェック（〜なくはない、〜ないわけではない等）
         registry.register(DoubleNegativeRule::default());
 
-        // 14. 形式名詞・漢字の開きチェック
+        // 16. 形式名詞・漢字の開きチェック
         registry.register(KanjiOpenCloseRule::default());
 
         registry
