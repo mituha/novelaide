@@ -61,7 +61,8 @@ interface DocumentContextType {
   // ドキュメント実体編集・保存
   updateContent: (path: string, content: string) => void;
   updateMetadata: (path: string, metadata: Record<string, any>) => void;
-  saveDocument: (path?: string) => Promise<void>;
+  saveDocument: (path?: string, options?: { force?: boolean }) => Promise<void>;
+  setCompositionState: (isComposing: boolean) => void;
 }
 
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
@@ -81,6 +82,17 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     openDocumentsRef.current = openDocuments;
   }, [openDocuments]);
+
+  // 自動保存用タイマーおよび IME 入力状態管理
+  const autoSaveTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
+  const isComposingRef = useRef<boolean>(false);
+
+  const clearAutoSaveTimer = useCallback((path: string) => {
+    if (autoSaveTimersRef.current[path]) {
+      clearTimeout(autoSaveTimersRef.current[path]);
+      delete autoSaveTimersRef.current[path];
+    }
+  }, []);
 
   // 指定ペインに属するタブ一覧を導出
   const getTabsForPane = useCallback(
@@ -163,19 +175,58 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // ドキュメントを保存（未保存ドキュメントのディスク永続化）
   const saveDocument = useCallback(
-    async (path?: string) => {
+    async (path?: string, options?: { force?: boolean }) => {
       const targetPath = path || activePath;
       if (!targetPath) return;
 
       const docToSave = openDocuments.find((doc) => doc.path === targetPath);
       if (!docToSave) return;
 
+      // 大幅激減検知セーフティネット（自動保存時のみ検証、手動/force時はスキップ）
+      if (!options?.force) {
+        const lastLen = docToSave.lastSavedLength ?? docToSave.content.length;
+        const currLen = docToSave.content.length;
+        const diff = lastLen - currLen;
+        const ratio = diff / Math.max(lastLen, 1);
+
+        if (ratio >= 0.30 && diff >= 200) {
+          const bannerId = `drastic-decrease-${docToSave.path}`;
+          showBanner({
+            id: bannerId,
+            type: 'warning',
+            message: `${docToSave.baseName} の文字数が大幅に減少しています（前回: ${lastLen}字 → 現在: ${currLen}字、-${Math.round(ratio * 100)}%）。この内容で保存しますか？`,
+            actions: [
+              {
+                label: 'そのまま保存',
+                onClick: async () => {
+                  dismissBanner(bannerId);
+                  await saveDocument(docToSave.path, { force: true });
+                },
+              },
+              {
+                label: '保留',
+                primary: true,
+                onClick: () => {
+                  dismissBanner(bannerId);
+                },
+              },
+            ],
+          });
+          return;
+        }
+      }
+
       try {
         const mtime = await fileService.writeFile(docToSave.path, docToSave.content, docToSave.metadata);
         setOpenDocuments((prev) =>
           prev.map((doc) => {
             if (doc.path === targetPath) {
-              return { ...doc, isDirty: false, mtime };
+              return {
+                ...doc,
+                isDirty: false,
+                mtime,
+                lastSavedLength: doc.content.length,
+              };
             }
             return doc;
           })
@@ -184,7 +235,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         console.error('Failed to save document:', err);
       }
     },
-    [activePath, openDocuments]
+    [activePath, openDocuments, showBanner, dismissBanner]
   );
 
   // ファイルを開く（参照カウント式）
@@ -226,6 +277,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             documentType: fileData.documentType,
             isDirty: false,
             mtime: fileData.mtimeMs,
+            lastSavedLength: fileData.content.length,
             views: [{ viewId: targetPane, viewMode: mode }],
             leftViewMode: targetPane === 'editor.left' ? mode : 'none',
             rightViewMode: targetPane === 'editor.right' ? mode : 'none',
@@ -256,11 +308,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       // 1. 未保存なら確認ダイアログを出さずに自動保存
       if (targetDoc && targetDoc.isDirty) {
-        try {
-          await fileService.writeFile(targetDoc.path, targetDoc.content, targetDoc.metadata);
-        } catch (e) {
-          console.error('Failed to auto-save document on close:', e);
-        }
+        clearAutoSaveTimer(path);
+        await saveDocument(path);
       }
 
       // 2. 参照カウントの減算とクローズ処理
@@ -339,7 +388,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return prevPaths;
       });
     },
-    [activePane, openDocuments]
+    [activePane, openDocuments, saveDocument, clearAutoSaveTimer]
   );
 
   // 全ペインから当該ドキュメントを閉じる（後方互換用）
@@ -394,21 +443,64 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [closeAllTabs]
   );
 
-  // タブの切り替え
+  // タブの切り替え（切り替え元の未保存ドキュメントを即時自動保存）
   const switchTab = useCallback((path: string, paneId?: PaneId) => {
     const targetPane = paneId || activePane;
+    const currentPath = activePathByPane[targetPane];
+    if (currentPath && currentPath !== path) {
+      const currentDoc = openDocumentsRef.current.find((d) => d.path === currentPath);
+      if (currentDoc?.isDirty) {
+        clearAutoSaveTimer(currentPath);
+        saveDocument(currentPath);
+      }
+    }
+
     setActivePathByPane((prev) => ({
       ...prev,
       [targetPane]: path,
     }));
     setActivePane(targetPane);
-  }, [activePane]);
+  }, [activePane, activePathByPane, clearAutoSaveTimer, saveDocument]);
 
   const setActivePath = useCallback((path: string) => {
     switchTab(path, activePane);
   }, [switchTab, activePane]);
 
-  // 本文内容を更新（単一実体のため左右両ペインで即同期）
+  // ペインのアクティブ切り替え（移動元未保存ドキュメントの即時保存）
+  const handleSetActivePane = useCallback((paneId: PaneId) => {
+    if (paneId !== activePane) {
+      const currentPath = activePathByPane[activePane];
+      if (currentPath) {
+        const currentDoc = openDocumentsRef.current.find((d) => d.path === currentPath);
+        if (currentDoc?.isDirty) {
+          clearAutoSaveTimer(currentPath);
+          saveDocument(currentPath);
+        }
+      }
+    }
+    setActivePane(paneId);
+  }, [activePane, activePathByPane, clearAutoSaveTimer, saveDocument]);
+
+  // IME変換状態の制御
+  const setCompositionState = useCallback((isComposing: boolean) => {
+    isComposingRef.current = isComposing;
+    if (!isComposing) {
+      // 変換確定時、アクティブドキュメントが未保存であれば3秒デバウンスタイマーを開始
+      const activeP = activePathRef.current;
+      if (activeP) {
+        const doc = openDocumentsRef.current.find((d) => d.path === activeP);
+        if (doc?.isDirty) {
+          clearAutoSaveTimer(activeP);
+          autoSaveTimersRef.current[activeP] = setTimeout(() => {
+            saveDocument(activeP);
+            delete autoSaveTimersRef.current[activeP];
+          }, 3000);
+        }
+      }
+    }
+  }, [clearAutoSaveTimer, saveDocument]);
+
+  // 本文内容を更新（単一実体のため左右両ペインで即同期、デバウンス自動保存）
   const updateContent = useCallback((path: string, content: string) => {
     setOpenDocuments((prev) =>
       prev.map((doc) => {
@@ -422,7 +514,16 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return doc;
       })
     );
-  }, []);
+
+    // デバウンス自動保存（IME変換中でない場合に3秒後保存）
+    clearAutoSaveTimer(path);
+    if (!isComposingRef.current) {
+      autoSaveTimersRef.current[path] = setTimeout(() => {
+        saveDocument(path);
+        delete autoSaveTimersRef.current[path];
+      }, 3000);
+    }
+  }, [clearAutoSaveTimer, saveDocument]);
 
   // メタデータを更新
   const updateMetadata = useCallback((path: string, metadata: Record<string, any>) => {
@@ -718,11 +819,24 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       checkExternalChanges();
     };
 
+    const handleBlur = () => {
+      // ウィンドウフォーカス喪失時（他アプリ切り替え等）に未保存ドキュメントを即時保存
+      const docs = openDocumentsRef.current;
+      for (const doc of docs) {
+        if (doc.isDirty) {
+          clearAutoSaveTimer(doc.path);
+          saveDocument(doc.path);
+        }
+      }
+    };
+
     window.addEventListener('focus', handleFocus);
+    window.addEventListener('blur', handleBlur);
     return () => {
       window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('blur', handleBlur);
     };
-  }, [checkExternalChanges]);
+  }, [checkExternalChanges, clearAutoSaveTimer, saveDocument]);
 
   return (
     <DocumentContext.Provider
@@ -745,7 +859,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         closeOtherTabs,
         closeAllTabs,
         switchTab,
-        setActivePane,
+        setActivePane: handleSetActivePane,
         setActivePath,
         changeViewMode,
         openPreview,
@@ -759,6 +873,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateContent,
         updateMetadata,
         saveDocument,
+        setCompositionState,
       }}
     >
       {children}

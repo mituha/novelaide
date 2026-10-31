@@ -24,7 +24,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   onChangeContent,
 }) => {
   const { effectiveTheme } = useTheme();
-  const { saveDocument } = useDocument();
+  const { saveDocument, setCompositionState } = useDocument();
   const { settings } = useSettings();
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
@@ -67,10 +67,28 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       updateDecorations(editor);
     });
 
-    // ショートカットキー: Ctrl+S (Cmd+S) で保存
+    // ショートカットキー: Ctrl+S (Cmd+S) で手動保存（強制保存フラグ付与）
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      saveDocumentRef.current();
+      saveDocumentRef.current(undefined, { force: true });
     });
+
+    // IME 入力（日本語変換）状態の監視
+    if (typeof editor.onDidCompositionStart === 'function') {
+      editor.onDidCompositionStart(() => {
+        setCompositionState(true);
+      });
+    }
+    if (typeof editor.onDidCompositionEnd === 'function') {
+      editor.onDidCompositionEnd(() => {
+        setCompositionState(false);
+      });
+    }
+
+    const domNode = editor.getDomNode();
+    if (domNode) {
+      domNode.addEventListener('compositionstart', () => setCompositionState(true));
+      domNode.addEventListener('compositionend', () => setCompositionState(false));
+    }
 
     // 選択テキスト変更イベント
     editor.onDidChangeCursorSelection(() => {

@@ -47,6 +47,8 @@ export interface DocumentState {
   isDirty: boolean;
   /** ファイルシステムの最終更新日時（Unixミリ秒） */
   mtime?: number;
+  /** 前回保存時の文字数（大幅激減検知用） */
+  lastSavedLength?: number;
 
   /** 現在このドキュメントを参照・表示している View 一覧（参照カウント式） */
   views: DocumentViewRef[];
