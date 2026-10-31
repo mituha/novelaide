@@ -246,11 +246,48 @@ impl<R: Runtime> NovelaidCalibration<R> {
                 }
             }
 
-            // 作法チェック3: 感嘆符・疑問符の直後の空白チェック
-            // ※「本当？」のように閉じ括弧が続く場合や行末、別の！？が連続する場合は空白不要。
-            // ※ 直後に文章（文字）が続く場合のみ全角空白を要求する。
+            // 作法チェック3: 文字単位の走査（半角空白・全角パイプ・感嘆符疑問符直後の空白）
             let chars: Vec<char> = line.chars().collect();
             for (ci, &c) in chars.iter().enumerate() {
+                let col = (ci + 1) as u32;
+
+                // 半角空白禁止チェック (小説では半角空白を使用せず全角空白に統一)
+                if c == ' ' {
+                    issues.push(CalibrationIssue {
+                        id: format!("no-half-width-space-{}-{}", line_num, ci),
+                        rule_id: "novel-no-half-width-space".into(),
+                        rule_type: "novel_style".into(),
+                        message: "小説執筆では原則として半角空白は使用しません。全角空白への置換を推奨します".into(),
+                        range: CalibrationRange {
+                            start_line: line_num,
+                            start_column: col,
+                            end_line: line_num,
+                            end_column: col + 1,
+                        },
+                        suggestion: Some("　".into()),
+                    });
+                }
+
+                // 全角パイプ禁止チェック (ルビ開始記号には半角パイプ | を使用)
+                if c == '｜' {
+                    issues.push(CalibrationIssue {
+                        id: format!("no-full-width-pipe-{}-{}", line_num, ci),
+                        rule_id: "novel-no-full-width-pipe".into(),
+                        rule_type: "novel_style".into(),
+                        message: "ルビ開始記号には半角パイプ「|」を使用します。全角「｜」は使用しません".into(),
+                        range: CalibrationRange {
+                            start_line: line_num,
+                            start_column: col,
+                            end_line: line_num,
+                            end_column: col + 1,
+                        },
+                        suggestion: Some("|".into()),
+                    });
+                }
+
+                // 感嘆符・疑問符の直後の空白チェック
+                // ※「本当？」のように閉じ括弧が続く場合や行末、別の！？が連続する場合は空白不要。
+                // ※ 直後に文章（文字）が続く場合のみ全角空白を要求する。
                 if is_exclamation_question(c) && ci + 1 < chars.len() {
                     let next = chars[ci + 1];
                     // 空白、閉じ括弧、または別の感嘆符・疑問符が続く場合は正常（空白要求不要）
@@ -262,9 +299,9 @@ impl<R: Runtime> NovelaidCalibration<R> {
                             message: "感嘆符・疑問符の直後に文章が続く場合は全角空白を空けるのが通例です".into(),
                             range: CalibrationRange {
                                 start_line: line_num,
-                                start_column: (ci + 1) as u32,
+                                start_column: col,
                                 end_line: line_num,
-                                end_column: (ci + 2) as u32,
+                                end_column: col + 1,
                             },
                             suggestion: Some(format!("{}　", c)),
                         });
@@ -473,5 +510,25 @@ mod tests {
         let issues2 = check_exclamation_issues("本当？そうなんだ");
         assert_eq!(issues2.len(), 1);
         assert_eq!(issues2[0], "2:？->そ");
+    }
+
+    #[test]
+    fn test_no_half_width_space_and_full_width_pipe() {
+        let text = "これは 半角空白 と ｜全角パイプ《ルビ》 のテスト。";
+        let chars: Vec<char> = text.chars().collect();
+        let mut space_issues = Vec::new();
+        let mut pipe_issues = Vec::new();
+
+        for (ci, &c) in chars.iter().enumerate() {
+            if c == ' ' {
+                space_issues.push(ci);
+            }
+            if c == '｜' {
+                pipe_issues.push(ci);
+            }
+        }
+
+        assert_eq!(space_issues.len(), 4);
+        assert_eq!(pipe_issues.len(), 1);
     }
 }
