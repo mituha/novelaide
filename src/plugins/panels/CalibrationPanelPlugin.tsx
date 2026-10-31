@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { PanelPlugin } from '../../types/panelPlugin';
 import {
   SpellCheck,
@@ -11,6 +11,7 @@ import {
   FileText,
   Tag,
   ArrowRight,
+  LocateFixed,
 } from 'lucide-react';
 import { useDocument } from '../../contexts/DocumentContext';
 import { useNotification } from '../../contexts/NotificationContext';
@@ -20,6 +21,7 @@ import {
   CheckTextResult,
   RubyCandidate,
   CalibrationIssue,
+  CalibrationRange,
 } from 'tauri-plugin-novelaid-calibration-api';
 
 type TabType = 'issues' | 'metrics' | 'ruby';
@@ -33,11 +35,23 @@ export const CalibrationPanel: React.FC = () => {
   const [result, setResult] = useState<CheckTextResult | null>(null);
   const [rubies, setRubies] = useState<RubyCandidate[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
+  const activePathRef = useRef<string | null>(activeDocument?.path ?? null);
+
+  useEffect(() => {
+    activePathRef.current = activeDocument?.path ?? null;
+  }, [activeDocument?.path]);
 
   const runCalibration = useCallback(async () => {
     if (!activeDocument?.content) {
       setResult(null);
       setRubies([]);
+      if (activePathRef.current) {
+        window.dispatchEvent(
+          new CustomEvent('calibration-issues-update', {
+            detail: { path: activePathRef.current, issues: [] },
+          })
+        );
+      }
       return;
     }
 
@@ -49,6 +63,13 @@ export const CalibrationPanel: React.FC = () => {
       ]);
       setResult(res);
       setRubies(rubyRes);
+
+      // エディタ側へ波線表示用マーカーイベントを発火
+      window.dispatchEvent(
+        new CustomEvent('calibration-issues-update', {
+          detail: { path: activeDocument.path, issues: res.issues },
+        })
+      );
     } catch (err) {
       console.error('Calibration error:', err);
       showToast({
@@ -58,11 +79,27 @@ export const CalibrationPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [activeDocument?.content, showToast]);
+  }, [activeDocument?.path, activeDocument?.content, showToast]);
 
   useEffect(() => {
     runCalibration();
   }, [runCalibration]);
+
+  // エディタ上の該当位置へジャンプ
+  const handleJumpToRange = (range: CalibrationRange) => {
+    if (!activeDocument) return;
+    window.dispatchEvent(
+      new CustomEvent('editor-jump-to', {
+        detail: {
+          path: activeDocument.path,
+          line: range.startLine,
+          column: range.startColumn,
+          endLine: range.endLine,
+          endColumn: range.endColumn,
+        },
+      })
+    );
+  };
 
   // 指摘修正の適用
   const handleApplyIssue = (issue: CalibrationIssue) => {
@@ -380,6 +417,8 @@ export const CalibrationPanel: React.FC = () => {
                   return (
                     <div
                       key={issue.id}
+                      onClick={() => handleJumpToRange(issue.range)}
+                      title="クリックしてエディターの該当箇所へジャンプ"
                       style={{
                         padding: '10px',
                         borderRadius: '6px',
@@ -388,6 +427,14 @@ export const CalibrationPanel: React.FC = () => {
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '6px',
+                        cursor: 'pointer',
+                        transition: 'border-color 0.15s, background-color 0.15s',
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--accent-color, #3b82f6)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--border-color, #e5e7eb)';
                       }}
                     >
                       <div
@@ -414,15 +461,22 @@ export const CalibrationPanel: React.FC = () => {
                             style={{
                               fontSize: '11px',
                               color: 'var(--text-secondary, #6b7280)',
+                              display: 'flex',
+                              alignItems: 'center',
+                              gap: '2px',
                             }}
                           >
-                            L{issue.range.startLine}:{issue.range.startColumn}
+                            <LocateFixed size={11} opacity={0.7} />
+                            <span>L{issue.range.startLine}:{issue.range.startColumn}</span>
                           </span>
                         </div>
 
                         <div style={{ display: 'flex', gap: '4px' }}>
                           <button
-                            onClick={() => handleConsultAi(issue)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleConsultAi(issue);
+                            }}
                             title="AIパートナーに相談"
                             style={{
                               display: 'flex',
@@ -443,7 +497,10 @@ export const CalibrationPanel: React.FC = () => {
 
                           {issue.suggestion && (
                             <button
-                              onClick={() => handleApplyIssue(issue)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApplyIssue(issue);
+                              }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
@@ -703,6 +760,8 @@ export const CalibrationPanel: React.FC = () => {
                 {rubies.map((ruby, idx) => (
                   <div
                     key={idx}
+                    onClick={() => handleJumpToRange(ruby.range)}
+                    title="クリックしてエディターの該当箇所へジャンプ"
                     style={{
                       padding: '8px 10px',
                       borderRadius: '6px',
@@ -711,6 +770,14 @@ export const CalibrationPanel: React.FC = () => {
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'space-between',
+                      cursor: 'pointer',
+                      transition: 'border-color 0.15s',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--accent-color, #3b82f6)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--border-color, #e5e7eb)';
                     }}
                   >
                     <div>
@@ -721,13 +788,26 @@ export const CalibrationPanel: React.FC = () => {
                           {ruby.ruby}
                         </span>
                       </div>
-                      <div style={{ fontSize: '10px', color: 'var(--text-secondary, #9ca3af)', marginTop: '2px' }}>
-                        L{ruby.range.startLine}:{ruby.range.startColumn}
+                      <div
+                        style={{
+                          fontSize: '10px',
+                          color: 'var(--text-secondary, #9ca3af)',
+                          marginTop: '2px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '2px',
+                        }}
+                      >
+                        <LocateFixed size={10} opacity={0.7} />
+                        <span>L{ruby.range.startLine}:{ruby.range.startColumn}</span>
                       </div>
                     </div>
 
                     <button
-                      onClick={() => handleApplyRuby(ruby)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleApplyRuby(ruby);
+                      }}
                       style={{
                         padding: '3px 8px',
                         borderRadius: '4px',

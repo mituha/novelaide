@@ -109,6 +109,76 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         );
       }
     });
+
+    // 校正指摘マーカーの反映リスナー
+    const handleCalibrationIssues = (e: any) => {
+      const { path: eventPath, issues } = e.detail || {};
+      if (eventPath !== path) return;
+      const model = editor.getModel();
+      if (!model) return;
+
+      if (!issues || issues.length === 0) {
+        monaco.editor.setModelMarkers(model, 'calibration', []);
+        return;
+      }
+
+      const markers = issues.map((issue: any) => {
+        let severity = monaco.MarkerSeverity.Warning;
+        if (issue.ruleType === 'novel_style') {
+          severity = monaco.MarkerSeverity.Info;
+        } else if (issue.ruleType === 'grammar') {
+          severity = monaco.MarkerSeverity.Error;
+        }
+
+        return {
+          severity,
+          message: `[校正] ${issue.message}${issue.suggestion ? ` (修正案: ${issue.suggestion})` : ''}`,
+          startLineNumber: issue.range.startLine,
+          startColumn: issue.range.startColumn,
+          endLineNumber: issue.range.endLine,
+          endColumn: issue.range.endColumn,
+          source: '文章校正',
+        };
+      });
+
+      monaco.editor.setModelMarkers(model, 'calibration', markers);
+    };
+
+    // エディタ位置へのジャンプリスナー
+    const handleEditorJumpTo = (e: any) => {
+      const { path: eventPath, line, column, endLine, endColumn } = e.detail || {};
+      if (eventPath && eventPath !== path) return;
+
+      const targetLine = line || 1;
+      const targetCol = column || 1;
+      const targetEndLine = endLine || targetLine;
+      const targetEndCol = endColumn || targetCol;
+
+      editor.revealRangeInCenter({
+        startLineNumber: targetLine,
+        startColumn: targetCol,
+        endLineNumber: targetEndLine,
+        endColumn: targetEndCol,
+      });
+
+      editor.setSelection({
+        startLineNumber: targetLine,
+        startColumn: targetCol,
+        endLineNumber: targetEndLine,
+        endColumn: targetEndCol,
+      });
+
+      editor.focus();
+    };
+
+    window.addEventListener('calibration-issues-update', handleCalibrationIssues);
+    window.addEventListener('editor-jump-to', handleEditorJumpTo);
+
+    // クリーンアップ
+    editor.onDidDispose(() => {
+      window.removeEventListener('calibration-issues-update', handleCalibrationIssues);
+      window.removeEventListener('editor-jump-to', handleEditorJumpTo);
+    });
   };
 
   // テキスト変更時のハンドラ
