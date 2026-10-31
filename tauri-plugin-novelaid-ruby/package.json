@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-novelaid-ruby-api",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "Mizuki Mituha",
   "description": "Novel ruby syntax, HTML transformation, and character count plugin for Novelaid",
   "type": "module",
