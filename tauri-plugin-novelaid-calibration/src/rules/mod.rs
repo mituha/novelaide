@@ -1,4 +1,5 @@
 pub mod context;
+pub mod brackets;
 pub mod prohibited_char;
 pub mod even_symbol;
 pub mod closing_period;

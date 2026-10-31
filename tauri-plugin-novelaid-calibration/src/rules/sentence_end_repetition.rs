@@ -1,4 +1,5 @@
 use crate::models::{CalibrationIssue, CalibrationRange};
+use crate::rules::brackets::{is_closing_bracket, is_opening_bracket};
 use crate::rules::context::CalibrationContext;
 use crate::rules::CalibrationRule;
 
@@ -67,8 +68,8 @@ impl SentenceEndRepetitionRule {
             return Vec::new();
         }
 
-        // 会話文行（「……」など）は地の文ではないためスキップ
-        if trimmed.starts_with('「') || trimmed.starts_with('『') {
+        // 会話文行（開き括弧で始まる行など）は地の文ではないためスキップ
+        if trimmed.chars().next().map(is_opening_bracket).unwrap_or(false) {
             return Vec::new();
         }
 
@@ -78,9 +79,9 @@ impl SentenceEndRepetitionRule {
         let mut current_segment = String::new();
 
         for (i, &ch) in chars.iter().enumerate() {
-            if ch == '「' || ch == '『' || ch == '（' {
+            if is_opening_bracket(ch) {
                 in_bracket = true;
-            } else if ch == '」' || ch == '』' || ch == '）' {
+            } else if is_closing_bracket(ch) {
                 in_bracket = false;
             }
 
@@ -165,8 +166,8 @@ impl CalibrationRule for SentenceEndRepetitionRule {
             let line_num = (line_idx + 1) as u32;
             let trimmed = line.trim();
 
-            // 空行や会話行の場合は連続カウントをリセット（段落や会話の境界）
-            if trimmed.is_empty() || trimmed.starts_with('「') || trimmed.starts_with('『') {
+            // 空行や会話行（開き括弧で始まる行）の場合は連続カウントをリセット（段落や会話の境界）
+            if trimmed.is_empty() || trimmed.chars().next().map(is_opening_bracket).unwrap_or(false) {
                 current_kind = SentenceEndKind::Other;
                 repeat_count = 0;
                 continue;

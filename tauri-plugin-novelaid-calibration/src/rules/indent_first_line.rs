@@ -1,13 +1,11 @@
 use crate::models::{CalibrationIssue, CalibrationRange};
+use crate::rules::brackets::is_opening_bracket as brackets_is_opening_bracket;
 use crate::rules::context::CalibrationContext;
 use crate::rules::CalibrationRule;
 
-/// 開き括弧文字かどうかを判定
+/// 開き括弧文字かどうかを判定（共通括弧モジュールへの委譲・再エクスポート）
 pub fn is_opening_bracket(c: char) -> bool {
-    matches!(
-        c,
-        '「' | '『' | '（' | '(' | '【' | '［' | '[' | '｛' | '{' | '〈' | '《' | '〔' | '“' | '"' | '‘' | '\''
-    )
+    brackets_is_opening_bracket(c)
 }
 
 /// 段落冒頭の字下げ（行頭全角空白）ルール

@@ -286,7 +286,8 @@ mod tests {
     use lindera::dictionary::load_dictionary;
     use lindera::mode::Mode;
     use lindera::segmenter::Segmenter;
-    use crate::rules::exclamation_space::{is_closing_bracket, is_exclamation_question, is_space};
+    use crate::rules::brackets::{is_closing_bracket, is_opening_bracket, get_matching_closing_bracket};
+    use crate::rules::exclamation_space::{is_exclamation_question, is_space};
 
     #[test]
     fn test_lindera_ipadic() {
@@ -317,6 +318,12 @@ mod tests {
         assert!(is_closing_bracket('】'));
         assert!(is_closing_bracket('》'));
         assert!(!is_closing_bracket('あ'));
+
+        assert!(is_opening_bracket('「'));
+        assert!(is_opening_bracket('『'));
+        assert!(is_opening_bracket('（'));
+        assert_eq!(get_matching_closing_bracket('「'), Some('」'));
+        assert_eq!(get_matching_closing_bracket('（'), Some('）'));
 
         assert!(is_exclamation_question('！'));
         assert!(is_exclamation_question('？'));

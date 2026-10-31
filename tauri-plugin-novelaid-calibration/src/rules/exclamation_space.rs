@@ -1,4 +1,5 @@
 use crate::models::{CalibrationIssue, CalibrationRange};
+use crate::rules::brackets::is_closing_bracket as brackets_is_closing_bracket;
 use crate::rules::context::CalibrationContext;
 use crate::rules::CalibrationRule;
 
@@ -12,12 +13,9 @@ pub fn is_space(c: char) -> bool {
     c == '　' || c == ' ' || c == '\t'
 }
 
-/// 閉じ括弧文字かどうかを判定
+/// 閉じ括弧文字かどうかを判定（共通括弧モジュールへの委譲・再エクスポート）
 pub fn is_closing_bracket(c: char) -> bool {
-    matches!(
-        c,
-        '」' | '』' | '）' | ')' | '】' | '］' | ']' | '｝' | '}' | '〉' | '》' | '〕' | '”' | '"' | '’' | '\''
-    )
+    brackets_is_closing_bracket(c)
 }
 
 /// 感嘆符・疑問符の直後の空白チェックルール
