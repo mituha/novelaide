@@ -1,5 +1,5 @@
 import React, { useCallback, useRef, useEffect, useState } from 'react';
-import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
+import MonacoEditor, { OnMount, BeforeMount, loader } from '@monaco-editor/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDocument } from '../../contexts/DocumentContext';
 import { useProject } from '../../contexts/ProjectContext';
@@ -9,6 +9,15 @@ import { EditorSupport } from './EditorSupport';
 import { RubyDialog } from './RubyDialog';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';
+
+// Monaco Editor 標準UI（コンテキストメニュー、コマンドパレット、組み込みメッセージ等）の日本語ローカライズ
+loader.config({
+  'vs/nls': {
+    availableLanguages: {
+      '*': 'ja',
+    },
+  },
+});
 
 interface CodeEditorProps extends Partial<DocumentViewProps> {
   value?: string;
