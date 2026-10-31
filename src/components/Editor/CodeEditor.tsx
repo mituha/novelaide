@@ -1,9 +1,12 @@
-import React, { useCallback, useRef, useEffect } from 'react';
+import React, { useCallback, useRef, useEffect, useState } from 'react';
 import MonacoEditor, { OnMount, BeforeMount } from '@monaco-editor/react';
 import { useTheme } from '../../contexts/ThemeContext';
 import { useDocument } from '../../contexts/DocumentContext';
+import { useProject } from '../../contexts/ProjectContext';
 import { useSettings } from 'restar-app-settings';
+import { fileService } from '../../services/fileService';
 import { EditorSupport } from './EditorSupport';
+import { RubyDialog } from './RubyDialog';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import './CodeEditor.css';
 
@@ -25,10 +28,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 }) => {
   const { effectiveTheme } = useTheme();
   const { saveDocument, setCompositionState } = useDocument();
+  const { projectPath } = useProject();
   const { settings } = useSettings();
   const editorRef = useRef<any>(null);
   const decorationsRef = useRef<string[]>([]);
   const saveDocumentRef = useRef(saveDocument);
+
+  // ルビダイアログ用ステート
+  const [isRubyDialogOpen, setIsRubyDialogOpen] = useState(false);
+  const [selectedText, setSelectedText] = useState('');
 
   // 表示するテキスト（content または value）
   const textValue = content !== undefined ? content : (value ?? '');
@@ -39,6 +47,103 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   useEffect(() => {
     saveDocumentRef.current = saveDocument;
   }, [saveDocument]);
+
+  // メタデータ補完候補のロードとグローバルキャッシュ
+  useEffect(() => {
+    if (!projectPath) return;
+
+    let isMounted = true;
+    const scanMetadata = async () => {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const files: typeof entries = [];
+        const collect = (items: typeof entries) => {
+          for (const item of items) {
+            if (item.isDirectory && item.children) {
+              collect(item.children);
+            } else if (!item.isDirectory && (item.path.endsWith('.md') || item.path.endsWith('.txt'))) {
+              files.push(item);
+            }
+          }
+        };
+        collect(entries);
+
+        const completions: Array<{ name: string; type: 'character' | 'location' }> = [];
+        const seenNames = new Set<string>();
+
+        for (const file of files) {
+          const doc = await fileService.readFile(file.path);
+          const meta = doc.metadata || {};
+          const tags: string[] = Array.isArray(meta.tags) ? meta.tags : [];
+          const lowerPath = file.path.toLowerCase();
+
+          const isChara =
+            tags.some((t) => ['character', '登場人物', '人名', '人物', 'chara'].includes(t)) ||
+            lowerPath.includes('character') ||
+            lowerPath.includes('登場人物');
+
+          const isLoc =
+            tags.some((t) => ['location', 'places', '地名', '施設', '場所', 'place'].includes(t)) ||
+            lowerPath.includes('location') ||
+            lowerPath.includes('地名') ||
+            lowerPath.includes('世界観');
+
+          if (isChara || isLoc) {
+            const candidateName = meta.name || meta.title || file.baseName.replace(/\.[^/.]+$/, '');
+            if (candidateName && !seenNames.has(candidateName)) {
+              seenNames.add(candidateName);
+              completions.push({
+                name: candidateName,
+                type: isChara ? 'character' : 'location',
+              });
+            }
+          }
+        }
+
+        if (isMounted) {
+          (window as any).__novelaid_metadata_completions = completions;
+        }
+      } catch (err) {
+        console.warn('Metadata completion scan error:', err);
+      }
+    };
+
+    scanMetadata();
+    return () => {
+      isMounted = false;
+    };
+  }, [projectPath]);
+
+  // ルビダイアログの開閉ハンドラ
+  const handleOpenRubyDialog = useCallback((text: string) => {
+    setSelectedText(text);
+    setIsRubyDialogOpen(true);
+  }, []);
+
+  const handleRubyConfirm = useCallback(
+    (ruby: string) => {
+      if (editorRef.current && selectedText) {
+        const selection = editorRef.current.getSelection();
+        if (selection) {
+          const range = {
+            startLineNumber: selection.startLineNumber,
+            startColumn: selection.startColumn,
+            endLineNumber: selection.endLineNumber,
+            endColumn: selection.endColumn,
+          };
+          const op = {
+            identifier: { major: 1, minor: 1 },
+            range,
+            text: `|${selectedText}《${ruby}》`,
+            forceMoveMarkers: true,
+          };
+          editorRef.current.executeEdits('ruby-insertion', [op]);
+        }
+      }
+      setIsRubyDialogOpen(false);
+    },
+    [selectedText]
+  );
 
   // デコレーション（全角スペース等）の更新
   const updateDecorations = useCallback((editor: any) => {
@@ -61,6 +166,11 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
 
     // 初回デコレーション
     updateDecorations(editor);
+
+    // 小説執筆支援コンテキストメニューアクションの登録
+    EditorSupport.setupEditorInstance(editor, monaco, effectiveLanguage, {
+      onOpenRubyDialog: handleOpenRubyDialog,
+    });
 
     // テキスト変更時のデコレーション更新
     editor.onDidChangeModelContent(() => {
@@ -234,6 +344,12 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             other: true,
           },
         }}
+      />
+      <RubyDialog
+        isOpen={isRubyDialogOpen}
+        initialText={selectedText}
+        onConfirm={handleRubyConfirm}
+        onCancel={() => setIsRubyDialogOpen(false)}
       />
     </div>
   );

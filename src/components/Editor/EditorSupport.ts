@@ -196,16 +196,194 @@ export class EditorSupport {
         return { suggestions };
       },
     });
+
+    // 5. 小説・マークダウン共通のメタデータ補完（登場人物・場所等）
+    ['novel', 'markdown'].forEach((lang) => {
+      monaco.languages.registerCompletionItemProvider(lang, {
+        provideCompletionItems: (_model: any, position: any) => {
+          const metaEntries: Array<{ name: string; type: 'character' | 'location' }> =
+            (window as any).__novelaid_metadata_completions || [];
+
+          if (!metaEntries.length) return { suggestions: [] };
+
+          const suggestions = metaEntries.map((entry) => ({
+            label: entry.name,
+            kind:
+              entry.type === 'character'
+                ? monaco.languages.CompletionItemKind.User
+                : monaco.languages.CompletionItemKind.Class,
+            insertText: entry.name,
+            detail: entry.type === 'character' ? '登場人物' : '地名・舞台',
+            range: {
+              startLineNumber: position.lineNumber,
+              endLineNumber: position.lineNumber,
+              startColumn: position.column,
+              endColumn: position.column,
+            },
+          }));
+
+          return { suggestions };
+        },
+      });
+    });
   }
 
   /**
-   * エディターのデコレーション（全角スペース可視化等）を生成します
+   * 指定記号で選択領域を囲みます
+   */
+  public static wrapSelection(
+    editor: any,
+    prefix: string,
+    suffix: string,
+    label: string = 'wrap-action',
+  ) {
+    const selection = editor.getSelection();
+    const model = editor.getModel();
+    if (!selection || !model) return;
+
+    const text = model.getValueInRange(selection);
+    const range = {
+      startLineNumber: selection.startLineNumber,
+      startColumn: selection.startColumn,
+      endLineNumber: selection.endLineNumber,
+      endColumn: selection.endColumn,
+    };
+
+    const newText = `${prefix}${text}${suffix}`;
+    const op = {
+      identifier: { major: 1, minor: 1 },
+      range,
+      text: newText,
+      forceMoveMarkers: true,
+    };
+
+    editor.executeEdits(label, [op]);
+
+    if (text === '') {
+      const newColumn = selection.startColumn + prefix.length;
+      editor.setPosition({
+        lineNumber: selection.startLineNumber,
+        column: newColumn,
+      });
+    }
+  }
+
+  /**
+   * カーソル位置に単語を挿入します（選択範囲を上書き）
+   */
+  public static insertWord(
+    editor: any,
+    word: string,
+    label: string = 'insert-word',
+  ) {
+    const selection = editor.getSelection();
+    if (!selection) return;
+
+    const op = {
+      identifier: { major: 1, minor: 1 },
+      range: selection,
+      text: word,
+      forceMoveMarkers: true,
+    };
+    editor.executeEdits(label, [op]);
+  }
+
+  /**
+   * エディターインスタンスごとの設定・コンテキストメニューアクションを適用します
+   */
+  public static setupEditorInstance(
+    editor: any,
+    monaco: Monaco,
+    docType: string,
+    callbacks: {
+      onOpenRubyDialog: (selectedText: string) => void;
+    }
+  ) {
+    const isNovel = docType === 'novel';
+    const isMarkdown = docType === 'markdown';
+
+    if (isNovel || isMarkdown) {
+      // ルビを振る
+      editor.addAction({
+        id: 'insert-ruby',
+        label: 'ルビを振る',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyR],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 1.5,
+        run: () => {
+          const selection = editor.getSelection();
+          const model = editor.getModel();
+          if (selection && model) {
+            const text = model.getValueInRange(selection);
+            if (text) {
+              callbacks.onOpenRubyDialog(text);
+            }
+          }
+        },
+      });
+
+      // 傍点を振る
+      editor.addAction({
+        id: 'insert-bouten',
+        label: '傍点を振る',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyB],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 1.6,
+        run: () => this.wrapSelection(editor, '《《', '》》', 'insert-bouten'),
+      });
+    }
+
+    if (isNovel) {
+      // 「」を追加
+      editor.addAction({
+        id: 'insert-corner-brackets',
+        label: '「」を追加',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyCode.BracketLeft],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 1.7,
+        run: () => this.wrapSelection(editor, '「', '」', 'insert-corner-brackets'),
+      });
+
+      // 『』を追加
+      editor.addAction({
+        id: 'insert-corner-brackets2',
+        label: '『』を追加',
+        keybindings: [monaco.KeyMod.CtrlCmd | monaco.KeyMod.Shift | monaco.KeyCode.BracketLeft],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 1.8,
+        run: () => this.wrapSelection(editor, '『', '』', 'insert-corner-brackets2'),
+      });
+
+      // ―― を追加
+      editor.addAction({
+        id: 'insert-dash',
+        label: '―― を追加',
+        keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.Minus],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 2.1,
+        run: () => this.insertWord(editor, '――', 'insert-dash'),
+      });
+
+      // …… を追加
+      editor.addAction({
+        id: 'insert-ellipsis',
+        label: '…… を追加',
+        keybindings: [monaco.KeyMod.Alt | monaco.KeyCode.Period],
+        contextMenuGroupId: 'navigation',
+        contextMenuOrder: 2.2,
+        run: () => this.insertWord(editor, '……', 'insert-ellipsis'),
+      });
+    }
+  }
+
+  /**
+   * エディターのデコレーション（全角スペース可視化、ルビ・傍点ホバー）を生成します
    */
   public static getEditorDecorations(model: any): any[] {
     const newDecorations: any[] = [];
     const text = model.getValue();
 
-    // 全角スペースの可視化（novelaid-ruby の FULL_WIDTH_SPACE パターン使用）
+    // 1. 全角スペースの可視化（novelaid-ruby の FULL_WIDTH_SPACE パターン使用）
     const regex = new RegExp(NOVEL_PATTERNS.FULL_WIDTH_SPACE.source, 'g');
     let match;
     while ((match = regex.exec(text)) !== null) {
@@ -221,6 +399,46 @@ export class EditorSupport {
         options: {
           inlineClassName: 'monaco-full-width-space',
           stickiness: 1, // TrackedRangeStickiness.NeverGrowsWhenTypingAtEdges
+        },
+      });
+    }
+
+    // 2. ルビのハイライト (マークダウンと小説両方)
+    const usedRanges: { start: number; end: number }[] = [];
+    const rubyPipePattern = new RegExp(NOVEL_PATTERNS.RUBY_WITH_PIPE.source, 'g');
+    let rubyMatch;
+    while ((rubyMatch = rubyPipePattern.exec(text)) !== null) {
+      const startPos = model.getPositionAt(rubyMatch.index);
+      const endPos = model.getPositionAt(rubyMatch.index + rubyMatch[0].length);
+      usedRanges.push({ start: rubyMatch.index, end: rubyMatch.index + rubyMatch[0].length });
+      newDecorations.push({
+        range: {
+          startLineNumber: startPos.lineNumber,
+          startColumn: startPos.column,
+          endLineNumber: endPos.lineNumber,
+          endColumn: endPos.column,
+        },
+        options: {
+          hoverMessage: { value: 'ルビ記法: `' + rubyMatch[0] + '`' },
+        },
+      });
+    }
+
+    // 3. 傍点のハイライト
+    const boutenPattern = new RegExp(NOVEL_PATTERNS.BOUTEN.source, 'g');
+    let boutenMatch;
+    while ((boutenMatch = boutenPattern.exec(text)) !== null) {
+      const startPos = model.getPositionAt(boutenMatch.index);
+      const endPos = model.getPositionAt(boutenMatch.index + boutenMatch[0].length);
+      newDecorations.push({
+        range: {
+          startLineNumber: startPos.lineNumber,
+          startColumn: startPos.column,
+          endLineNumber: endPos.lineNumber,
+          endColumn: endPos.column,
+        },
+        options: {
+          hoverMessage: { value: '傍点記法: `' + boutenMatch[0] + '`' },
         },
       });
     }
