@@ -60,6 +60,24 @@ pub fn byte_offset_to_line_col(text: &str, byte_offset: usize) -> (u32, u32) {
     (line, col)
 }
 
+/// 閉じ括弧文字かどうかを判定する
+pub fn is_closing_bracket(c: char) -> bool {
+    matches!(
+        c,
+        '」' | '』' | '）' | ')' | '】' | '］' | ']' | '｝' | '}' | '〉' | '》' | '〕' | '”' | '"' | '’' | '\''
+    )
+}
+
+/// 感嘆符・疑問符かどうかを判定する
+pub fn is_exclamation_question(c: char) -> bool {
+    matches!(c, '！' | '？' | '!' | '?')
+}
+
+/// 空白文字（全角・半角・タブ）かどうかを判定する
+pub fn is_space(c: char) -> bool {
+    c == '　' || c == ' ' || c == '\t'
+}
+
 impl<R: Runtime> NovelaidCalibration<R> {
     pub fn new(app: AppHandle<R>) -> Result<Self> {
         let dictionary = load_dictionary("embedded://ipadic")
@@ -228,17 +246,20 @@ impl<R: Runtime> NovelaidCalibration<R> {
                 }
             }
 
-            // 作法チェック3: 感嘆符・疑問符の直後の空白欠落（行末や閉じ括弧直前以外）
+            // 作法チェック3: 感嘆符・疑問符の直後の空白チェック
+            // ※「本当？」のように閉じ括弧が続く場合や行末、別の！？が連続する場合は空白不要。
+            // ※ 直後に文章（文字）が続く場合のみ全角空白を要求する。
             let chars: Vec<char> = line.chars().collect();
             for (ci, &c) in chars.iter().enumerate() {
-                if (c == '！' || c == '？' || c == '!' || c == '?') && ci + 1 < chars.len() {
+                if is_exclamation_question(c) && ci + 1 < chars.len() {
                     let next = chars[ci + 1];
-                    if next != '　' && next != ' ' && next != '」' && next != '』' && next != '）' && next != ')' && next != '！' && next != '？' && next != '!' && next != '?' {
+                    // 空白、閉じ括弧、または別の感嘆符・疑問符が続く場合は正常（空白要求不要）
+                    if !is_space(next) && !is_closing_bracket(next) && !is_exclamation_question(next) {
                         issues.push(CalibrationIssue {
                             id: format!("exclamation-space-{}-{}", line_num, ci),
                             rule_id: "novel-exclamation-space".into(),
                             rule_type: "novel_style".into(),
-                            message: "感嘆符・疑問符の直後には全角空白を空けるのが通例です".into(),
+                            message: "感嘆符・疑問符の直後に文章が続く場合は全角空白を空けるのが通例です".into(),
                             range: CalibrationRange {
                                 start_line: line_num,
                                 start_column: (ci + 1) as u32,
@@ -388,5 +409,69 @@ mod tests {
         assert_eq!(super::katakana_to_hiragana("コンニチハ"), "こんにちは");
         assert_eq!(super::katakana_to_hiragana("カイコウ"), "かいこう");
         assert_eq!(super::katakana_to_hiragana("アメ"), "あめ");
+    }
+
+    #[test]
+    fn test_is_closing_bracket_and_helpers() {
+        assert!(super::is_closing_bracket('」'));
+        assert!(super::is_closing_bracket('』'));
+        assert!(super::is_closing_bracket('）'));
+        assert!(super::is_closing_bracket(')'));
+        assert!(super::is_closing_bracket('】'));
+        assert!(super::is_closing_bracket('》'));
+        assert!(!super::is_closing_bracket('あ'));
+
+        assert!(super::is_exclamation_question('！'));
+        assert!(super::is_exclamation_question('？'));
+        assert!(super::is_exclamation_question('!'));
+        assert!(super::is_exclamation_question('?'));
+        assert!(!super::is_exclamation_question('。'));
+
+        assert!(super::is_space('　'));
+        assert!(super::is_space(' '));
+        assert!(super::is_space('\t'));
+        assert!(!super::is_space('a'));
+    }
+
+    #[test]
+    fn test_exclamation_space_logic() {
+        // 判定ロジックの単体テスト
+        fn check_exclamation_issues(text: &str) -> Vec<String> {
+            let mut issues = Vec::new();
+            let chars: Vec<char> = text.chars().collect();
+            for (ci, &c) in chars.iter().enumerate() {
+                if super::is_exclamation_question(c) && ci + 1 < chars.len() {
+                    let next = chars[ci + 1];
+                    if !super::is_space(next) && !super::is_closing_bracket(next) && !super::is_exclamation_question(next) {
+                        issues.push(format!("{}:{}->{}", ci, c, next));
+                    }
+                }
+            }
+            issues
+        }
+
+        // 1. 閉じ括弧が続く場合は空白不要
+        assert!(check_exclamation_issues("「本当？」").is_empty());
+        assert!(check_exclamation_issues("『信じられない！』").is_empty());
+        assert!(check_exclamation_issues("（えっ？）").is_empty());
+
+        // 2. 行末の場合は空白不要
+        assert!(check_exclamation_issues("本当？").is_empty());
+        assert!(check_exclamation_issues("すごい！").is_empty());
+
+        // 3. 既に空白がある場合は空白不要
+        assert!(check_exclamation_issues("「本当？　そうなんだ」").is_empty());
+        assert!(check_exclamation_issues("本当！　すごいね").is_empty());
+
+        // 4. 感嘆符・疑問符が連続している場合（！？）
+        // 末尾の記号の直後に文章が続く場合のみ指摘
+        let issues = check_exclamation_issues("「本当！？そうなんだ」");
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0], "4:？->そ"); // 0:「 1:本 2:当 3:！ 4:？
+
+        // 5. 直後に文章が続く場合は指摘
+        let issues2 = check_exclamation_issues("本当？そうなんだ");
+        assert_eq!(issues2.len(), 1);
+        assert_eq!(issues2[0], "2:？->そ");
     }
 }
