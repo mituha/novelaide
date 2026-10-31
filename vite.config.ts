@@ -1,12 +1,26 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
+import { viteStaticCopy } from "vite-plugin-static-copy";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
 const host = process.env.TAURI_DEV_HOST;
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [react()],
+  plugins: [
+    react(),
+    viteStaticCopy({
+      targets: [
+        {
+          src: "node_modules/monaco-editor/min/vs/**/*",
+          dest: "monaco/vs",
+          rename: {
+            stripBase: 4,
+          },
+        },
+      ],
+    }),
+  ],
   define: {
     "process.env": {},
     "process.platform": JSON.stringify("win32"),
