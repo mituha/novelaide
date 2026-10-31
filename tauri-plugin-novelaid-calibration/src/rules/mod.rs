@@ -7,6 +7,7 @@ pub mod bracket_trailing_space;
 pub mod exclamation_space;
 pub mod exclamation_normalization;
 pub mod indent_first_line;
+pub mod dropping_ra;
 pub mod doubled_joshi;
 pub mod kanji_open_close;
 
@@ -21,6 +22,7 @@ pub use self::bracket_trailing_space::BracketTrailingSpaceRule;
 pub use self::exclamation_space::ExclamationSpaceRule;
 pub use self::exclamation_normalization::ExclamationNormalizationRule;
 pub use self::indent_first_line::IndentFirstLineRule;
+pub use self::dropping_ra::DroppingRaRule;
 pub use self::doubled_joshi::DoubledJoshiRule;
 pub use self::kanji_open_close::KanjiOpenCloseRule;
 
@@ -108,10 +110,13 @@ impl RuleRegistry {
         // 9. 段落冒頭の字下げチェック（地の文の先頭全角1マス）
         registry.register(IndentFirstLineRule::default());
 
-        // 10. 助詞「の」連続チェック
+        // 10. ら抜き言葉チェック（見れる、食べれる等）
+        registry.register(DroppingRaRule::default());
+
+        // 11. 助詞「の」連続チェック
         registry.register(DoubledJoshiRule::default());
 
-        // 11. 形式名詞・漢字の開きチェック
+        // 12. 形式名詞・漢字の開きチェック
         registry.register(KanjiOpenCloseRule::default());
 
         registry
