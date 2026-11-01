@@ -332,6 +332,36 @@ impl<R: Runtime> NovelaidFs<R> {
   fn get_document_type_internal(&self, path: &Path) -> NovelaidDocumentType {
     self.attributes_manager.get_document_type(path)
   }
+
+  /// プロジェクト内の Markdown/Novel ドキュメントを走査して NovelaidDocument 一覧を返却
+  pub fn scan_documents(&self, project_path: &Path) -> crate::Result<Vec<NovelaidDocument>> {
+    let mut documents = Vec::new();
+    if !project_path.exists() {
+      return Ok(documents);
+    }
+
+    for entry in walkdir::WalkDir::new(project_path)
+      .into_iter()
+      .filter_entry(|e| {
+        let name = e.file_name().to_string_lossy();
+        !name.starts_with('.') && name != "node_modules" && name != "target" && name != "dist" && name != "dist-js"
+      })
+      .filter_map(|e| e.ok())
+    {
+      let path = entry.path();
+      if path.is_file() {
+        if let Some(ext) = path.extension() {
+          let ext_str = ext.to_string_lossy().to_lowercase();
+          if ext_str == "md" || ext_str == "markdown" || ext_str == "txt" {
+            if let Ok(doc) = self.read_document(path) {
+              documents.push(doc);
+            }
+          }
+        }
+      }
+    }
+    Ok(documents)
+  }
 }
 
 // バックグラウンドワーカーから self なしで呼び出せる静的フロントマター抽出ヘルパー

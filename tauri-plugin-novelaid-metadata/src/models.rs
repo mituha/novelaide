@@ -77,13 +77,7 @@ pub struct ProjectScanSummary {
     pub duration_ms: u64,
 }
 
-/// 本文とメタデータの分離結果
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct DocumentContentWithMetadata {
-    pub metadata: serde_json::Value,
-    pub content: String,
-}
+pub use tauri_plugin_novelaid_fs::NovelaidDocument;
 
 /// メタデータキャッシュの型エイリアス
 pub type MetadataCache = HashMap<String, serde_json::Value>;

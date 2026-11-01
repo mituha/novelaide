@@ -1,9 +1,18 @@
-import { CalibrationProjectContext, DocumentContentWithMetadata, ProjectEntity, ProjectRubyEntry, ProjectScanSummary } from './models';
+import { CalibrationProjectContext, NovelaidDocument, ProjectEntity, ProjectRubyEntry, ProjectScanSummary } from './models';
 export * from './models';
 /**
  * プロジェクト全体を走査し、Frontmatter・登場人物・世界設定・ルビ辞書を一括インデックス化します。
+ * （物理走査はバックエンドの novelaid-fs に委譲されます）
  */
 export declare function scanProject(projectPath: string): Promise<ProjectScanSummary>;
+/**
+ * 読み込まれた NovelaidDocument リストを一括で解析・インデックス化します。
+ */
+export declare function indexDocuments(projectPath: string, documents: NovelaidDocument[]): Promise<ProjectScanSummary>;
+/**
+ * 単一の NovelaidDocument を増分インデックス更新します。
+ */
+export declare function indexDocument(document: NovelaidDocument): Promise<void>;
 /**
  * プロジェクト内の全ファイルのメタデータ（Frontmatter）キャッシュを取得します。
  */
@@ -25,11 +34,3 @@ export declare function getCalibrationContext(): Promise<CalibrationProjectConte
  * 指定ファイルのメタデータ（Frontmatter）を更新します。
  */
 export declare function updateFileMetadata(path: string, metadata: Record<string, any>): Promise<void>;
-/**
- * テキストから YAML Frontmatter を分離します。
- */
-export declare function extractFrontmatter(content: string): Promise<DocumentContentWithMetadata>;
-/**
- * メタデータと本文を再シリアライズして Frontmatter 付きテキストを生成します。
- */
-export declare function formatFrontmatter(metadata: Record<string, any>, content: string): Promise<string>;

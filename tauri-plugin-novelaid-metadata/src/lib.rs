@@ -9,10 +9,9 @@ mod commands;
 mod desktop;
 pub mod entities;
 mod error;
-pub mod frontmatter;
+pub mod indexer;
 pub mod models;
 pub mod ruby_dict;
-pub mod scanner;
 
 pub use desktop::NovelaidMetadata;
 pub use error::{Error, Result};
@@ -31,13 +30,13 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
     Builder::new("novelaid-metadata")
         .invoke_handler(tauri::generate_handler![
             commands::scan_project,
+            commands::index_documents,
+            commands::index_document,
             commands::get_metadata_cache,
             commands::get_entities,
             commands::get_ruby_dictionary,
             commands::get_calibration_context,
             commands::update_file_metadata,
-            commands::extract_frontmatter,
-            commands::format_frontmatter,
         ])
         .setup(|app, _api| {
             app.manage(NovelaidMetadata::new(app.clone()));

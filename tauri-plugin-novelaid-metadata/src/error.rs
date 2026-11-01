@@ -7,7 +7,7 @@ pub enum Error {
     #[error(transparent)]
     Io(#[from] std::io::Error),
     #[error(transparent)]
-    Yaml(#[from] serde_yaml::Error),
+    Fs(#[from] tauri_plugin_novelaid_fs::Error),
     #[error(transparent)]
     Json(#[from] serde_json::Error),
     #[error("Plugin error: {0}")]

@@ -57,6 +57,7 @@ pub struct NovelaidDocument {
     #[ts(type = "any")]
     pub metadata: serde_json::Value,
     pub document_type: NovelaidDocumentType,
+    #[ts(type = "number")]
     pub mtime_ms: u64,
 }
 
@@ -66,7 +67,9 @@ pub struct NovelaidDocument {
 pub struct DocumentStat {
     pub path: String,
     pub exists: bool,
+    #[ts(type = "number")]
     pub mtime_ms: u64,
+    #[ts(type = "number")]
     pub size: u64,
 }
 
@@ -88,7 +91,11 @@ pub struct PingResponse {
 pub enum RemoveResult {
     Success,
     NeedConfirm {
+        #[serde(rename = "fileName")]
+        #[ts(rename = "fileName")]
         file_name: String,
+        #[serde(rename = "isDirectory")]
+        #[ts(rename = "isDirectory")]
         is_directory: bool,
     },
     NotFound,

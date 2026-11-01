@@ -17,4 +17,5 @@ permissions = [
     "allow-copy",
     "allow-get-metadata-cache",
     "allow-scan-project-metadata",
+    "allow-scan-documents",
 ]

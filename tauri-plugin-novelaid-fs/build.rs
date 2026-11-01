@@ -15,6 +15,7 @@ const COMMANDS: &[&str] = &[
     "copy",
     "get_metadata_cache",
     "scan_project_metadata",
+    "scan_documents",
 ];
 
 fn main() {

@@ -367,6 +367,30 @@
           "markdownDescription": "Denies the get_ruby_dictionary command without any pre-configured scope."
         },
         {
+          "description": "Enables the index_document command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-index-document",
+          "markdownDescription": "Enables the index_document command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the index_document command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-index-document",
+          "markdownDescription": "Denies the index_document command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the index_documents command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-index-documents",
+          "markdownDescription": "Enables the index_documents command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the index_documents command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-index-documents",
+          "markdownDescription": "Denies the index_documents command without any pre-configured scope."
+        },
+        {
           "description": "Enables the scan_project command without any pre-configured scope.",
           "type": "string",
           "const": "allow-scan-project",
@@ -391,10 +415,10 @@
           "markdownDescription": "Denies the update_file_metadata command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for novelaid-metadata plugin\n#### This default permission set includes:\n\n- `allow-scan-project`\n- `allow-get-metadata-cache`\n- `allow-get-entities`\n- `allow-get-ruby-dictionary`\n- `allow-get-calibration-context`\n- `allow-update-file-metadata`\n- `allow-extract-frontmatter`\n- `allow-format-frontmatter`",
+          "description": "Default permissions for novelaid-metadata plugin\n#### This default permission set includes:\n\n- `allow-scan-project`\n- `allow-index-documents`\n- `allow-index-document`\n- `allow-get-metadata-cache`\n- `allow-get-entities`\n- `allow-get-ruby-dictionary`\n- `allow-get-calibration-context`\n- `allow-update-file-metadata`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for novelaid-metadata plugin\n#### This default permission set includes:\n\n- `allow-scan-project`\n- `allow-get-metadata-cache`\n- `allow-get-entities`\n- `allow-get-ruby-dictionary`\n- `allow-get-calibration-context`\n- `allow-update-file-metadata`\n- `allow-extract-frontmatter`\n- `allow-format-frontmatter`"
+          "markdownDescription": "Default permissions for novelaid-metadata plugin\n#### This default permission set includes:\n\n- `allow-scan-project`\n- `allow-index-documents`\n- `allow-index-document`\n- `allow-get-metadata-cache`\n- `allow-get-entities`\n- `allow-get-ruby-dictionary`\n- `allow-get-calibration-context`\n- `allow-update-file-metadata`"
         }
       ]
     }

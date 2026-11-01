@@ -303,3 +303,11 @@ pub(crate) async fn get_metadata_cache<R: Runtime>(
 ) -> Result<std::collections::HashMap<String, serde_json::Value>> {
     Ok(app.novelaid_fs().get_metadata_cache())
 }
+
+#[command]
+pub(crate) async fn scan_documents<R: Runtime>(
+    app: AppHandle<R>,
+    project_path: String,
+) -> Result<Vec<NovelaidDocument>> {
+    app.novelaid_fs().scan_documents(std::path::Path::new(&project_path))
+}

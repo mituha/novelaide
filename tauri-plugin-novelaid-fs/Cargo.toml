@@ -1,6 +1,6 @@
 [package]
 name = "tauri-plugin-novelaid-fs"
-version = "0.2.0"
+version = "0.2.1"
 authors = [ "Mizuki Mituha" ]
 description = "novelaide filesystem plugin with frontmatter parsing and auto-generated TypeScript types"
 edition = "2021"
@@ -17,6 +17,7 @@ serde_yaml = "0.9"
 thiserror = "2"
 ts-rs = "12.0"
 tokio = { version = "1", features = ["sync", "rt"] }
+walkdir = "2.4"
 
 [build-dependencies]
 tauri-plugin = { version = "2", features = ["build"] }

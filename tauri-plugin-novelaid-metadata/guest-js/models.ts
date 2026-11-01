@@ -75,9 +75,14 @@ export interface ProjectScanSummary {
 }
 
 /**
- * 本文とメタデータの分離結果
+ * Novelaidドキュメント構造（novelaid-fs 準拠）
  */
-export interface DocumentContentWithMetadata {
-  metadata: Record<string, any>;
+export interface NovelaidDocument {
+  path: string;
+  baseName: string;
+  fileTitle: string;
   content: string;
+  metadata: Record<string, any>;
+  documentType: string;
+  mtimeMs: number;
 }

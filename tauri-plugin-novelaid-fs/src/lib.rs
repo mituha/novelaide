@@ -53,7 +53,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       commands::remove,
       commands::rename,
       commands::copy,
-      commands::get_metadata_cache
+      commands::get_metadata_cache,
+      commands::scan_documents
     ])
     .setup(|app, api| {
       #[cfg(mobile)]

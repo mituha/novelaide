@@ -1,18 +1,19 @@
 use crate::entities::EntityStore;
 use crate::error::Result;
-use crate::frontmatter::{extract_frontmatter_static, format_frontmatter_static};
+use crate::indexer::DocumentIndexer;
 use crate::models::{
-    CalibrationProjectContext, DocumentContentWithMetadata, EntityCategory, MetadataCache,
-    ProjectEntity, ProjectRubyEntry, ProjectScanSummary,
+    CalibrationProjectContext, EntityCategory, MetadataCache, NovelaidDocument, ProjectEntity,
+    ProjectRubyEntry, ProjectScanSummary,
 };
 use crate::ruby_dict::RubyDictionaryStore;
-use crate::scanner::scan_project_directory;
 use serde_json::Value;
+use std::path::Path;
 use std::sync::Mutex;
 use tauri::Runtime;
+use tauri_plugin_novelaid_fs::NovelaidFsExt;
 
 pub struct NovelaidMetadata<R: Runtime> {
-    _app: tauri::AppHandle<R>,
+    app: tauri::AppHandle<R>,
     metadata_cache: Mutex<MetadataCache>,
     entity_store: Mutex<EntityStore>,
     ruby_store: Mutex<RubyDictionaryStore>,
@@ -21,21 +22,54 @@ pub struct NovelaidMetadata<R: Runtime> {
 impl<R: Runtime> NovelaidMetadata<R> {
     pub fn new(app: tauri::AppHandle<R>) -> Self {
         Self {
-            _app: app,
+            app,
             metadata_cache: Mutex::new(MetadataCache::new()),
             entity_store: Mutex::new(EntityStore::new()),
             ruby_store: Mutex::new(RubyDictionaryStore::new()),
         }
     }
 
-    /// プロジェクトの全走査を実行
+    /// プロジェクトの全走査を実行（物理走査は novelaid-fs に委譲し、取得された NovelaidDocument をインデックス化）
     pub fn scan_project(&self, project_path: &str) -> Result<ProjectScanSummary> {
+        let path = Path::new(project_path);
+        let documents = self.app.novelaid_fs().scan_documents(path)?;
+
         let mut meta = self.metadata_cache.lock().unwrap();
         let mut entities = self.entity_store.lock().unwrap();
         let mut rubies = self.ruby_store.lock().unwrap();
 
-        let summary = scan_project_directory(project_path, &mut meta, &mut entities, &mut rubies)?;
+        let summary = DocumentIndexer::index_documents(
+            project_path,
+            &documents,
+            &mut meta,
+            &mut entities,
+            &mut rubies,
+        );
         Ok(summary)
+    }
+
+    /// 渡された NovelaidDocument リストを一括インデックス化
+    pub fn index_documents(&self, project_path: &str, documents: &[NovelaidDocument]) -> ProjectScanSummary {
+        let mut meta = self.metadata_cache.lock().unwrap();
+        let mut entities = self.entity_store.lock().unwrap();
+        let mut rubies = self.ruby_store.lock().unwrap();
+
+        DocumentIndexer::index_documents(
+            project_path,
+            documents,
+            &mut meta,
+            &mut entities,
+            &mut rubies,
+        )
+    }
+
+    /// 単一 NovelaidDocument の増分インデックス更新
+    pub fn index_document(&self, document: &NovelaidDocument) {
+        let mut meta = self.metadata_cache.lock().unwrap();
+        let mut entities = self.entity_store.lock().unwrap();
+        let mut rubies = self.ruby_store.lock().unwrap();
+
+        DocumentIndexer::index_document(document, &mut meta, &mut entities, &mut rubies);
     }
 
     /// メタデータキャッシュの取得
@@ -81,19 +115,5 @@ impl<R: Runtime> NovelaidMetadata<R> {
         let mut cache = self.metadata_cache.lock().unwrap();
         cache.insert(path.to_string(), metadata);
         Ok(())
-    }
-
-    /// 本文から Frontmatter を抽出
-    pub fn extract_frontmatter(&self, content: &str) -> DocumentContentWithMetadata {
-        let (metadata, body) = extract_frontmatter_static(content);
-        DocumentContentWithMetadata {
-            metadata,
-            content: body.to_string(),
-        }
-    }
-
-    /// 本文とメタデータを再結合
-    pub fn format_frontmatter(&self, metadata: &Value, content: &str) -> String {
-        format_frontmatter_static(metadata, content)
     }
 }

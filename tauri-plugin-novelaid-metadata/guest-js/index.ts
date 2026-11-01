@@ -1,7 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
   CalibrationProjectContext,
-  DocumentContentWithMetadata,
+  NovelaidDocument,
   ProjectEntity,
   ProjectRubyEntry,
   ProjectScanSummary,
@@ -11,10 +11,33 @@ export * from './models';
 
 /**
  * プロジェクト全体を走査し、Frontmatter・登場人物・世界設定・ルビ辞書を一括インデックス化します。
+ * （物理走査はバックエンドの novelaid-fs に委譲されます）
  */
 export async function scanProject(projectPath: string): Promise<ProjectScanSummary> {
   return await invoke<ProjectScanSummary>('plugin:novelaid-metadata|scan_project', {
     projectPath,
+  });
+}
+
+/**
+ * 読み込まれた NovelaidDocument リストを一括で解析・インデックス化します。
+ */
+export async function indexDocuments(
+  projectPath: string,
+  documents: NovelaidDocument[]
+): Promise<ProjectScanSummary> {
+  return await invoke<ProjectScanSummary>('plugin:novelaid-metadata|index_documents', {
+    projectPath,
+    documents,
+  });
+}
+
+/**
+ * 単一の NovelaidDocument を増分インデックス更新します。
+ */
+export async function indexDocument(document: NovelaidDocument): Promise<void> {
+  await invoke('plugin:novelaid-metadata|index_document', {
+    document,
   });
 }
 
@@ -59,30 +82,5 @@ export async function updateFileMetadata(
   await invoke('plugin:novelaid-metadata|update_file_metadata', {
     path,
     metadata,
-  });
-}
-
-/**
- * テキストから YAML Frontmatter を分離します。
- */
-export async function extractFrontmatter(
-  content: string
-): Promise<DocumentContentWithMetadata> {
-  return await invoke<DocumentContentWithMetadata>(
-    'plugin:novelaid-metadata|extract_frontmatter',
-    { content }
-  );
-}
-
-/**
- * メタデータと本文を再シリアライズして Frontmatter 付きテキストを生成します。
- */
-export async function formatFrontmatter(
-  metadata: Record<string, any>,
-  content: string
-): Promise<string> {
-  return await invoke<string>('plugin:novelaid-metadata|format_frontmatter', {
-    metadata,
-    content,
   });
 }

@@ -116,3 +116,9 @@ export async function copy(sourcePath: string, targetPath: string): Promise<void
 export async function getMetadataCache(): Promise<Record<string, any>> {
   return await invoke<Record<string, any>>('plugin:novelaid-fs|get_metadata_cache');
 }
+
+export async function scanDocuments(projectPath: string): Promise<NovelaidDocument[]> {
+  return await invoke<NovelaidDocument[]>('plugin:novelaid-fs|scan_documents', {
+    projectPath,
+  });
+}

@@ -1,6 +1,6 @@
 use crate::error::Result;
 use crate::models::{
-    CalibrationProjectContext, DocumentContentWithMetadata, MetadataCache, ProjectEntity,
+    CalibrationProjectContext, MetadataCache, NovelaidDocument, ProjectEntity,
     ProjectRubyEntry, ProjectScanSummary,
 };
 use crate::NovelaidMetadataExt;
@@ -13,6 +13,24 @@ pub(crate) async fn scan_project<R: Runtime>(
     project_path: String,
 ) -> Result<ProjectScanSummary> {
     app.novelaid_metadata().scan_project(&project_path)
+}
+
+#[command]
+pub(crate) async fn index_documents<R: Runtime>(
+    app: AppHandle<R>,
+    project_path: String,
+    documents: Vec<NovelaidDocument>,
+) -> Result<ProjectScanSummary> {
+    Ok(app.novelaid_metadata().index_documents(&project_path, &documents))
+}
+
+#[command]
+pub(crate) async fn index_document<R: Runtime>(
+    app: AppHandle<R>,
+    document: NovelaidDocument,
+) -> Result<()> {
+    app.novelaid_metadata().index_document(&document);
+    Ok(())
 }
 
 #[command]
@@ -51,21 +69,4 @@ pub(crate) async fn update_file_metadata<R: Runtime>(
     metadata: Value,
 ) -> Result<()> {
     app.novelaid_metadata().update_file_metadata(&path, metadata)
-}
-
-#[command]
-pub(crate) async fn extract_frontmatter<R: Runtime>(
-    app: AppHandle<R>,
-    content: String,
-) -> Result<DocumentContentWithMetadata> {
-    Ok(app.novelaid_metadata().extract_frontmatter(&content))
-}
-
-#[command]
-pub(crate) async fn format_frontmatter<R: Runtime>(
-    app: AppHandle<R>,
-    metadata: Value,
-    content: String,
-) -> Result<String> {
-    Ok(app.novelaid_metadata().format_frontmatter(&metadata, &content))
 }

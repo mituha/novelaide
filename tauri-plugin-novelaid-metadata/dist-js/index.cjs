@@ -4,10 +4,28 @@ var core = require('@tauri-apps/api/core');
 
 /**
  * プロジェクト全体を走査し、Frontmatter・登場人物・世界設定・ルビ辞書を一括インデックス化します。
+ * （物理走査はバックエンドの novelaid-fs に委譲されます）
  */
 async function scanProject(projectPath) {
     return await core.invoke('plugin:novelaid-metadata|scan_project', {
         projectPath,
+    });
+}
+/**
+ * 読み込まれた NovelaidDocument リストを一括で解析・インデックス化します。
+ */
+async function indexDocuments(projectPath, documents) {
+    return await core.invoke('plugin:novelaid-metadata|index_documents', {
+        projectPath,
+        documents,
+    });
+}
+/**
+ * 単一の NovelaidDocument を増分インデックス更新します。
+ */
+async function indexDocument(document) {
+    await core.invoke('plugin:novelaid-metadata|index_document', {
+        document,
     });
 }
 /**
@@ -46,27 +64,12 @@ async function updateFileMetadata(path, metadata) {
         metadata,
     });
 }
-/**
- * テキストから YAML Frontmatter を分離します。
- */
-async function extractFrontmatter(content) {
-    return await core.invoke('plugin:novelaid-metadata|extract_frontmatter', { content });
-}
-/**
- * メタデータと本文を再シリアライズして Frontmatter 付きテキストを生成します。
- */
-async function formatFrontmatter(metadata, content) {
-    return await core.invoke('plugin:novelaid-metadata|format_frontmatter', {
-        metadata,
-        content,
-    });
-}
 
-exports.extractFrontmatter = extractFrontmatter;
-exports.formatFrontmatter = formatFrontmatter;
 exports.getCalibrationContext = getCalibrationContext;
 exports.getEntities = getEntities;
 exports.getMetadataCache = getMetadataCache;
 exports.getRubyDictionary = getRubyDictionary;
+exports.indexDocument = indexDocument;
+exports.indexDocuments = indexDocuments;
 exports.scanProject = scanProject;
 exports.updateFileMetadata = updateFileMetadata;

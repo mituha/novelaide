@@ -20,6 +20,7 @@ Default permissions for the plugin
 - `allow-copy`
 - `allow-get-metadata-cache`
 - `allow-scan-project-metadata`
+- `allow-scan-documents`
 
 ## Permission Table
 
@@ -364,6 +365,32 @@ Enables the rename command without any pre-configured scope.
 <td>
 
 Denies the rename command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:allow-scan-documents`
+
+</td>
+<td>
+
+Enables the scan_documents command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:deny-scan-documents`
+
+</td>
+<td>
+
+Denies the scan_documents command without any pre-configured scope.
 
 </td>
 </tr>

@@ -5,13 +5,13 @@ Default permissions for novelaid-metadata plugin
 #### This default permission set includes the following:
 
 - `allow-scan-project`
+- `allow-index-documents`
+- `allow-index-document`
 - `allow-get-metadata-cache`
 - `allow-get-entities`
 - `allow-get-ruby-dictionary`
 - `allow-get-calibration-context`
 - `allow-update-file-metadata`
-- `allow-extract-frontmatter`
-- `allow-format-frontmatter`
 
 ## Permission Table
 
@@ -174,6 +174,58 @@ Enables the get_ruby_dictionary command without any pre-configured scope.
 <td>
 
 Denies the get_ruby_dictionary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-metadata:allow-index-document`
+
+</td>
+<td>
+
+Enables the index_document command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-metadata:deny-index-document`
+
+</td>
+<td>
+
+Denies the index_document command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-metadata:allow-index-documents`
+
+</td>
+<td>
+
+Enables the index_documents command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-metadata:deny-index-documents`
+
+</td>
+<td>
+
+Denies the index_documents command without any pre-configured scope.
 
 </td>
 </tr>
