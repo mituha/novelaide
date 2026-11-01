@@ -1,10 +1,13 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
 import type { ProjectItem } from "restar-app";
+import { getVersion } from "@tauri-apps/api/app";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { bootLog } from "../utils/bootLogger";
 
 interface ProjectContextType {
   projectPath: string | null;
   projectName: string | null;
+  appVersion: string;
   recentProjects: ProjectItem[];
   openProject: (path: string, name?: string) => Promise<void>;
   closeProject: () => void;
@@ -39,6 +42,44 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       return [];
     }
   });
+
+  const [appVersion, setAppVersion] = useState<string>("");
+
+  const updateTitle = useCallback(async (pName: string | null, version: string) => {
+    const base = "novelaide";
+    const versionStr = version ? ` v${version}` : "";
+    const projectStr = pName ? ` - ${pName}` : "";
+    const title = `${base}${versionStr}${projectStr}`;
+
+    document.title = title;
+    try {
+      await getCurrentWindow().setTitle(title);
+      bootLog("Window title updated:", title);
+    } catch (error) {
+      console.warn("Failed to set window title via Tauri API:", error);
+    }
+  }, []);
+
+  // 起動時にバージョンを取得してタイトルに反映
+  useEffect(() => {
+    const initVersion = async () => {
+      try {
+        const ver = await getVersion();
+        setAppVersion(ver);
+        updateTitle(projectName, ver);
+      } catch (error) {
+        console.warn("Failed to get app version from Tauri API:", error);
+      }
+    };
+    initVersion();
+  }, []);
+
+  // projectName または appVersion の変更時にタイトルを再計算
+  useEffect(() => {
+    if (appVersion) {
+      updateTitle(projectName, appVersion);
+    }
+  }, [projectName, appVersion, updateTitle]);
 
   useEffect(() => {
     bootLog("ProjectProvider mounted", { projectPath, projectName });
@@ -97,6 +138,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
       value={{
         projectPath,
         projectName,
+        appVersion,
         recentProjects,
         openProject,
         closeProject,
