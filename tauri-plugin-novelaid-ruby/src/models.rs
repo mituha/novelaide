@@ -51,3 +51,39 @@ pub struct CountOptions {
     pub manuscript_chars_per_line: Option<usize>,
     pub manuscript_lines_per_sheet: Option<usize>,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../guest-js/models.ts")]
+pub struct SourcePosition {
+    /// 1-based 行番号
+    pub line: u32,
+    /// 1-based 列番号 (char単位)
+    pub column: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../guest-js/models.ts")]
+pub struct RubyRange {
+    /// 親文字の表層形
+    pub surface: String,
+    /// ルビ文字列
+    pub ruby: String,
+    /// 親文字の開始位置 (1-based)
+    pub start: SourcePosition,
+    /// 親文字の終了位置 (1-based, 終端文字の次の位置)
+    pub end: SourcePosition,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[serde(rename_all = "camelCase")]
+#[ts(export, export_to = "../guest-js/models.ts")]
+pub struct StrippedResultWithMap {
+    /// ルビ・傍点記法を除去したプレーンテキスト
+    pub clean_text: String,
+    /// clean_text の各文字（char単位）に対応する元テキストの位置情報
+    pub char_map: Vec<SourcePosition>,
+    /// 元テキストに存在するルビ一覧とその親文字の正確な範囲
+    pub existing_rubies: Vec<RubyRange>,
+}

@@ -3616,6 +3616,20 @@ dependencies = [
  "serde_json",
  "tauri",
  "tauri-plugin",
+ "tauri-plugin-novelaid-ruby",
+ "thiserror 2.0.21",
+ "ts-rs",
+]
+
+[[package]]
+name = "tauri-plugin-novelaid-ruby"
+version = "0.3.0"
+dependencies = [
+ "regex",
+ "serde",
+ "serde_json",
+ "tauri",
+ "tauri-plugin",
  "thiserror 2.0.21",
  "ts-rs",
 ]

@@ -6,6 +6,7 @@ use serde::de::DeserializeOwned;
 use lindera::dictionary::load_dictionary;
 use lindera::mode::Mode;
 use lindera::segmenter::Segmenter;
+use tauri_plugin_novelaid_ruby::strip_ruby_with_map;
 
 use crate::models::*;
 use crate::rules::context::{AnalyzedToken, CalibrationContext};
@@ -46,6 +47,7 @@ pub fn contains_kanji(s: &str) -> bool {
 }
 
 /// バイトオフセットから 1-based の行番号・列番号を算出する
+#[allow(dead_code)]
 pub fn byte_offset_to_line_col(text: &str, byte_offset: usize) -> (u32, u32) {
     let mut line = 1u32;
     let mut col = 1u32;
@@ -61,6 +63,55 @@ pub fn byte_offset_to_line_col(text: &str, byte_offset: usize) -> (u32, u32) {
         }
     }
     (line, col)
+}
+
+/// clean_text のバイトオフセットから char_map 上の元位置 (line, column) を解決するヘルパー
+pub fn resolve_source_range(
+    char_map: &[tauri_plugin_novelaid_ruby::SourcePosition],
+    byte_to_char: &[usize],
+    byte_start: usize,
+    byte_end: usize,
+) -> (u32, u32, u32, u32) {
+    if char_map.is_empty() {
+        return (1, 1, 1, 1);
+    }
+
+    let start_char_idx = *byte_to_char.get(byte_start).unwrap_or(&0);
+    let end_char_idx = *byte_to_char.get(byte_end).unwrap_or(&char_map.len());
+
+    let (start_line, start_col) = if let Some(pos) = char_map.get(start_char_idx) {
+        (pos.line, pos.column)
+    } else {
+        let last = char_map.last().unwrap();
+        (last.line, last.column + 1)
+    };
+
+    let (end_line, end_col) = if end_char_idx > start_char_idx {
+        if let Some(pos) = char_map.get(end_char_idx - 1) {
+            (pos.line, pos.column + 1)
+        } else {
+            (start_line, start_col + 1)
+        }
+    } else {
+        (start_line, start_col + 1)
+    };
+
+    (start_line, start_col, end_line, end_col)
+}
+
+/// clean_text の各バイト位置に対応する char_map の文字インデックス配列を生成
+pub fn build_byte_to_char_index(clean_text: &str, total_chars: usize) -> Vec<usize> {
+    let mut byte_to_char = Vec::with_capacity(clean_text.len() + 1);
+    for (char_idx, (b_idx, _)) in clean_text.char_indices().enumerate() {
+        while byte_to_char.len() < b_idx {
+            byte_to_char.push(char_idx.saturating_sub(1));
+        }
+        byte_to_char.push(char_idx);
+    }
+    while byte_to_char.len() <= clean_text.len() {
+        byte_to_char.push(total_chars);
+    }
+    byte_to_char
 }
 
 impl<R: Runtime> NovelaidCalibration<R> {
@@ -83,11 +134,12 @@ impl<R: Runtime> NovelaidCalibration<R> {
         })
     }
 
-    /// 形態素解析を実行しトークン列を取得
+    /// 形態素解析を実行しトークン列を取得（ルビ・傍点を除外した自然文として解析）
     pub fn tokenize_text(&self, text: &str) -> Result<Vec<TokenInfo>> {
+        let stripped = strip_ruby_with_map(text);
         let segmenter = self.segmenter.read().map_err(|e| Error::Other(e.to_string()))?;
         let mut tokens = segmenter
-            .segment(Cow::Borrowed(text))
+            .segment(Cow::Borrowed(&stripped.clean_text))
             .map_err(|e| Error::Lindera(e.to_string()))?;
 
         let mut result = Vec::with_capacity(tokens.len());
@@ -126,11 +178,14 @@ impl<R: Runtime> NovelaidCalibration<R> {
         Ok(result)
     }
 
-    /// 本文中の難読・漢字語句に対するルビ候補を抽出
+    /// 本文中の難読・漢字語句に対するルビ候補を抽出（既存ルビの重複提案防止および元位置マッピング対応）
     pub fn get_ruby_candidates(&self, text: &str) -> Result<Vec<RubyCandidate>> {
+        let stripped = strip_ruby_with_map(text);
+        let byte_to_char = build_byte_to_char_index(&stripped.clean_text, stripped.char_map.len());
+
         let segmenter = self.segmenter.read().map_err(|e| Error::Other(e.to_string()))?;
         let mut tokens = segmenter
-            .segment(Cow::Borrowed(text))
+            .segment(Cow::Borrowed(&stripped.clean_text))
             .map_err(|e| Error::Lindera(e.to_string()))?;
 
         let mut candidates = Vec::new();
@@ -150,21 +205,30 @@ impl<R: Runtime> NovelaidCalibration<R> {
 
                         // 表層形と同じ（ひらがなのみ等）でなく、まだ未登録の語句
                         if hiragana != surface && !seen_words.contains(&surface) {
-                            seen_words.insert(surface.clone());
+                            let (start_line, start_col, end_line, end_col) =
+                                resolve_source_range(&stripped.char_map, &byte_to_char, byte_start, byte_end);
 
-                            let (start_line, start_col) = byte_offset_to_line_col(text, byte_start);
-                            let (end_line, end_col) = byte_offset_to_line_col(text, byte_end);
-
-                            candidates.push(RubyCandidate {
-                                surface,
-                                ruby: hiragana,
-                                range: CalibrationRange {
-                                    start_line,
-                                    start_column: start_col,
-                                    end_line,
-                                    end_column: end_col,
-                                },
+                            // 既にルビが振られている語句（existing_rubies）と重複しているか判定
+                            let is_already_rubied = stripped.existing_rubies.iter().any(|r| {
+                                r.start.line == start_line
+                                    && r.start.column <= start_col
+                                    && end_col <= r.end.column
                             });
+
+                            if !is_already_rubied {
+                                seen_words.insert(surface.clone());
+
+                                candidates.push(RubyCandidate {
+                                    surface,
+                                    ruby: hiragana,
+                                    range: CalibrationRange {
+                                        start_line,
+                                        start_column: start_col,
+                                        end_line,
+                                        end_column: end_col,
+                                    },
+                                });
+                            }
                         }
                     }
                 }
@@ -174,22 +238,24 @@ impl<R: Runtime> NovelaidCalibration<R> {
         Ok(candidates)
     }
 
-    /// 文章校正チェックおよび文体比率集計の本実装
+    /// 文章校正チェックおよび文体比率集計の本実装（ルビ除去自然文での高精度解析＆元位置復元）
     pub fn check_text(&self, text: &str) -> Result<CheckTextResult> {
+        let stripped = strip_ruby_with_map(text);
+        let byte_to_char = build_byte_to_char_index(&stripped.clean_text, stripped.char_map.len());
+
         let mut kanji_count = 0;
         let mut hiragana_count = 0;
         let mut total_chars = 0;
 
-        // 1. 文字種比率の集計
-        let lines: Vec<&str> = text.lines().collect();
-        for line in &lines {
-            for c in line.chars() {
+        // 1. ルビ除去後の自然文から文字種比率を集計（記法記号やルビによる歪みを完全に排除）
+        for c in stripped.clean_text.chars() {
+            if !c.is_whitespace() {
                 total_chars += 1;
-                if ('\u{4E00}'..='\u{9FFF}').contains(&c) {
-                    kanji_count += 1;
-                } else if ('\u{3040}'..='\u{309F}').contains(&c) {
-                    hiragana_count += 1;
-                }
+            }
+            if ('\u{4E00}'..='\u{9FFF}').contains(&c) {
+                kanji_count += 1;
+            } else if ('\u{3040}'..='\u{309F}').contains(&c) {
+                hiragana_count += 1;
             }
         }
 
@@ -199,7 +265,7 @@ impl<R: Runtime> NovelaidCalibration<R> {
 
         let segmenter = self.segmenter.read().map_err(|e| Error::Other(e.to_string()))?;
         let mut tokens = segmenter
-            .segment(Cow::Borrowed(text))
+            .segment(Cow::Borrowed(&stripped.clean_text))
             .map_err(|e| Error::Lindera(e.to_string()))?;
 
         for t in tokens.iter_mut() {
@@ -210,8 +276,10 @@ impl<R: Runtime> NovelaidCalibration<R> {
             let pos_main = details.get(0).copied().unwrap_or("*").to_string();
             let pos_sub1 = details.get(1).copied().unwrap_or("*").to_string();
             let reading = details.get(7).and_then(|&s| if s == "*" { None } else { Some(s.to_string()) });
-            let (start_line, start_column) = byte_offset_to_line_col(text, byte_start);
-            let (end_line, end_column) = byte_offset_to_line_col(text, byte_end);
+
+            // 元テキスト上の正確な行・列を復元
+            let (start_line, start_column, end_line, end_column) =
+                resolve_source_range(&stripped.char_map, &byte_to_char, byte_start, byte_end);
 
             analyzed_tokens.push(AnalyzedToken {
                 surface: surface.clone(),
@@ -224,7 +292,7 @@ impl<R: Runtime> NovelaidCalibration<R> {
                 end_column,
             });
 
-            // 頻出語集計: 名詞（自立・固有名詞等）で2文字以上
+            // 頻出語集計: 名詞（自立・固有名詞等）で2文字以上（ルビ読み仮名の混入を完全遮断）
             if pos_main == "名詞" && pos_sub1 != "代名詞" && pos_sub1 != "非自立" && pos_sub1 != "数" {
                 if surface.chars().count() >= 2 {
                     let entry = word_counts.entry(surface).or_insert((0, pos_sub1));
@@ -234,6 +302,7 @@ impl<R: Runtime> NovelaidCalibration<R> {
         }
 
         // 3. ルールエンジン（RuleRegistry）による一括校正チェック
+        let lines: Vec<&str> = text.lines().collect();
         let ctx = CalibrationContext {
             text,
             lines: &lines,
@@ -282,6 +351,7 @@ impl<R: Runtime> NovelaidCalibration<R> {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use std::borrow::Cow;
     use lindera::dictionary::load_dictionary;
     use lindera::mode::Mode;
@@ -415,5 +485,30 @@ mod tests {
         assert_eq!(issues.len(), 6);
         assert_eq!(issues[0].rule_id, "novel-no-half-width-space");
         assert_eq!(issues[issues.len() - 1].rule_id, "novel-closing-period");
+    }
+
+    #[test]
+    fn test_resolve_source_range_with_ruby() {
+        let text = "|東京《とうきょう》特許許可局";
+        let stripped = strip_ruby_with_map(text);
+        assert_eq!(stripped.clean_text, "東京特許許可局");
+
+        let byte_to_char = build_byte_to_char_index(&stripped.clean_text, stripped.char_map.len());
+
+        // 1. 親文字「東京」: clean_text 上のバイト範囲は 0..6 (UTF-8で3バイト*2文字)
+        let (s_line, s_col, e_line, e_col) =
+            resolve_source_range(&stripped.char_map, &byte_to_char, 0, 6);
+        assert_eq!(s_line, 1);
+        assert_eq!(s_col, 2); // 元テキストの | の次 = 2列目
+        assert_eq!(e_line, 1);
+        assert_eq!(e_col, 4); // 元テキストの 東京 の終端 = 4列目
+
+        // 2. 後続単語「特許」: clean_text 上のバイト範囲は 6..12
+        let (s_line2, s_col2, e_line2, e_col2) =
+            resolve_source_range(&stripped.char_map, &byte_to_char, 6, 12);
+        assert_eq!(s_line2, 1);
+        assert_eq!(s_col2, 11); // 元テキストの 》 の次 = 11列目！
+        assert_eq!(e_line2, 1);
+        assert_eq!(e_col2, 13);
     }
 }

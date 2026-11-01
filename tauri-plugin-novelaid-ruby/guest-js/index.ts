@@ -1,5 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
-import { CountOptions, DetailedCountResult } from './models';
+import { CountOptions, DetailedCountResult, StrippedResultWithMap } from './models';
 
 export * from './models';
 export * from './patterns';
@@ -113,6 +113,18 @@ export async function transformToHtml(text: string): Promise<string> {
  */
 export async function stripRuby(text: string): Promise<string> {
   return await invoke<string>('plugin:novelaid-ruby|strip_ruby', {
+    text,
+  });
+}
+
+/**
+ * ルビ記法や傍点を除去し、各文字の元位置マッピング（行・列）および既存ルビ範囲情報を取得します。
+ *
+ * @param text 対象テキスト
+ * @returns クリーンテキストと位置マッピング情報
+ */
+export async function stripRubyWithMap(text: string): Promise<StrippedResultWithMap> {
+  return await invoke<StrippedResultWithMap>('plugin:novelaid-ruby|strip_ruby_with_map', {
     text,
   });
 }

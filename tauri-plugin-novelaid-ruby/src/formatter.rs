@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::sync::LazyLock;
+use crate::models::{RubyRange, SourcePosition, StrippedResultWithMap};
 
 static RE_RUBY_WITH_PIPE: LazyLock<Regex> = LazyLock::new(|| {
     Regex::new(r"[|｜]([^|｜\n《》]+)《([^《》\n]+)》").expect("invalid regex for ruby with pipe")
@@ -113,17 +114,214 @@ pub fn transform_to_html(text: &str) -> String {
     step3.into_owned()
 }
 
+pub fn is_kanji_char(c: char) -> bool {
+    c == '々'
+        || c == '〇'
+        || ('\u{4E00}'..='\u{9FFF}').contains(&c)
+        || ('\u{3400}'..='\u{4DBF}').contains(&c)
+        || ('\u{20000}'..='\u{2A6DF}').contains(&c)
+}
+
 /// ルビ記法や傍点を除去して親文字のみのテキストを取得
 pub fn strip_ruby(text: &str) -> String {
     if text.is_empty() {
         return String::new();
     }
+    strip_ruby_with_map(text).clean_text
+}
 
-    let step1 = RE_RUBY_WITH_PIPE.replace_all(text, "$1");
-    let step2 = RE_RUBY_WITHOUT_PIPE.replace_all(&step1, "$1");
-    let step3 = RE_BOUTEN.replace_all(&step2, "$1");
+/// ルビ記法や傍点を除去し、各文字の元位置マッピング（行・列）と既存ルビ範囲を構築する
+pub fn strip_ruby_with_map(text: &str) -> StrippedResultWithMap {
+    if text.is_empty() {
+        return StrippedResultWithMap {
+            clean_text: String::new(),
+            char_map: Vec::new(),
+            existing_rubies: Vec::new(),
+        };
+    }
 
-    step3.into_owned()
+    let chars: Vec<char> = text.chars().collect();
+    let n = chars.len();
+
+    // 1. 各文字の (line, column) を計算
+    let mut raw_positions = Vec::with_capacity(n);
+    let mut current_line = 1u32;
+    let mut current_col = 1u32;
+    for &c in &chars {
+        raw_positions.push(SourcePosition {
+            line: current_line,
+            column: current_col,
+        });
+        if c == '\n' {
+            current_line += 1;
+            current_col = 1;
+        } else {
+            current_col += 1;
+        }
+    }
+
+    let mut clean_chars = Vec::with_capacity(n);
+    let mut char_map = Vec::with_capacity(n);
+    let mut existing_rubies = Vec::new();
+
+    let mut i = 0;
+    while i < n {
+        // ① 傍点 《《...》》
+        if i + 1 < n && chars[i] == '《' && chars[i + 1] == '《' {
+            let mut close_idx = None;
+            let mut j = i + 2;
+            while j + 1 < n {
+                if chars[j] == '\n' {
+                    break;
+                }
+                if chars[j] == '》' && chars[j + 1] == '》' {
+                    close_idx = Some(j);
+                    break;
+                }
+                j += 1;
+            }
+
+            if let Some(c_idx) = close_idx {
+                for k in (i + 2)..c_idx {
+                    clean_chars.push(chars[k]);
+                    char_map.push(raw_positions[k]);
+                }
+                i = c_idx + 2;
+                continue;
+            }
+        }
+
+        // ② パイプありルビ [|｜]親文字《ルビ》
+        if chars[i] == '|' || chars[i] == '｜' {
+            let mut ruby_open = None;
+            let mut j = i + 1;
+            while j < n {
+                let c = chars[j];
+                if c == '\n' || c == '|' || c == '｜' {
+                    break;
+                }
+                if c == '《' {
+                    if j + 1 < n && chars[j + 1] == '《' {
+                        break;
+                    }
+                    ruby_open = Some(j);
+                    break;
+                }
+                j += 1;
+            }
+
+            if let Some(open_idx) = ruby_open {
+                if open_idx > i + 1 {
+                    let mut ruby_close = None;
+                    let mut k = open_idx + 1;
+                    while k < n {
+                        let c = chars[k];
+                        if c == '\n' || c == '《' {
+                            break;
+                        }
+                        if c == '》' {
+                            ruby_close = Some(k);
+                            break;
+                        }
+                        k += 1;
+                    }
+
+                    if let Some(close_idx) = ruby_close {
+                        let parent_start = i + 1;
+                        let parent_end = open_idx;
+                        let parent_surface: String = chars[parent_start..parent_end].iter().collect();
+                        let ruby_text: String = chars[(open_idx + 1)..close_idx].iter().collect();
+
+                        let start_pos = raw_positions[parent_start];
+                        let last_pos = raw_positions[parent_end - 1];
+                        let end_pos = SourcePosition {
+                            line: last_pos.line,
+                            column: last_pos.column + 1,
+                        };
+
+                        existing_rubies.push(RubyRange {
+                            surface: parent_surface,
+                            ruby: ruby_text,
+                            start: start_pos,
+                            end: end_pos,
+                        });
+
+                        for idx in parent_start..parent_end {
+                            clean_chars.push(chars[idx]);
+                            char_map.push(raw_positions[idx]);
+                        }
+
+                        i = close_idx + 1;
+                        continue;
+                    }
+                }
+            }
+        }
+
+        // ③ 漢字ルビ 漢字連続《ルビ》
+        if is_kanji_char(chars[i]) {
+            let mut kanji_end = i;
+            while kanji_end < n && is_kanji_char(chars[kanji_end]) {
+                kanji_end += 1;
+            }
+
+            if kanji_end < n && chars[kanji_end] == '《' && (kanji_end + 1 >= n || chars[kanji_end + 1] != '《') {
+                let mut ruby_close = None;
+                let mut k = kanji_end + 1;
+                while k < n {
+                    let c = chars[k];
+                    if c == '\n' || c == '《' {
+                        break;
+                    }
+                    if c == '》' {
+                        ruby_close = Some(k);
+                        break;
+                    }
+                    k += 1;
+                }
+
+                if let Some(close_idx) = ruby_close {
+                    let parent_surface: String = chars[i..kanji_end].iter().collect();
+                    let ruby_text: String = chars[(kanji_end + 1)..close_idx].iter().collect();
+
+                    let start_pos = raw_positions[i];
+                    let last_pos = raw_positions[kanji_end - 1];
+                    let end_pos = SourcePosition {
+                        line: last_pos.line,
+                        column: last_pos.column + 1,
+                    };
+
+                    existing_rubies.push(RubyRange {
+                        surface: parent_surface,
+                        ruby: ruby_text,
+                        start: start_pos,
+                        end: end_pos,
+                    });
+
+                    for idx in i..kanji_end {
+                        clean_chars.push(chars[idx]);
+                        char_map.push(raw_positions[idx]);
+                    }
+
+                    i = close_idx + 1;
+                    continue;
+                }
+            }
+        }
+
+        // ④ 通常文字
+        clean_chars.push(chars[i]);
+        char_map.push(raw_positions[i]);
+        i += 1;
+    }
+
+    let clean_text: String = clean_chars.into_iter().collect();
+
+    StrippedResultWithMap {
+        clean_text,
+        char_map,
+        existing_rubies,
+    }
 }
 
 /// ルビ読みのみをスペース区切りで抽出
@@ -232,6 +430,36 @@ mod tests {
             "ルビ かんじ"
         );
         assert_eq!(extract_ruby_text("ルビのないテキスト"), "");
+    }
+
+    #[test]
+    fn test_strip_ruby_with_map() {
+        let text = "|東京《とうきょう》特許許可局\n漢字《かんじ》と《《傍点》》";
+        let res = strip_ruby_with_map(text);
+
+        assert_eq!(res.clean_text, "東京特許許可局\n漢字と傍点");
+        assert_eq!(res.clean_text.chars().count(), res.char_map.len());
+
+        // 1行目: |東京《とうきょう》特許許可局
+        // '東': 元行 1, 元列 2 (| の次)
+        assert_eq!(res.char_map[0], SourcePosition { line: 1, column: 2 });
+        // '京': 元行 1, 元列 3
+        assert_eq!(res.char_map[1], SourcePosition { line: 1, column: 3 });
+        // '特': 元行 1, 元列 11 (》 の次)
+        assert_eq!(res.char_map[2], SourcePosition { line: 1, column: 11 });
+
+        // 既存ルビ範囲の検証
+        assert_eq!(res.existing_rubies.len(), 2);
+        assert_eq!(res.existing_rubies[0].surface, "東京");
+        assert_eq!(res.existing_rubies[0].ruby, "とうきょう");
+        assert_eq!(res.existing_rubies[0].start, SourcePosition { line: 1, column: 2 });
+        assert_eq!(res.existing_rubies[0].end, SourcePosition { line: 1, column: 4 });
+
+        // 2行目の漢字ルビ: 漢字《かんじ》
+        assert_eq!(res.existing_rubies[1].surface, "漢字");
+        assert_eq!(res.existing_rubies[1].ruby, "かんじ");
+        assert_eq!(res.existing_rubies[1].start, SourcePosition { line: 2, column: 1 });
+        assert_eq!(res.existing_rubies[1].end, SourcePosition { line: 2, column: 3 });
     }
 }
 

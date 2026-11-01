@@ -1,4 +1,4 @@
-import { CountOptions, DetailedCountResult } from './models';
+import { CountOptions, DetailedCountResult, StrippedResultWithMap } from './models';
 export * from './models';
 export * from './patterns';
 /**
@@ -35,6 +35,13 @@ export declare function transformToHtml(text: string): Promise<string>;
  * @returns ルビ記法等が除去されたプレーンテキスト
  */
 export declare function stripRuby(text: string): Promise<string>;
+/**
+ * ルビ記法や傍点を除去し、各文字の元位置マッピング（行・列）および既存ルビ範囲情報を取得します。
+ *
+ * @param text 対象テキスト
+ * @returns クリーンテキストと位置マッピング情報
+ */
+export declare function stripRubyWithMap(text: string): Promise<StrippedResultWithMap>;
 /**
  * ルビ読みのみをスペース区切りで抽出します。
  *

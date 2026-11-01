@@ -214,6 +214,17 @@ async function stripRuby(text) {
     });
 }
 /**
+ * ルビ記法や傍点を除去し、各文字の元位置マッピング（行・列）および既存ルビ範囲情報を取得します。
+ *
+ * @param text 対象テキスト
+ * @returns クリーンテキストと位置マッピング情報
+ */
+async function stripRubyWithMap(text) {
+    return await invoke('plugin:novelaid-ruby|strip_ruby_with_map', {
+        text,
+    });
+}
+/**
  * ルビ読みのみをスペース区切りで抽出します。
  *
  * @param text 対象テキスト
@@ -238,4 +249,4 @@ async function countCharacters(text, options) {
     });
 }
 
-export { DIALOGUE_PATTERNS, NOVEL_MONARCH_PATTERNS, NOVEL_PATTERNS, RUBY_PATTERNS, countCharacters, extractRubyText, formatRuby, formatSmartRuby, stripRuby, transformToHtml };
+export { DIALOGUE_PATTERNS, NOVEL_MONARCH_PATTERNS, NOVEL_PATTERNS, RUBY_PATTERNS, countCharacters, extractRubyText, formatRuby, formatSmartRuby, stripRuby, stripRubyWithMap, transformToHtml };

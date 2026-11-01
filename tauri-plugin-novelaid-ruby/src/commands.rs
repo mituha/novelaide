@@ -1,7 +1,7 @@
 use tauri::command;
 use crate::formatter;
 use crate::counter;
-use crate::models::{CountOptions, DetailedCountResult};
+use crate::models::{CountOptions, DetailedCountResult, StrippedResultWithMap};
 
 #[command]
 pub fn format_ruby(surface: String, ruby: String) -> String {
@@ -21,6 +21,11 @@ pub fn transform_to_html(text: String) -> String {
 #[command]
 pub fn strip_ruby(text: String) -> String {
     formatter::strip_ruby(&text)
+}
+
+#[command]
+pub fn strip_ruby_with_map(text: String) -> StrippedResultWithMap {
+    formatter::strip_ruby_with_map(&text)
 }
 
 #[command]

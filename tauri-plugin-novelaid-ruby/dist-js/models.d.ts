@@ -34,10 +34,52 @@ export type DetailedCountResult = {
      */
     manuscriptSheets: number;
 };
+export type RubyRange = {
+    /**
+     * 親文字の表層形
+     */
+    surface: string;
+    /**
+     * ルビ文字列
+     */
+    ruby: string;
+    /**
+     * 親文字の開始位置 (1-based)
+     */
+    start: SourcePosition;
+    /**
+     * 親文字の終了位置 (1-based, 終端文字の次の位置)
+     */
+    end: SourcePosition;
+};
+export type SourcePosition = {
+    /**
+     * 1-based 行番号
+     */
+    line: number;
+    /**
+     * 1-based 列番号 (char単位)
+     */
+    column: number;
+};
 export type SpaceBreakdown = {
     halfWidth: number;
     fullWidth: number;
     total: number;
+};
+export type StrippedResultWithMap = {
+    /**
+     * ルビ・傍点記法を除去したプレーンテキスト
+     */
+    cleanText: string;
+    /**
+     * clean_text の各文字（char単位）に対応する元テキストの位置情報
+     */
+    charMap: Array<SourcePosition>;
+    /**
+     * 元テキストに存在するルビ一覧とその親文字の正確な範囲
+     */
+    existingRubies: Array<RubyRange>;
 };
 export type TextSegmentMetrics = {
     charCount: number;
