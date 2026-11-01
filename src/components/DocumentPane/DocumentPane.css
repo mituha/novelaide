@@ -10,8 +10,8 @@
 
 .document-pane-content {
   flex: 1;
+  min-height: 0;
   width: 100%;
-  height: calc(100% - 38px);
   position: relative;
   overflow: hidden;
 }

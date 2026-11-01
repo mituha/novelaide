@@ -1,8 +1,9 @@
 import React from 'react';
-import { DocumentState, DocumentViewMode } from '../../types/document';
+import { DocumentState, DocumentViewMode, PaneId } from '../../types/document';
 import { viewRegistry } from '../../core/viewRegistry';
 import { useDocument } from '../../contexts/DocumentContext';
 import { FileNameHeader } from '../Editor/FileNameHeader';
+import { EpisodeNavigator } from '../Editor/EpisodeNavigator';
 import './DocumentPane.css';
 
 interface DocumentPaneProps {
@@ -34,6 +35,7 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
   }
 
   const Component = plugin.component;
+  const paneId: PaneId = paneSide === 'left' ? 'editor.left' : 'editor.right';
 
   return (
     <div
@@ -56,6 +58,12 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
           metadata={document.metadata}
         />
       </div>
+      <EpisodeNavigator
+        activePath={document.path}
+        documentType={document.documentType}
+        paneId={paneId}
+        viewMode={viewMode}
+      />
     </div>
   );
 };

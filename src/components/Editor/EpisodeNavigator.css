@@ -1,0 +1,56 @@
+.episode-navigator {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 16px;
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  font-size: 0.85rem;
+  min-height: 36px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.episode-nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  max-width: 45%;
+  text-decoration: none;
+  font-size: 0.82rem;
+  transition: color 0.15s, background-color 0.15s, border-color 0.15s;
+}
+
+.episode-nav-button:hover {
+  color: var(--text-primary);
+  background-color: var(--bg-hover);
+}
+
+.episode-nav-prev {
+  text-align: left;
+}
+
+.episode-nav-next {
+  text-align: right;
+  margin-left: auto;
+}
+
+.episode-nav-label {
+  font-weight: 600;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  opacity: 0.9;
+}
+
+.episode-nav-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
