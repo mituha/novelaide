@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { ActivityBar } from "./ActivityBar";
 import { SidePane } from "./SidePane";
 import { StatusBar } from "./StatusBar";
+import { panelRegistry } from "../../core/panelRegistry";
 import { useProject } from "../../contexts/ProjectContext";
 import { useDocument } from "../../contexts/DocumentContext";
 import { useGit } from "../../contexts/GitContext";
@@ -69,6 +70,31 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
       window.removeEventListener("editor-selection-change", handleSelectionChange);
     };
   }, []);
+
+  // ドキュメントタイプの変更やファイルクローズに伴う非対応パネルの自動クローズ連動
+  useEffect(() => {
+    if (leftActivePanelId) {
+      const panel = panelRegistry.findPanel(leftActivePanelId);
+      if (panel?.supportedDocumentTypes && panel.supportedDocumentTypes.length > 0) {
+        const isSupported =
+          activeDocument && panel.supportedDocumentTypes.includes(activeDocument.documentType);
+        if (!isSupported) {
+          setLeftActivePanelId(null);
+        }
+      }
+    }
+
+    if (rightActivePanelId) {
+      const panel = panelRegistry.findPanel(rightActivePanelId);
+      if (panel?.supportedDocumentTypes && panel.supportedDocumentTypes.length > 0) {
+        const isSupported =
+          activeDocument && panel.supportedDocumentTypes.includes(activeDocument.documentType);
+        if (!isSupported) {
+          setRightActivePanelId(null);
+        }
+      }
+    }
+  }, [activeDocument?.documentType, activeDocument?.path, leftActivePanelId, rightActivePanelId]);
 
   // リアルタイム文字数・原稿用紙換算カウント
   const { detailedMetrics, selectedMetrics } = useCharacterCount(

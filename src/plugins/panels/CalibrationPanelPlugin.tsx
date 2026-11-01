@@ -45,7 +45,8 @@ export const CalibrationPanel: React.FC = () => {
   }, [activeDocument?.path]);
 
   const runCalibration = useCallback(async () => {
-    if (!activeDocument?.content) {
+    // novel 形式以外のドキュメント、または本文が空の場合は校正を実行しない
+    if (!activeDocument?.content || activeDocument.documentType !== 'novel') {
       setResult(null);
       setRubies([]);
       if (activePathRef.current) {
@@ -184,6 +185,8 @@ export const CalibrationPanel: React.FC = () => {
     }
   };
 
+  const isNovel = activeDocument?.documentType === 'novel';
+
   const filteredIssues =
     result?.issues.filter((i) => {
       if (filterType === 'all') return true;
@@ -218,8 +221,8 @@ export const CalibrationPanel: React.FC = () => {
         </div>
         <button
           onClick={runCalibration}
-          disabled={loading || !activeDocument}
-          title="再検証を実行"
+          disabled={loading || !activeDocument || !isNovel}
+          title={!isNovel ? '小説（novel）編集時のみ実行可能' : '再検証を実行'}
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -228,9 +231,9 @@ export const CalibrationPanel: React.FC = () => {
             borderRadius: '4px',
             border: '1px solid var(--border-color, #d1d5db)',
             backgroundColor: 'var(--bg-primary, #ffffff)',
-            cursor: loading || !activeDocument ? 'not-allowed' : 'pointer',
+            cursor: loading || !activeDocument || !isNovel ? 'not-allowed' : 'pointer',
             fontSize: '11px',
-            opacity: loading || !activeDocument ? 0.6 : 1,
+            opacity: loading || !activeDocument || !isNovel ? 0.6 : 1,
           }}
         >
           <RefreshCw size={12} style={{ animation: loading ? 'spin 1s linear infinite' : 'none' }} />
@@ -262,7 +265,47 @@ export const CalibrationPanel: React.FC = () => {
         </span>
       </div>
 
-      {/* タブバー */}
+      {!isNovel ? (
+        <div
+          style={{
+            padding: '24px 16px',
+            textAlign: 'center',
+            color: 'var(--text-secondary, #6b7280)',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <Sparkles size={32} color="var(--accent-color, #3b82f6)" style={{ opacity: 0.6 }} />
+          <div>
+            <div style={{ fontWeight: 600, color: 'var(--text-primary, #111827)', marginBottom: '4px' }}>
+              小説以外のファイルが開かれています
+            </div>
+            <div style={{ fontSize: '12px', lineHeight: '1.5' }}>
+              形式: <code>{activeDocument?.documentType || 'unknown'}</code>
+              <br />
+              校正・文体解析機能は小説（novel）編集時のみ動作します。
+            </div>
+            {activeDocument?.documentType === 'markdown' && (
+              <div
+                style={{
+                  marginTop: '12px',
+                  padding: '8px 12px',
+                  backgroundColor: 'var(--bg-secondary, #f3f4f6)',
+                  borderRadius: '6px',
+                  fontSize: '11px',
+                  textAlign: 'left',
+                }}
+              >
+                ※エディター上でのルビ振り（<kbd>Ctrl+R</kbd>）や傍点（<kbd>Ctrl+B</kbd>）は引き続きご利用いただけます。
+              </div>
+            )}
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* タブバー */}
       <div
         style={{
           display: 'flex',
@@ -883,7 +926,9 @@ export const CalibrationPanel: React.FC = () => {
           </div>
         )}
       </div>
-    </div>
+    </>
+  )}
+</div>
   );
 };
 
@@ -893,7 +938,8 @@ export const CalibrationPanelPlugin: PanelPlugin = {
   icon: SpellCheck,
   defaultPlacement: 'right',
   allowedPlacements: ['left', 'right'],
-  scope: 'project',
+  scope: 'document',
+  supportedDocumentTypes: ['novel'],
   priority: 70,
   component: CalibrationPanel,
 };

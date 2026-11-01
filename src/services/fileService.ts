@@ -230,7 +230,7 @@ marker:
 　鳥は突然、人の言葉を話した。
 　少年の日常が、《《音を立てて崩れ去った》》瞬間だった。`,
         metadata: {},
-        documentType: isMd ? "novel" : "novel",
+        documentType: isMd ? "markdown" : "novel",
       };
     }
   },

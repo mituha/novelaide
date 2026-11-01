@@ -87,6 +87,16 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     saveDocumentRef.current = saveDocument;
   }, [saveDocument]);
 
+  // ドキュメントタイプが novel 以外の場合、残存している校正マーカーを破棄
+  useEffect(() => {
+    if (documentType !== 'novel' && editorRef.current) {
+      const model = editorRef.current.getModel();
+      if (model && (window as any).monaco) {
+        (window as any).monaco.editor.setModelMarkers(model, 'calibration', []);
+      }
+    }
+  }, [documentType]);
+
   // メタデータ補完候補のロードとグローバルキャッシュ
   useEffect(() => {
     if (!projectPath) return;
@@ -266,7 +276,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       const model = editor.getModel();
       if (!model) return;
 
-      if (!issues || issues.length === 0) {
+      // novel 形式以外、または指摘が空の場合はマーカーを空クリア
+      if (documentType !== 'novel' || !issues || issues.length === 0) {
         monaco.editor.setModelMarkers(model, 'calibration', []);
         return;
       }

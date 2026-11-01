@@ -1,6 +1,7 @@
 import React from "react";
 import { panelRegistry } from "../../core/panelRegistry";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useDocument } from "../../contexts/DocumentContext";
 import { useSettings } from "restar-app-settings";
 import { Sun, Moon, Coffee, Laptop, Settings } from "lucide-react";
 import "./ActivityBar.css";
@@ -21,6 +22,7 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
   onOpenSettings,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const { activeDocument } = useDocument();
   const { settings } = useSettings();
 
   // デバッグパネルの表示設定（デフォルト: true）
@@ -28,9 +30,20 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
 
   // レジストリから該当サイドのパネル一覧を取得
   const panels = panelRegistry.getPanelsForSide(side).filter((p) => {
-    if (p.id === 'novelaid.panel.debug') {
-      return showDebugPanel;
+    if (p.id === 'novelaid.panel.debug' && !showDebugPanel) {
+      return false;
     }
+
+    // supportedDocumentTypes が指定されている場合、現在の activeDocument の形式と照合
+    if (p.supportedDocumentTypes && p.supportedDocumentTypes.length > 0) {
+      if (!activeDocument) {
+        return false;
+      }
+      if (!p.supportedDocumentTypes.includes(activeDocument.documentType)) {
+        return false;
+      }
+    }
+
     return true;
   });
 

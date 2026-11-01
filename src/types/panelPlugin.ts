@@ -1,5 +1,5 @@
 import React from 'react';
-import { DocumentState } from './document';
+import { DocumentState, NovelaidDocumentType } from './document';
 
 /**
  * サイドペイン内のパネルコンポーネントに渡される標準プロパティ
@@ -28,6 +28,8 @@ export interface PanelPlugin {
   readonly allowedPlacements?: ('left' | 'right')[];
   /** スコープ（'project': プロジェクト全体 / 'document': 開いている原稿個別） */
   readonly scope: 'project' | 'document';
+  /** サポートするドキュメントタイプ（省略時は全ドキュメントタイプで常に表示） */
+  readonly supportedDocumentTypes?: NovelaidDocumentType[];
   /** アイコン横のバッジ表示 (例: 校正エラー件数、Git変更件数など) */
   readonly badge?: () => number | string | null;
   /** 表示優先順位 (アクティビティバーでの並び順) */
