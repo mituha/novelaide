@@ -58,10 +58,11 @@ interface DocumentContextType {
   setSplitRatio: (ratio: number) => void;
   closePane: (paneId: PaneId) => Promise<void>;
 
-  // ドキュメント実体編集・保存
+  // ドキュメント実体編集・保存・リネーム
   updateContent: (path: string, content: string) => void;
   updateMetadata: (path: string, metadata: Record<string, any>) => void;
   saveDocument: (path?: string, options?: { force?: boolean }) => Promise<void>;
+  renameDocument: (oldPath: string, newTitle: string) => Promise<boolean>;
   setCompositionState: (isComposing: boolean) => void;
 }
 
@@ -814,6 +815,96 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     window.dispatchEvent(new CustomEvent('novelaide:project-refresh-needed'));
   }, [closeDocument, showBanner, showToast, dismissBanner, saveDocument]);
 
+  // ドキュメントのリネーム（ファイル名変更）
+  const renameDocument = useCallback(
+    async (oldPath: string, newTitle: string): Promise<boolean> => {
+      const trimmedTitle = newTitle.trim();
+      if (!trimmedTitle) {
+        showToast({
+          type: 'warning',
+          message: 'ファイル名を入力してください',
+        });
+        return false;
+      }
+
+      // Windows/Unix 禁止文字チェック: \ / : * ? " < > |
+      if (/[\\/:*?"<>|]/.test(trimmedTitle)) {
+        showToast({
+          type: 'warning',
+          message: 'ファイル名に使用できない文字が含まれています (\\ / : * ? " < > |)',
+        });
+        return false;
+      }
+
+      // パスから親ディレクトリと拡張子を分解
+      const separator = oldPath.includes('\\') ? '\\' : '/';
+      const lastSlashIndex = Math.max(oldPath.lastIndexOf('/'), oldPath.lastIndexOf('\\'));
+      const parentDir = lastSlashIndex !== -1 ? oldPath.substring(0, lastSlashIndex) : '';
+      const currentFileName = lastSlashIndex !== -1 ? oldPath.substring(lastSlashIndex + 1) : oldPath;
+
+      const dotIndex = currentFileName.lastIndexOf('.');
+      const ext = dotIndex !== -1 ? currentFileName.substring(dotIndex) : '';
+      const currentTitle = dotIndex !== -1 ? currentFileName.substring(0, dotIndex) : currentFileName;
+
+      if (trimmedTitle === currentTitle) {
+        return false; // 変更なし
+      }
+
+      const newFileName = `${trimmedTitle}${ext}`;
+      const newPath = parentDir ? `${parentDir}${separator}${newFileName}` : newFileName;
+
+      // 未保存の編集内容があれば先に保存
+      const doc = openDocuments.find((d) => d.path === oldPath);
+      if (doc && doc.isDirty) {
+        await saveDocument(oldPath);
+      }
+
+      try {
+        await fileService.rename(oldPath, newPath);
+
+        // openDocuments 内のパス、ファイル名、タイトルをアトミックに更新
+        setOpenDocuments((prev) =>
+          prev.map((d) =>
+            d.path === oldPath
+              ? {
+                  ...d,
+                  path: newPath,
+                  baseName: newFileName,
+                  fileTitle: trimmedTitle,
+                }
+              : d
+          )
+        );
+
+        // activePathByPane の追従
+        setActivePathByPane((prev) => {
+          const updated = { ...prev };
+          (Object.keys(updated) as PaneId[]).forEach((paneId) => {
+            if (updated[paneId] === oldPath) {
+              updated[paneId] = newPath;
+            }
+          });
+          return updated;
+        });
+
+        showToast({
+          type: 'info',
+          message: `「${newFileName}」に名前を変更しました`,
+        });
+        window.dispatchEvent(new CustomEvent('novelaide:project-refresh-needed'));
+        return true;
+      } catch (err) {
+        console.error('Failed to rename document:', err);
+        showToast({
+          type: 'error',
+          message: `名前の変更に失敗しました: ${err}`,
+        });
+        return false;
+      }
+    },
+    [openDocuments, saveDocument, showToast]
+  );
+
   useEffect(() => {
     const handleFocus = () => {
       checkExternalChanges();
@@ -873,6 +964,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateContent,
         updateMetadata,
         saveDocument,
+        renameDocument,
         setCompositionState,
       }}
     >

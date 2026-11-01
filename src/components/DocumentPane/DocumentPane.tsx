@@ -1,6 +1,8 @@
 import React from 'react';
 import { DocumentState, DocumentViewMode } from '../../types/document';
 import { viewRegistry } from '../../core/viewRegistry';
+import { useDocument } from '../../contexts/DocumentContext';
+import { FileNameHeader } from '../Editor/FileNameHeader';
 import './DocumentPane.css';
 
 interface DocumentPaneProps {
@@ -16,6 +18,8 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
   paneSide,
   onChangeContent,
 }) => {
+  const { renameDocument } = useDocument();
+
   // レジストリからプラグインを動的に解決
   const plugin = viewRegistry.findPlugin(document.documentType, viewMode);
 
@@ -35,15 +39,23 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
     <div
       className={`document-pane-container pane-${paneSide} view-mode-${viewMode}`}
     >
-      <Component
-        path={document.path}
-        content={document.content}
-        documentType={document.documentType}
+      <FileNameHeader
+        fileTitle={document.fileTitle}
+        activePath={document.path}
+        onRename={(newTitle) => renameDocument(document.path, newTitle)}
         isReadOnly={viewMode !== 'editor'}
-        onChangeContent={onChangeContent}
-        paneSide={paneSide}
-        metadata={document.metadata}
       />
+      <div className="document-pane-content">
+        <Component
+          path={document.path}
+          content={document.content}
+          documentType={document.documentType}
+          isReadOnly={viewMode !== 'editor'}
+          onChangeContent={onChangeContent}
+          paneSide={paneSide}
+          metadata={document.metadata}
+        />
+      </div>
     </div>
   );
 };

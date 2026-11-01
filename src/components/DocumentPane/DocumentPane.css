@@ -8,6 +8,14 @@
   background-color: var(--color-bg-base);
 }
 
+.document-pane-content {
+  flex: 1;
+  width: 100%;
+  height: calc(100% - 38px);
+  position: relative;
+  overflow: hidden;
+}
+
 .document-pane-empty {
   display: flex;
   flex-direction: column;
