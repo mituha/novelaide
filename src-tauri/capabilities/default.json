@@ -12,6 +12,7 @@
     "restar-git:default",
     "novelaid-ai:default",
     "novelaid-calibration:default",
-    "novelaid-ruby:default"
+    "novelaid-ruby:default",
+    "novelaid-metadata:default"
   ]
 }

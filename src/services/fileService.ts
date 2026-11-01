@@ -1,4 +1,5 @@
 import * as novelaidFs from "tauri-plugin-novelaid-fs-api";
+import * as novelaidMetadata from "tauri-plugin-novelaid-metadata-api";
 import { DirEntry, FileDocument } from "../types/document";
 
 // ブラウザ環境やプレビュー撮影用のモックデータ
@@ -323,10 +324,14 @@ marker:
   // メタデータキャッシュ取得
   async getMetadataCache(): Promise<Record<string, any>> {
     try {
-      return await novelaidFs.getMetadataCache();
+      return await novelaidMetadata.getMetadataCache();
     } catch (err) {
-      console.warn("getMetadataCache fallback:", err);
-      return {
+      console.warn("getMetadataCache fallback to fs:", err);
+      try {
+        return await novelaidFs.getMetadataCache();
+      } catch (e) {
+        console.warn("getMetadataCache fallback to mock:", e);
+        return {
         "mock/characters/主人公_ソラ.md": {
           title: "主人公 ソラ",
           name: "ソラ・アルスター",
@@ -358,6 +363,47 @@ marker:
           summary: "青い空の彼方から漆黒の羽根を持つ鳥が舞い降り、日常が崩壊する導入部。",
         },
       };
+      }
+    }
+  },
+
+  // プロジェクトメタデータの一括スキャン
+  async scanProjectMetadata(projectPath: string) {
+    try {
+      return await novelaidMetadata.scanProject(projectPath);
+    } catch (err) {
+      console.warn("scanProjectMetadata failed:", err);
+      return null;
+    }
+  },
+
+  // プロジェクトエンティティ（登場人物・用語）取得
+  async getProjectEntities(category?: string) {
+    try {
+      return await novelaidMetadata.getEntities(category);
+    } catch (err) {
+      console.warn("getProjectEntities failed:", err);
+      return [];
+    }
+  },
+
+  // 作品固有ルビ辞書取得
+  async getProjectRubyDictionary() {
+    try {
+      return await novelaidMetadata.getRubyDictionary();
+    } catch (err) {
+      console.warn("getProjectRubyDictionary failed:", err);
+      return [];
+    }
+  },
+
+  // 校正エンジン用プロジェクト知識コンテキスト取得
+  async getCalibrationContext() {
+    try {
+      return await novelaidMetadata.getCalibrationContext();
+    } catch (err) {
+      console.warn("getCalibrationContext failed:", err);
+      return { entities: [], rubyDictionary: [] };
     }
   },
 };

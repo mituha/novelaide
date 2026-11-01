@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "target": "es2021",
+    "module": "esnext",
+    "strict": true,
+    "sourceMap": true,
+    "declaration": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "rootDir": "./guest-js",
+    "outDir": "./dist-js"
+  },
+  "include": ["guest-js"],
+  "exclude": ["guest-js/__tests__", "dist-js", "node_modules"]
+}

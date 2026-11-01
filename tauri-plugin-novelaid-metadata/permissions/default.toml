@@ -1,0 +1,12 @@
+[default]
+description = "Default permissions for novelaid-metadata plugin"
+permissions = [
+    "allow-scan-project",
+    "allow-get-metadata-cache",
+    "allow-get-entities",
+    "allow-get-ruby-dictionary",
+    "allow-get-calibration-context",
+    "allow-update-file-metadata",
+    "allow-extract-frontmatter",
+    "allow-format-frontmatter",
+]

@@ -68,6 +68,9 @@ export const MetadataListPanel: React.FC = () => {
   const loadCache = useCallback(async () => {
     setIsLoading(true);
     try {
+      if (projectPath && !projectPath.startsWith('mock')) {
+        await fileService.scanProjectMetadata(projectPath);
+      }
       const data = await fileService.getMetadataCache();
       setCache(data || {});
     } catch (e) {
@@ -75,7 +78,7 @@ export const MetadataListPanel: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [projectPath]);
 
   useEffect(() => {
     loadCache();

@@ -15,6 +15,7 @@ pub fn run() {
         .plugin(tauri_plugin_novelaid_ai::init())
         .plugin(tauri_plugin_novelaid_calibration::init())
         .plugin(tauri_plugin_novelaid_ruby::init())
+        .plugin(tauri_plugin_novelaid_metadata::init())
         .invoke_handler(tauri::generate_handler![
             greet,
         ])

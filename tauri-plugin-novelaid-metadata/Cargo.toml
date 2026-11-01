@@ -1,0 +1,21 @@
+[package]
+name = "tauri-plugin-novelaid-metadata"
+version = "0.1.0"
+authors = [ "Mizuki Mituha" ]
+description = "novelaide unified metadata, character entity, and ruby dictionary plugin"
+edition = "2021"
+rust-version = "1.77.2"
+exclude = ["/examples", "/dist-js", "/guest-js", "/node_modules"]
+links = "tauri-plugin-novelaid-metadata"
+
+[dependencies]
+tauri = { version = "2" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+regex = "1.10"
+thiserror = "2"
+walkdir = "2.4"
+
+[build-dependencies]
+tauri-plugin = { version = "2", features = ["build"] }
