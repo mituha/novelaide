@@ -198,14 +198,32 @@ impl<R: Runtime> NovelaidFs<R> {
 
   pub fn write_document(&self, path: &Path, document: NovelaidDocument) -> crate::Result<u64> {
     let full_content = self.format_frontmatter(&document.metadata, &document.content);
+    
+    // 1. 保存開始前の現在時刻を取得 (A)
+    let time_before_write = SystemTime::now();
+
+    // 2. ファイルの保存
     std::fs::write(path, full_content).map_err(crate::Error::Io)?;
     
     // Invalidate attributes cache if modifying .novelaidattributes
     self.attributes_manager.invalidate_if_attributes_file(path);
 
-    let mtime = std::fs::metadata(path)
+    // 3. ファイルの更新日時の取得 (B) とリトライ検証 (B >= A)
+    let mut mtime = std::fs::metadata(path)
         .and_then(|m| m.modified())
-        .unwrap_or_else(|_| SystemTime::now());
+        .unwrap_or(time_before_write);
+
+    let mut retries = 0;
+    while mtime < time_before_write && retries < 10 {
+      std::thread::sleep(std::time::Duration::from_millis(10));
+      if let Ok(meta) = std::fs::metadata(path) {
+        if let Ok(modified) = meta.modified() {
+          mtime = modified;
+        }
+      }
+      retries += 1;
+    }
+
     let mtime_ms = system_time_to_ms(mtime);
 
     // Update cache

@@ -58,9 +58,9 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
           return (
             <div
               key={`${paneId}-${tab.path}`}
-              className={`editor-tab-item ${isActive ? 'active' : ''}`}
+              className={`editor-tab-item ${isActive ? 'active' : ''} ${tab.isDirty ? 'is-dirty' : ''}`}
               onClick={() => switchTab(tab.path, paneId)}
-              title={`${tab.path} (${tab.viewMode})`}
+              title={`${tab.path} (${tab.viewMode})${tab.isDirty ? ' - 未保存の変更あり' : ''}`}
             >
               <DocumentIcon
                 type={tab.documentType}

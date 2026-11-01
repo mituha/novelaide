@@ -69,7 +69,7 @@ interface DocumentContextType {
 const DocumentContext = createContext<DocumentContextType | undefined>(undefined);
 
 export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { showToast, showBanner, dismissBanner } = useNotification();
+  const { showToast, showBanner, dismissBanner, showStatusMessage } = useNotification();
   const [openDocuments, setOpenDocuments] = useState<DocumentState[]>([]);
   const [activePane, setActivePane] = useState<PaneId>('editor.left');
   const [activePathByPane, setActivePathByPane] = useState<Record<PaneId, string | null>>({
@@ -83,6 +83,9 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     openDocumentsRef.current = openDocuments;
   }, [openDocuments]);
+
+  // 自己保存中のエコー防止用セット
+  const savingPathsRef = useRef<Set<string>>(new Set());
 
   // 自動保存用タイマーおよび IME 入力状態管理
   const autoSaveTimersRef = useRef<Record<string, NodeJS.Timeout>>({});
@@ -180,8 +183,12 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const targetPath = path || activePath;
       if (!targetPath) return;
 
-      const docToSave = openDocuments.find((doc) => doc.path === targetPath);
+      // クロージャの openDocuments ではなく、常に最新の openDocumentsRef.current から取得
+      const docToSave = openDocumentsRef.current.find((doc) => doc.path === targetPath);
       if (!docToSave) return;
+
+      // 自己保存ガードに登録（保存完了後のフォーカス復帰による自己エコーを確実に遮断）
+      savingPathsRef.current.add(targetPath);
 
       // 大幅激減検知セーフティネット（自動保存時のみ検証、手動/force時はスキップ）
       if (!options?.force) {
@@ -213,12 +220,33 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               },
             ],
           });
+          savingPathsRef.current.delete(targetPath);
           return;
         }
       }
 
+      console.log('[DocumentContext] Save Start:', targetPath, {
+        length: docToSave.content.length,
+        isDirty: docToSave.isDirty,
+      });
+
       try {
         const mtime = await fileService.writeFile(docToSave.path, docToSave.content, docToSave.metadata);
+
+        // openDocumentsRef.current を同期的に即座に更新
+        openDocumentsRef.current = openDocumentsRef.current.map((doc) => {
+          if (doc.path === targetPath) {
+            return {
+              ...doc,
+              isDirty: false,
+              mtime,
+              lastSavedLength: doc.content.length,
+            };
+          }
+          return doc;
+        });
+
+        // React state を更新して UI（未保存マーク等）へ反映
         setOpenDocuments((prev) =>
           prev.map((doc) => {
             if (doc.path === targetPath) {
@@ -232,11 +260,28 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             return doc;
           })
         );
+
+        console.log('[DocumentContext] Save Success:', targetPath, {
+          mtime,
+          length: docToSave.content.length,
+        });
+
+        const displayTitle = docToSave.fileTitle || docToSave.baseName;
+        showStatusMessage(`保存完了: ${displayTitle}`, 2500);
       } catch (err) {
-        console.error('Failed to save document:', err);
+        console.error('[DocumentContext] Save Error:', err);
+        showToast({
+          type: 'error',
+          message: `保存に失敗しました: ${String(err)}`,
+        });
+      } finally {
+        // 保存直後のファイルシステム遅延やフォーカス復帰エコーを防ぐため800ms保持
+        setTimeout(() => {
+          savingPathsRef.current.delete(targetPath);
+        }, 800);
       }
     },
-    [activePath, openDocuments, showBanner, dismissBanner]
+    [activePath, showBanner, dismissBanner, showStatusMessage, showToast]
   );
 
   // ファイルを開く（参照カウント式）
@@ -284,9 +329,18 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             rightViewMode: targetPane === 'editor.right' ? mode : 'none',
           };
 
+          // openDocumentsRef.current にも即時反映
+          openDocumentsRef.current = [...openDocumentsRef.current, newDoc];
           setOpenDocuments((prev) => [...prev, newDoc]);
+
+          console.log('[DocumentContext] Read Success:', path, {
+            mtime: fileData.mtimeMs,
+            length: fileData.content.length,
+          });
+          const displayTitle = fileData.fileTitle || fileData.baseName;
+          showStatusMessage(`読み込み完了: ${displayTitle}`, 2500);
         } catch (err) {
-          console.error('Failed to open document:', err);
+          console.error('[DocumentContext] Read Error:', err);
           return;
         }
       }
@@ -298,7 +352,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }));
       setActivePane(targetPane);
     },
-    [activePane, openDocuments]
+    [activePane, openDocuments, showStatusMessage]
   );
 
   // タブを閉じる（未保存なら自動保存、参照カウントゼロで完全アンロード、右ペインのみ残れば左昇格）
@@ -503,6 +557,20 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // 本文内容を更新（単一実体のため左右両ペインで即同期、デバウンス自動保存）
   const updateContent = useCallback((path: string, content: string) => {
+    // 【重要】openDocumentsRef.current を同期的に即座に更新！
+    // React の非同期 state レンダリングを待たずに即時反映することで、
+    // Backspace直後の Ctrl+S や自動保存に古いクロージャのテキスト（ゴミ）が保存されるのを完全に防止する
+    openDocumentsRef.current = openDocumentsRef.current.map((doc) => {
+      if (doc.path === path) {
+        return {
+          ...doc,
+          content,
+          isDirty: true,
+        };
+      }
+      return doc;
+    });
+
     setOpenDocuments((prev) =>
       prev.map((doc) => {
         if (doc.path === path) {
@@ -682,8 +750,23 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const activeP = activePathRef.current;
 
     const checkDoc = async (doc: DocumentState, isActive: boolean) => {
+      // 自己保存処理中の場合は外部変更チェックをスキップ（自己エコー遮断）
+      if (savingPathsRef.current.has(doc.path)) {
+        console.log('[DocumentContext] Focus Check: skipped (self-saving in progress):', doc.baseName);
+        return;
+      }
+
       try {
         const stat = await fileService.getDocumentStat(doc.path);
+        const diff = doc.mtime ? stat.mtimeMs - doc.mtime : 0;
+
+        console.log('[DocumentContext] Focus Check:', doc.baseName, {
+          memMtime: doc.mtime,
+          diskMtime: stat.mtimeMs,
+          diff,
+          isDirty: doc.isDirty,
+        });
+
         if (!stat.exists) {
           if (!doc.isDirty) {
             showToast({
@@ -720,11 +803,26 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return;
         }
 
-        // mtime 比較による外部更新検知
-        if (doc.mtime && stat.mtimeMs > doc.mtime) {
+        // mtime 比較による外部更新検知（Windows NTFS等の微小遅延を考慮し 100ms 以上の差がある場合のみ判定）
+        if (doc.mtime && diff > 100) {
           if (!doc.isDirty) {
             // 未編集（isDirty: false）: 自動再読み込み
+            console.log('[DocumentContext] External Reload Start:', doc.path, { oldMtime: doc.mtime, newMtime: stat.mtimeMs, diff });
             const fresh = await fileService.readFile(doc.path);
+
+            // openDocumentsRef.current を同期的に即座に更新
+            openDocumentsRef.current = openDocumentsRef.current.map((d) =>
+              d.path === doc.path
+                ? {
+                    ...d,
+                    content: fresh.content,
+                    metadata: fresh.metadata || {},
+                    mtime: fresh.mtimeMs,
+                    isDirty: false,
+                  }
+                : d
+            );
+
             setOpenDocuments((prev) =>
               prev.map((d) =>
                 d.path === doc.path
@@ -738,6 +836,18 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   : d
               )
             );
+
+            // Monaco Editor 等のビューへ外部変更による再読み込みを通知
+            window.dispatchEvent(
+              new CustomEvent('novelaide:document-reloaded', {
+                detail: { path: doc.path, content: fresh.content },
+              })
+            );
+
+            console.log('[DocumentContext] External Reload Done:', doc.path);
+            const displayTitle = doc.fileTitle || doc.baseName;
+            showStatusMessage(`外部変更を再読み込み: ${displayTitle}`, 3000);
+
             if (isActive) {
               showToast({
                 type: 'info',
@@ -747,6 +857,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             }
           } else {
             // 編集中（isDirty: true）: メモリ内容保護、L3エディタバナーで選択提示
+            console.warn('[DocumentContext] External Conflict Detected (doc isDirty):', doc.baseName, { diff });
             const bannerId = `external-conflict-${doc.path}`;
             showBanner({
               id: bannerId,
@@ -758,6 +869,19 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   onClick: async () => {
                     dismissBanner(bannerId);
                     const fresh = await fileService.readFile(doc.path);
+
+                    openDocumentsRef.current = openDocumentsRef.current.map((d) =>
+                      d.path === doc.path
+                        ? {
+                            ...d,
+                            content: fresh.content,
+                            metadata: fresh.metadata || {},
+                            mtime: fresh.mtimeMs,
+                            isDirty: false,
+                          }
+                        : d
+                    );
+
                     setOpenDocuments((prev) =>
                       prev.map((d) =>
                         d.path === doc.path
@@ -771,6 +895,14 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                           : d
                       )
                     );
+
+                    window.dispatchEvent(
+                      new CustomEvent('novelaide:document-reloaded', {
+                        detail: { path: doc.path, content: fresh.content },
+                      })
+                    );
+
+                    showStatusMessage(`外部変更を反映: ${doc.fileTitle || doc.baseName}`, 3000);
                     showToast({
                       type: 'success',
                       message: `${doc.baseName} を最新の内容に更新しました`,
@@ -783,6 +915,9 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
                   primary: true,
                   onClick: () => {
                     dismissBanner(bannerId);
+                    openDocumentsRef.current = openDocumentsRef.current.map((d) =>
+                      d.path === doc.path ? { ...d, mtime: stat.mtimeMs } : d
+                    );
                     setOpenDocuments((prev) =>
                       prev.map((d) =>
                         d.path === doc.path ? { ...d, mtime: stat.mtimeMs } : d
@@ -813,7 +948,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     // 第3優先: プロジェクト全体のディレクトリ走査通知
     window.dispatchEvent(new CustomEvent('novelaide:project-refresh-needed'));
-  }, [closeDocument, showBanner, showToast, dismissBanner, saveDocument]);
+  }, [closeDocument, showBanner, showToast, dismissBanner, saveDocument, showStatusMessage]);
 
   // ドキュメントのリネーム（ファイル名変更）
   const renameDocument = useCallback(

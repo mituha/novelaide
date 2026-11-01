@@ -66,6 +66,23 @@
   margin-left: 2px;
 }
 
+/* 未保存時の視覚的強調（文字色を赤系に変更し、インジケーターを明瞭化） */
+.editor-tab-item.is-dirty .tab-title {
+  color: #f87171 !important;
+  font-weight: 600;
+}
+
+.editor-tab-item.is-dirty .dirty-indicator {
+  font-size: 11px;
+  color: #ef4444;
+  margin-left: 3px;
+  line-height: 1;
+}
+
+.editor-tab-item.is-dirty.active {
+  border-bottom: 2px solid #ef4444;
+}
+
 .tab-close-btn {
   display: flex;
   align-items: center;

@@ -216,9 +216,9 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       updateDecorations(editor);
     });
 
-    // ショートカットキー: Ctrl+S (Cmd+S) で手動保存（強制保存フラグ付与）
+    // ショートカットキー: Ctrl+S (Cmd+S) で手動保存（強制保存フラグ付与・明示的パス指定）
     editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, () => {
-      saveDocumentRef.current(undefined, { force: true });
+      saveDocumentRef.current(path, { force: true });
     });
 
     // IME 入力（日本語変換）状態の監視
@@ -320,13 +320,28 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
       editor.focus();
     };
 
+    // 外部変更によるドキュメント再読み込み通知の監視
+    const handleDocumentReloaded = (e: Event) => {
+      const customEvent = e as CustomEvent<{ path: string; content: string }>;
+      if (!customEvent.detail) return;
+      if (customEvent.detail.path === path && editorRef.current) {
+        console.log('[CodeEditor] External reload applied to Monaco model:', path);
+        const currentVal = editorRef.current.getValue();
+        if (currentVal !== customEvent.detail.content) {
+          editorRef.current.setValue(customEvent.detail.content);
+        }
+      }
+    };
+
     window.addEventListener('calibration-issues-update', handleCalibrationIssues);
     window.addEventListener('editor-jump-to', handleEditorJumpTo);
+    window.addEventListener('novelaide:document-reloaded', handleDocumentReloaded);
 
     // クリーンアップ
     editor.onDidDispose(() => {
       window.removeEventListener('calibration-issues-update', handleCalibrationIssues);
       window.removeEventListener('editor-jump-to', handleEditorJumpTo);
+      window.removeEventListener('novelaide:document-reloaded', handleDocumentReloaded);
     });
   };
 
