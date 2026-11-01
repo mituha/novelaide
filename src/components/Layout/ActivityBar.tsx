@@ -1,6 +1,7 @@
 import React from "react";
 import { panelRegistry } from "../../core/panelRegistry";
 import { useTheme } from "../../contexts/ThemeContext";
+import { useSettings } from "restar-app-settings";
 import { Sun, Moon, Coffee, Laptop, Settings } from "lucide-react";
 import "./ActivityBar.css";
 
@@ -20,9 +21,18 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
   onOpenSettings,
 }) => {
   const { theme, toggleTheme } = useTheme();
+  const { settings } = useSettings();
+
+  // デバッグパネルの表示設定（デフォルト: true）
+  const showDebugPanel = settings?.showDebugPanel !== false;
 
   // レジストリから該当サイドのパネル一覧を取得
-  const panels = panelRegistry.getPanelsForSide(side);
+  const panels = panelRegistry.getPanelsForSide(side).filter((p) => {
+    if (p.id === 'novelaid.panel.debug') {
+      return showDebugPanel;
+    }
+    return true;
+  });
 
   const getThemeIcon = () => {
     switch (theme) {

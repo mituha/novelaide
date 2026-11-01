@@ -10,6 +10,7 @@ import { OutlinePanelPlugin } from '../../plugins/panels/OutlinePanelPlugin';
 import { MetadataPanelPlugin } from '../../plugins/panels/MetadataPanelPlugin';
 import { AiPanelPlugin } from '../../plugins/panels/AiPanelPlugin';
 import { CalibrationPanelPlugin } from '../../plugins/panels/CalibrationPanelPlugin';
+import { DebugPanelPlugin } from '../../plugins/panels/DebugPanelPlugin';
 
 export const panelRegistry = new PanelRegistry();
 
@@ -25,5 +26,6 @@ panelRegistry.register(OutlinePanelPlugin);
 panelRegistry.register(MetadataPanelPlugin);
 panelRegistry.register(CalibrationPanelPlugin);
 panelRegistry.register(AiPanelPlugin);
+panelRegistry.register(DebugPanelPlugin);
 
 export { PanelRegistry };

@@ -31,6 +31,7 @@ pub struct TokenInfo {
     pub pos: String,
     pub reading: Option<String>,
     pub base_form: Option<String>,
+    pub range: Option<CalibrationRange>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -57,6 +58,7 @@ pub struct FrequencyItem {
 pub struct CheckTextResult {
     pub issues: Vec<CalibrationIssue>,
     pub frequencies: Vec<FrequencyItem>,
+    pub all_frequencies: Vec<FrequencyItem>,
     pub total_chars: u32,
     pub kanji_ratio: f32,
     pub hiragana_ratio: f32,

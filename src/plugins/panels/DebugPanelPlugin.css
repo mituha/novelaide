@@ -1,0 +1,212 @@
+.debug-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #1f2937);
+  font-family: var(--font-sans, system-ui, -apple-system, sans-serif);
+  overflow: hidden;
+}
+
+.debug-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background-color: var(--bg-secondary, #f9fafb);
+}
+
+.debug-panel-title-area {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.debug-panel-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+}
+
+.debug-panel-badge {
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 9999px;
+  background-color: var(--accent-color, #3b82f6);
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.debug-panel-tabs {
+  display: flex;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background-color: var(--bg-secondary, #f9fafb);
+  padding: 0 8px;
+}
+
+.debug-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary, #6b7280);
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.debug-tab-btn:hover {
+  color: var(--text-primary, #111827);
+}
+
+.debug-tab-btn.active {
+  color: var(--accent-color, #3b82f6);
+  border-bottom-color: var(--accent-color, #3b82f6);
+  font-weight: 600;
+}
+
+.debug-panel-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.debug-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  background-color: var(--bg-primary, #ffffff);
+}
+
+.debug-search-input {
+  flex: 1;
+  min-width: 140px;
+  padding: 4px 8px;
+  font-size: 12px;
+  border: 1px solid var(--border-color, #d1d5db);
+  border-radius: 4px;
+  background-color: var(--bg-secondary, #f9fafb);
+  color: var(--text-primary, #111827);
+}
+
+.debug-search-input:focus {
+  outline: none;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.debug-filter-pills {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.debug-pill-btn {
+  padding: 2px 8px;
+  font-size: 11px;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  background: var(--bg-secondary, #f3f4f6);
+  color: var(--text-secondary, #4b5563);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.debug-pill-btn.active {
+  background-color: var(--accent-color, #3b82f6);
+  color: #ffffff;
+  border-color: var(--accent-color, #3b82f6);
+}
+
+.debug-table-wrapper {
+  flex: 1;
+  overflow: auto;
+}
+
+.debug-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11px;
+  text-align: left;
+}
+
+.debug-table th {
+  position: sticky;
+  top: 0;
+  background-color: var(--bg-secondary, #f9fafb);
+  color: var(--text-secondary, #6b7280);
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  font-weight: 600;
+  z-index: 1;
+}
+
+.debug-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--border-color, #f3f4f6);
+  color: var(--text-primary, #1f2937);
+  white-space: nowrap;
+}
+
+.debug-table tr.clickable {
+  cursor: pointer;
+}
+
+.debug-table tr.clickable:hover {
+  background-color: var(--hover-color, #f0fdf4);
+}
+
+.debug-pos-tag {
+  display: inline-block;
+  padding: 1px 4px;
+  font-size: 10px;
+  border-radius: 3px;
+  background-color: #e0f2fe;
+  color: #0369a1;
+}
+
+.debug-reading {
+  font-family: monospace;
+  color: var(--text-secondary, #6b7280);
+}
+
+.debug-jump-link {
+  color: var(--accent-color, #3b82f6);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.debug-jump-link:hover {
+  text-decoration: underline;
+}
+
+.debug-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: var(--text-secondary, #9ca3af);
+  font-size: 12px;
+  gap: 8px;
+}
+
+.debug-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  color: var(--text-secondary, #4b5563);
+  cursor: pointer;
+  user-select: none;
+}

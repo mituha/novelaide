@@ -4,10 +4,10 @@ export type CalibrationIssue = { id: string, ruleId: string, ruleType: string, m
 
 export type CalibrationRange = { startLine: number, startColumn: number, endLine: number, endColumn: number, };
 
-export type CheckTextResult = { issues: Array<CalibrationIssue>, frequencies: Array<FrequencyItem>, totalChars: number, kanjiRatio: number, hiraganaRatio: number, };
+export type CheckTextResult = { issues: Array<CalibrationIssue>, frequencies: Array<FrequencyItem>, allFrequencies: Array<FrequencyItem>, totalChars: number, kanjiRatio: number, hiraganaRatio: number, };
 
 export type FrequencyItem = { word: string, count: number, pos: string, };
 
 export type RubyCandidate = { surface: string, ruby: string, range: CalibrationRange, };
 
-export type TokenInfo = { surface: string, pos: string, reading: string | null, baseForm: string | null, };
+export type TokenInfo = { surface: string, pos: string, reading: string | null, baseForm: string | null, range: CalibrationRange | null, };

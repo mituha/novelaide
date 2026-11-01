@@ -36,6 +36,8 @@ export const CalibrationPanel: React.FC = () => {
   const [result, setResult] = useState<CheckTextResult | null>(null);
   const [rubies, setRubies] = useState<RubyCandidate[]>([]);
   const [filterType, setFilterType] = useState<string>('all');
+  const [showAllFreq, setShowAllFreq] = useState<boolean>(false);
+  const [includeSingleCharFreq, setIncludeSingleCharFreq] = useState<boolean>(false);
   const activePathRef = useRef<string | null>(activeDocument?.path ?? null);
 
   useEffect(() => {
@@ -654,77 +656,129 @@ export const CalibrationPanel: React.FC = () => {
                   marginBottom: '8px',
                   display: 'flex',
                   alignItems: 'center',
-                  gap: '4px',
+                  justifyContent: 'space-between',
                 }}
               >
-                <Tag size={13} />
-                <span>頻出語ランキング（上位語句）</span>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Tag size={13} />
+                  <span>頻出語ランキング {showAllFreq ? '（全件）' : '（上位15件）'}</span>
+                </div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <label
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '4px',
+                      fontSize: '11px',
+                      fontWeight: 'normal',
+                      cursor: 'pointer',
+                      color: 'var(--text-secondary, #6b7280)',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={includeSingleCharFreq}
+                      onChange={(e) => setIncludeSingleCharFreq(e.target.checked)}
+                    />
+                    <span>1文字を含む</span>
+                  </label>
+                  <button
+                    type="button"
+                    style={{
+                      padding: '2px 6px',
+                      fontSize: '10px',
+                      borderRadius: '4px',
+                      border: '1px solid var(--border-color, #e5e7eb)',
+                      backgroundColor: showAllFreq ? 'var(--accent-color, #3b82f6)' : 'var(--bg-secondary, #f3f4f6)',
+                      color: showAllFreq ? '#ffffff' : 'var(--text-secondary, #4b5563)',
+                      cursor: 'pointer',
+                    }}
+                    onClick={() => setShowAllFreq((prev) => !prev)}
+                  >
+                    {showAllFreq ? '上位15件へ' : '全件表示'}
+                  </button>
+                </div>
               </div>
 
-              {!result?.frequencies || result.frequencies.length === 0 ? (
-                <div
-                  style={{
-                    padding: '20px 0',
-                    textAlign: 'center',
-                    color: 'var(--text-secondary, #9ca3af)',
-                    fontSize: '12px',
-                  }}
-                >
-                  頻出語データはありません
-                </div>
-              ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                  {result.frequencies.map((item, idx) => (
+              {(() => {
+                const sourceList = (result?.allFrequencies && result.allFrequencies.length > 0)
+                  ? result.allFrequencies
+                  : (result?.frequencies || []);
+                const filtered = sourceList.filter((item) => {
+                  if (!includeSingleCharFreq && item.word.length < 2) return false;
+                  return true;
+                });
+                const displayList = showAllFreq ? filtered : filtered.slice(0, 15);
+
+                if (displayList.length === 0) {
+                  return (
                     <div
-                      key={idx}
                       style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        padding: '6px 8px',
-                        borderRadius: '4px',
-                        backgroundColor: 'var(--bg-secondary, #f9fafb)',
-                        border: '1px solid var(--border-color, #e5e7eb)',
+                        padding: '20px 0',
+                        textAlign: 'center',
+                        color: 'var(--text-secondary, #9ca3af)',
                         fontSize: '12px',
                       }}
                     >
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            fontWeight: 700,
-                            color: idx < 3 ? 'var(--accent-color, #3b82f6)' : 'var(--text-secondary, #9ca3af)',
-                            width: '16px',
-                          }}
-                        >
-                          {idx + 1}
-                        </span>
-                        <span style={{ fontWeight: 500 }}>{item.word}</span>
-                        <span
-                          style={{
-                            fontSize: '10px',
-                            padding: '1px 4px',
-                            borderRadius: '3px',
-                            backgroundColor: '#f1f5f9',
-                            color: '#64748b',
-                          }}
-                        >
-                          {item.pos}
-                        </span>
-                      </div>
-                      <span
+                      頻出語データはありません
+                    </div>
+                  );
+                }
+
+                return (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    {displayList.map((item, idx) => (
+                      <div
+                        key={idx}
                         style={{
-                          fontSize: '11px',
-                          fontWeight: 600,
-                          color: 'var(--text-secondary, #4b5563)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          padding: '6px 8px',
+                          borderRadius: '4px',
+                          backgroundColor: 'var(--bg-secondary, #f9fafb)',
+                          border: '1px solid var(--border-color, #e5e7eb)',
+                          fontSize: '12px',
                         }}
                       >
-                        {item.count} 回
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              fontWeight: 700,
+                              color: idx < 3 ? 'var(--accent-color, #3b82f6)' : 'var(--text-secondary, #9ca3af)',
+                              width: '20px',
+                            }}
+                          >
+                            {idx + 1}
+                          </span>
+                          <span style={{ fontWeight: 500 }}>{item.word}</span>
+                          <span
+                            style={{
+                              fontSize: '10px',
+                              padding: '1px 4px',
+                              borderRadius: '3px',
+                              backgroundColor: '#f1f5f9',
+                              color: '#64748b',
+                            }}
+                          >
+                            {item.pos}
+                          </span>
+                        </div>
+                        <span
+                          style={{
+                            fontSize: '11px',
+                            fontWeight: 600,
+                            color: 'var(--text-secondary, #4b5563)',
+                          }}
+                        >
+                          {item.count} 回
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })()}
             </div>
           </div>
         ) : (

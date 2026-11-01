@@ -134,9 +134,10 @@ impl<R: Runtime> NovelaidCalibration<R> {
         })
     }
 
-    /// 形態素解析を実行しトークン列を取得（ルビ・傍点を除外した自然文として解析）
+    /// 形態素解析を実行しトークン列を取得（ルビ・傍点を除外した自然文として解析＆元位置復元）
     pub fn tokenize_text(&self, text: &str) -> Result<Vec<TokenInfo>> {
         let stripped = strip_ruby_with_map(text);
+        let byte_to_char = build_byte_to_char_index(&stripped.clean_text, stripped.char_map.len());
         let segmenter = self.segmenter.read().map_err(|e| Error::Other(e.to_string()))?;
         let mut tokens = segmenter
             .segment(Cow::Borrowed(&stripped.clean_text))
@@ -145,6 +146,8 @@ impl<R: Runtime> NovelaidCalibration<R> {
         let mut result = Vec::with_capacity(tokens.len());
         for t in tokens.iter_mut() {
             let surface = t.surface.to_string();
+            let byte_start = t.byte_start;
+            let byte_end = t.byte_end;
             let details = t.details();
 
             let pos_parts: Vec<&str> = details.iter()
@@ -167,11 +170,20 @@ impl<R: Runtime> NovelaidCalibration<R> {
                 if *s == "*" { None } else { Some(s.to_string()) }
             });
 
+            let (start_line, start_column, end_line, end_column) =
+                resolve_source_range(&stripped.char_map, &byte_to_char, byte_start, byte_end);
+
             result.push(TokenInfo {
                 surface,
                 pos,
                 reading,
                 base_form,
+                range: Some(CalibrationRange {
+                    start_line,
+                    start_column,
+                    end_line,
+                    end_column,
+                }),
             });
         }
 
@@ -292,12 +304,10 @@ impl<R: Runtime> NovelaidCalibration<R> {
                 end_column,
             });
 
-            // 頻出語集計: 名詞（自立・固有名詞等）で2文字以上（ルビ読み仮名の混入を完全遮断）
+            // 頻出語集計: 名詞（自立・固有名詞等、1文字語句も含む全件集計）
             if pos_main == "名詞" && pos_sub1 != "代名詞" && pos_sub1 != "非自立" && pos_sub1 != "数" {
-                if surface.chars().count() >= 2 {
-                    let entry = word_counts.entry(surface).or_insert((0, pos_sub1));
-                    entry.0 += 1;
-                }
+                let entry = word_counts.entry(surface).or_insert((0, pos_sub1));
+                entry.0 += 1;
             }
         }
 
@@ -310,15 +320,27 @@ impl<R: Runtime> NovelaidCalibration<R> {
         };
         let issues = self.rule_registry.check_all(&ctx, None);
 
-        // 頻出語ランキングのソート（上位15件）
+        // 頻出語ランキングのソート（出現回数降順、同順位は50音順）
         let mut freq_list: Vec<(String, u32, String)> = word_counts
             .into_iter()
             .map(|(w, (c, p))| (w, c, p))
             .collect();
-        freq_list.sort_by(|a, b| b.1.cmp(&a.1));
+        freq_list.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 
-        let frequencies = freq_list
+        // 全件リスト（1文字語句も含む）
+        let all_frequencies: Vec<FrequencyItem> = freq_list
+            .iter()
+            .map(|(w, c, p)| FrequencyItem {
+                word: w.clone(),
+                count: *c,
+                pos: p.clone(),
+            })
+            .collect();
+
+        // 従来互換: 2文字以上の上位15件
+        let frequencies: Vec<FrequencyItem> = freq_list
             .into_iter()
+            .filter(|(w, _, _)| w.chars().count() >= 2)
             .take(15)
             .map(|(w, c, p)| FrequencyItem {
                 word: w,
@@ -342,6 +364,7 @@ impl<R: Runtime> NovelaidCalibration<R> {
         Ok(CheckTextResult {
             issues,
             frequencies,
+            all_frequencies,
             total_chars,
             kanji_ratio,
             hiragana_ratio,
