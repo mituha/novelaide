@@ -1,7 +1,7 @@
 /**
  * プロジェクト内エンティティの分類カテゴリ
  */
-export type EntityCategory = 'character' | 'location' | 'term' | 'item' | 'other';
+export type EntityCategory = 'character' | 'location' | 'plot' | 'term' | 'item' | 'other';
 /**
  * 登場人物・世界設定エンティティ
  */
@@ -24,6 +24,12 @@ export interface ProjectEntity {
     sourcePath?: string;
     /** 本文内での出現回数 */
     occurrenceCount: number;
+    /** 所属シリーズ名リスト */
+    series?: string[];
+    /** 登場巻数・本リスト */
+    books?: string[];
+    /** 登場章リスト */
+    chapters?: string[];
 }
 /**
  * ルビ出現詳細

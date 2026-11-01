@@ -1,6 +1,6 @@
 {
   "name": "tauri-plugin-novelaid-metadata-api",
-  "version": "0.1.1",
+  "version": "0.2.0",
   "author": "Mizuki Mituha",
   "description": "Unified metadata, character entity, and novel ruby dictionary plugin for Novelaid",
   "type": "module",

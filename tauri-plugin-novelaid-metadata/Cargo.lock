@@ -3235,7 +3235,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-novelaid-fs"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "serde",
  "serde_json",
@@ -3251,7 +3251,7 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-novelaid-metadata"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "regex",
  "serde",

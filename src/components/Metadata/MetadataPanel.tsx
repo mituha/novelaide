@@ -254,6 +254,60 @@ export const MetadataPanel: React.FC = () => {
 
         {expandedDetails && (
           <div className="metadata-accordion-body">
+            {/* 作品階層（シリーズ・巻） */}
+            <div className="metadata-row">
+              <div className="metadata-field half">
+                <label className="metadata-label" htmlFor="meta-series">
+                  <BookOpen size={12} />
+                  <span>シリーズ</span>
+                </label>
+                <input
+                  id="meta-series"
+                  type="text"
+                  className="metadata-input"
+                  value={
+                    Array.isArray(metadata.series)
+                      ? metadata.series.join(', ')
+                      : metadata.series || ''
+                  }
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    handleChange(
+                      'series',
+                      val.includes(',')
+                        ? val.split(',').map((s) => s.trim()).filter(Boolean)
+                        : val
+                    );
+                  }}
+                  placeholder="例: 本編, 外伝"
+                />
+              </div>
+              <div className="metadata-field half">
+                <label className="metadata-label" htmlFor="meta-books">
+                  <BookOpen size={12} />
+                  <span>登場巻・本 (カンマ区切り)</span>
+                </label>
+                <input
+                  id="meta-books"
+                  type="text"
+                  className="metadata-input"
+                  value={
+                    Array.isArray(metadata.books)
+                      ? metadata.books.join(', ')
+                      : metadata.books || ''
+                  }
+                  onChange={(e) => {
+                    const splitted = e.target.value
+                      .split(',')
+                      .map((s) => s.trim())
+                      .filter(Boolean);
+                    handleChange('books', splitted);
+                  }}
+                  placeholder="例: 1巻, 2巻"
+                />
+              </div>
+            </div>
+
             <div className="metadata-row">
               <div className="metadata-field half">
                 <label className="metadata-label" htmlFor="meta-id">

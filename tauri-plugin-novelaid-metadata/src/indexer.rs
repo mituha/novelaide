@@ -92,27 +92,52 @@ mod tests {
             metadata: serde_json::json!({
                 "name": "ソラ・アルスター",
                 "tags": ["character", "主人公"],
-                "role": "主人公"
+                "role": "主人公",
+                "series": "本編",
+                "books": ["1巻", "2巻"]
             }),
             document_type: NovelaidDocumentType::Markdown,
             mtime_ms: 2000,
         };
 
+        let doc3 = NovelaidDocument {
+            path: "mock/places/royal_capital.md".to_string(),
+            base_name: "royal_capital.md".to_string(),
+            file_title: "royal_capital".to_string(),
+            content: "王都ルクシアの設定資料".to_string(),
+            metadata: serde_json::json!({
+                "title": "王都ルクシア",
+                "tag": "location",
+                "series": "本編",
+                "book": "1巻"
+            }),
+            document_type: NovelaidDocumentType::Markdown,
+            mtime_ms: 3000,
+        };
+
         let summary = DocumentIndexer::index_documents(
             "mock",
-            &[doc1, doc2],
+            &[doc1, doc2, doc3],
             &mut meta,
             &mut entities,
             &mut rubies,
         );
 
-        assert_eq!(summary.total_files_scanned, 2);
-        assert_eq!(summary.total_entities, 2);
+        assert_eq!(summary.total_files_scanned, 3);
+        assert_eq!(summary.total_entities, 3);
         assert_eq!(summary.total_ruby_entries, 1);
 
         let characters = entities.get_by_category(&crate::models::EntityCategory::Character);
         assert_eq!(characters.len(), 1);
         assert_eq!(characters[0].name, "ソラ・アルスター");
+        assert_eq!(characters[0].series, vec!["本編"]);
+        assert_eq!(characters[0].books, vec!["1巻", "2巻"]);
+
+        let locations = entities.get_by_category(&crate::models::EntityCategory::Location);
+        assert_eq!(locations.len(), 1);
+        assert_eq!(locations[0].name, "王都ルクシア");
+        assert_eq!(locations[0].series, vec!["本編"]);
+        assert_eq!(locations[0].books, vec!["1巻"]);
 
         let ruby_list = rubies.build_entries();
         assert_eq!(ruby_list[0].surface, "魔剣");

@@ -5,6 +5,8 @@
   --bg-primary: #1e1e1e;
   --bg-secondary: #252526;
   --bg-activity-bar: #333333;
+  --activity-bar-inactive: #a0a0a5;
+  --activity-bar-active: #ffffff;
   --bg-side-pane: #252526;
   --bg-status-bar: #007acc;
   --bg-status-bar-text: #ffffff;
@@ -26,6 +28,8 @@
   --bg-primary: #ffffff;
   --bg-secondary: #f3f3f3;
   --bg-activity-bar: #2c2c2c;
+  --activity-bar-inactive: #a0a0a5;
+  --activity-bar-active: #ffffff;
   --bg-side-pane: #f8f9fa;
   --bg-status-bar: #007acc;
   --bg-status-bar-text: #ffffff;
@@ -47,6 +51,8 @@
   --bg-primary: #1e1e1e;
   --bg-secondary: #252526;
   --bg-activity-bar: #333333;
+  --activity-bar-inactive: #a0a0a5;
+  --activity-bar-active: #ffffff;
   --bg-side-pane: #252526;
   --bg-status-bar: #007acc;
   --bg-status-bar-text: #ffffff;
@@ -69,6 +75,8 @@
   --bg-primary: #fbf0d9;
   --bg-secondary: #f4e5c2;
   --bg-activity-bar: #4a3b32;
+  --activity-bar-inactive: #c8bba9;
+  --activity-bar-active: #ffffff;
   --bg-side-pane: #f4e5c2;
   --bg-status-bar: #795548;
   --bg-status-bar-text: #ffffff;

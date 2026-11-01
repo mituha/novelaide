@@ -1,14 +1,14 @@
 import { PanelPlugin } from '../../types/panelPlugin';
-import { Users } from 'lucide-react';
+import { Bookmark } from 'lucide-react';
 import { MetadataListPanel } from '../../components/Metadata/MetadataListPanel';
 
 export const MetadataListPanelPlugin: PanelPlugin = {
   id: 'novelaid.panel.metadataList',
-  title: '設定資料・登場人物',
-  icon: Users,
+  title: '設定資料・収集一覧',
+  icon: Bookmark,
   defaultPlacement: 'left',
   allowedPlacements: ['left', 'right'],
   scope: 'project',
-  priority: 70,
+  priority: 68,
   component: MetadataListPanel,
 };

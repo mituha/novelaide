@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub enum EntityCategory {
     Character,
     Location,
+    Plot,
     Term,
     Item,
     Other,
@@ -37,6 +38,12 @@ pub struct ProjectEntity {
     pub source_path: Option<String>,
     #[serde(default)]
     pub occurrence_count: usize,
+    #[serde(default)]
+    pub series: Vec<String>,
+    #[serde(default)]
+    pub books: Vec<String>,
+    #[serde(default)]
+    pub chapters: Vec<String>,
 }
 
 /// ルビ出現詳細
