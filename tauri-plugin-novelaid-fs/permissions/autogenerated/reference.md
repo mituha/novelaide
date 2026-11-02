@@ -10,6 +10,7 @@ Default permissions for the plugin
 - `allow-read-directory`
 - `allow-set-project-directory`
 - `allow-get-project-directory`
+- `allow-read-file-binary`
 - `allow-read-document`
 - `allow-write-document`
 - `allow-create-directory`
@@ -313,6 +314,32 @@ Enables the read_document command without any pre-configured scope.
 <td>
 
 Denies the read_document command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:allow-read-file-binary`
+
+</td>
+<td>
+
+Enables the read_file_binary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-fs:deny-read-file-binary`
+
+</td>
+<td>
+
+Denies the read_file_binary command without any pre-configured scope.
 
 </td>
 </tr>

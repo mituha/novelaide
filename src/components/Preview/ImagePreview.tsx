@@ -1,18 +1,40 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { convertFileSrc } from '@tauri-apps/api/core';
-import { ZoomIn, ZoomOut, RotateCcw, Maximize2 } from 'lucide-react';
+import { ZoomIn, ZoomOut, RotateCcw, Maximize2, AlertCircle } from 'lucide-react';
 import { DocumentViewProps } from '../../types/viewPlugin';
+import { fileService } from '../../services/fileService';
 import './ImagePreview.css';
 
+function getMimeType(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'png':
+      return 'image/png';
+    case 'jpg':
+    case 'jpeg':
+      return 'image/jpeg';
+    case 'gif':
+      return 'image/gif';
+    case 'webp':
+      return 'image/webp';
+    case 'svg':
+      return 'image/svg+xml';
+    case 'bmp':
+      return 'image/bmp';
+    case 'ico':
+      return 'image/x-icon';
+    case 'tif':
+    case 'tiff':
+      return 'image/tiff';
+    default:
+      return 'image/png';
+  }
+}
+
 export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
-  // 画像のソースURL (Tauri 2 asset:// プロトコル)
-  const imageSrc = React.useMemo(() => {
-    try {
-      return convertFileSrc(path);
-    } catch {
-      return path;
-    }
-  }, [path]);
+  const [imageSrc, setImageSrc] = useState<string>('');
+  const [hasError, setHasError] = useState<boolean>(false);
+  const blobUrlRef = useRef<string | null>(null);
 
   const [scale, setScale] = useState<number>(1);
   const [position, setPosition] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -22,11 +44,66 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
 
-  // パス変更時に位置と倍率をリセット
+  // パス変更時のリセットおよび画像ソース初期化
   useEffect(() => {
     setScale(1);
     setPosition({ x: 0, y: 0 });
+    setHasError(false);
+
+    // 古いBlob URLの解放
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = null;
+    }
+
+    try {
+      const src = convertFileSrc(path);
+      setImageSrc(src);
+    } catch {
+      // convertFileSrc失敗時は最初からバイナリBlob読み込みを試みる
+      loadAsBlob();
+    }
+
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+    };
   }, [path]);
+
+  // バイナリ読み込みによるBlob URLフォールバック
+  const loadAsBlob = useCallback(async () => {
+    try {
+      const bytes = await fileService.readFileBinary(path);
+      if (!bytes || bytes.length === 0) {
+        setHasError(true);
+        return;
+      }
+      const mime = getMimeType(path);
+      const blob = new Blob([bytes as unknown as BlobPart], { type: mime });
+      const url = URL.createObjectURL(blob);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+      blobUrlRef.current = url;
+      setImageSrc(url);
+    } catch (e) {
+      console.error("Failed to load image as blob:", e);
+      setHasError(true);
+    }
+  }, [path]);
+
+  // 画像読み込みエラー時のフォールバック処理
+  const handleImageError = useCallback(() => {
+    // 既にBlob URLでの試行済みなら真のエラーとする
+    if (blobUrlRef.current && imageSrc === blobUrlRef.current) {
+      setHasError(true);
+      return;
+    }
+    // convertFileSrcで失敗した場合はバイナリBlobフォールバックを試みる
+    loadAsBlob();
+  }, [imageSrc, loadAsBlob]);
 
   // マウスホイールによるズーム
   const handleWheel = useCallback((e: React.WheelEvent) => {
@@ -96,6 +173,23 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
     setScale((prev) => Math.max(0.1, Math.round(prev * 0.8 * 100) / 100));
   };
 
+  const fileName = path.split(/[/\\]/).pop() || '';
+
+  if (hasError) {
+    return (
+      <div className="image-preview-container image-preview-error">
+        <div className="unsupported-file-content">
+          <AlertCircle size={40} className="unsupported-icon" />
+          <h3 className="unsupported-title">画像の読み込みに失敗しました</h3>
+          <p className="unsupported-desc">
+            ファイル形式が破損しているか、アクセスできません。<br />
+            <code>{fileName}</code>
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={containerRef}
@@ -112,26 +206,29 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
           transform: `translate(${position.x}px, ${position.y}px) scale(${scale})`,
         }}
       >
-        <img
-          ref={imageRef}
-          src={imageSrc}
-          alt={path.split(/[/\\]/).pop() || ''}
-          className="image-preview-element"
-          draggable={false}
-          onLoad={(e) => {
-            // 初回ロード時に大きすぎる画像はウィンドウにフィット
-            const target = e.currentTarget;
-            if (containerRef.current) {
-              const cW = containerRef.current.clientWidth - 60;
-              const cH = containerRef.current.clientHeight - 60;
-              if (target.naturalWidth > cW || target.naturalHeight > cH) {
-                const sW = cW / target.naturalWidth;
-                const sH = cH / target.naturalHeight;
-                setScale(Math.min(sW, sH, 1));
+        {imageSrc && (
+          <img
+            ref={imageRef}
+            src={imageSrc}
+            alt={fileName}
+            className="image-preview-element"
+            draggable={false}
+            onError={handleImageError}
+            onLoad={(e) => {
+              // 初回ロード時に大きすぎる画像はウィンドウにフィット
+              const target = e.currentTarget;
+              if (containerRef.current) {
+                const cW = containerRef.current.clientWidth - 60;
+                const cH = containerRef.current.clientHeight - 60;
+                if (target.naturalWidth > cW || target.naturalHeight > cH) {
+                  const sW = cW / target.naturalWidth;
+                  const sH = cH / target.naturalHeight;
+                  setScale(Math.min(sW, sH, 1));
+                }
               }
-            }
-          }}
-        />
+            }}
+          />
+        )}
       </div>
 
       {/* フローティングツールバー */}

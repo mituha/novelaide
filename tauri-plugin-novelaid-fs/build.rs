@@ -5,6 +5,7 @@ const COMMANDS: &[&str] = &[
     "set_project_directory",
     "get_project_directory",
     "read_directory",
+    "read_file_binary",
     "read_document",
     "write_document",
     "create_directory",

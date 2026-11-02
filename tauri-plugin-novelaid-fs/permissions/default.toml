@@ -7,6 +7,7 @@ permissions = [
     "allow-read-directory",
     "allow-set-project-directory",
     "allow-get-project-directory",
+    "allow-read-file-binary",
     "allow-read-document",
     "allow-write-document",
     "allow-create-directory",

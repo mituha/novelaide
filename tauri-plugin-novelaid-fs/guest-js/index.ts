@@ -57,6 +57,12 @@ export async function getDocumentStat(path: string): Promise<DocumentStat> {
   });
 }
 
+export async function readFileBinary(path: string): Promise<number[]> {
+  return await invoke<number[]>('plugin:novelaid-fs|read_file_binary', {
+    path,
+  });
+}
+
 export async function readDocument(path: string): Promise<NovelaidDocument> {
   return await invoke<NovelaidDocument>('plugin:novelaid-fs|read_document', {
     path,

@@ -45,6 +45,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
       commands::get_project_directory,
       commands::read_directory,
       commands::get_document_stat,
+      commands::read_file_binary,
       commands::read_document,
       commands::write_document,
       commands::create_directory,

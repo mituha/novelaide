@@ -41,9 +41,16 @@
 
 ## 4. 画像プレビュー（ImageView / `ImagePreview`）仕様
 
-### 4.1 画像の読み込み方式
-- Tauri 2 の `convertFileSrc(path)` を使用。
-- ローカル画像ファイルをBase64変換やメモリ全展開することなく、カスタムプロトコル（`asset://`）経由で直接・高速にレンダリング。
+### 4.1 画像の読み込み方式（Asset Protocol + 二段構えBlobフォールバック）
+- **プライマリ読み込み（Tauri 2 Asset Protocol）**:
+  - `convertFileSrc(path)` を使用。
+  - `src-tauri/tauri.conf.json` の `app.security.assetProtocol`（`enable: true`, `scope: ["**"]`）および `src-tauri/Cargo.toml` の `tauri` feature `protocol-asset` を有効化。
+  - ローカル画像ファイルをBase64文字列に変換することなく、カスタムプロトコル（`asset://`）経由で直接・高速にレンダリング。
+- **セカンダリ読み込み（バイナリBlob URLフォールバック）**:
+  - プラグイン `tauri-plugin-novelaid-fs` に `read_file_binary(path)` を追加。
+  - Windows WebView2 やパス形式（日本語・特殊記号など）に起因して `convertFileSrc` による画像ロードが失敗（`onError`）した場合、即座に Rust 側からバイナリを取得して `URL.createObjectURL(blob)` を生成し差し替える。
+  - これにより、どのようなOS環境やフォルダ構成であっても画像が確実に表示される堅牢性を担保。
+  - コンポーネント破棄時には `URL.revokeObjectURL` で安全にメモリ解放。
 
 ### 4.2 操作機能
 1. **マウスホイールズーム**:

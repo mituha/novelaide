@@ -70,8 +70,16 @@ graph TD
 
 小説の設定資料として不可欠な地図やキャラクター立ち絵、装丁ラフなどを快適に閲覧できるよう、専用の画像ビューコンポーネントを開発しました。
 
-### ① Tauri 2 `convertFileSrc` による爆速描画
-ローカルファイルをBase64変換することなく、Tauri 2 のカスタムアセットプロトコル（`asset://`）経由で直接 `<img>` 要素へ渡すことで、高解像度の地図画像でも瞬時に表示されます。
+### ① Tauri 2 `convertFileSrc` と二段構えのバイナリBlobフォールバック
+ローカル画像ファイルをレンダリングするにあたり、Tauri 2 ではセキュリティ保護の観点からアセットプロトコル（`asset://`）が標準で保護されています。
+
+そのため、以下の2重の安全対策を導入しました：
+1. **Asset Protocol の有効化**:
+   - `tauri.conf.json` で `app.security.assetProtocol: { enable: true, scope: ["**"] }` を許可し、`Cargo.toml` の `tauri` に `protocol-asset` フィーチャーを追加。
+2. **バイナリBlob URLへの自動フォールバック**:
+   - Windows WebView2 の環境依存や特殊な文字コードを含むパスでも確実に画像を表示できるよう、プラグイン `tauri-plugin-novelaid-fs` に `read_file_binary` を追加。
+   - 万が一 `convertFileSrc` によるロードで `onError` が発生した場合は、即座に Rust からバイナリデータを取得し、`URL.createObjectURL(blob)` を生成して画像を差し替える堅牢なフォールバック機構を構築しました。
+   - コンポーネント破棄時には `URL.revokeObjectURL` で安全にリソースを解放します。
 
 ### ② マウスホイールズームとドラッグ移動（パン）
 作家が細部までイラストや設定図を確認できるよう、直感的なインタラクションを組み込みました。

@@ -165,6 +165,10 @@ impl<R: Runtime> NovelaidFs<R> {
     }
   }
 
+  pub fn read_file_binary(&self, path: &Path) -> crate::Result<Vec<u8>> {
+    std::fs::read(path).map_err(crate::Error::Io)
+  }
+
   pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
     let document_type = self.get_document_type_internal(path);
     let base_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();

@@ -157,6 +157,14 @@ pub(crate) async fn get_document_stat<R: Runtime>(
 }
 
 #[command]
+pub(crate) async fn read_file_binary<R: Runtime>(
+    app: AppHandle<R>,
+    path: String,
+) -> Result<Vec<u8>> {
+    app.novelaid_fs().read_file_binary(std::path::Path::new(&path))
+}
+
+#[command]
 pub(crate) async fn read_document<R: Runtime>(
     app: AppHandle<R>,
     path: String,

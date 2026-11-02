@@ -206,6 +206,17 @@ export const fileService = {
     }
   },
 
+  // ファイルバイナリ読み込み
+  async readFileBinary(path: string): Promise<Uint8Array | null> {
+    try {
+      const data = await novelaidFs.readFileBinary(path);
+      return new Uint8Array(data);
+    } catch (err) {
+      console.warn("readFileBinary failed:", err);
+      return null;
+    }
+  },
+
   // ファイル保存
   async writeFile(path: string, content: string, metadata: any = {}): Promise<number> {
     try {
