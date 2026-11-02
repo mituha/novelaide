@@ -231,6 +231,9 @@ body.git-resizing {
   padding: 5px 12px 5px 22px;
   cursor: pointer;
   font-size: 12px;
+  min-height: 26px;
+  flex-shrink: 0;
+  box-sizing: border-box;
   transition: background-color 0.1s ease;
 }
 
@@ -282,8 +285,14 @@ body.git-resizing {
   padding: 4px 0;
 }
 
+.git-graph-svg {
+  flex-shrink: 0;
+  display: block;
+}
+
 .git-history-list {
   flex: 1;
+  min-width: 0;
   display: flex;
   flex-direction: column;
 }
@@ -293,6 +302,9 @@ body.git-resizing {
   flex-direction: column;
   justify-content: center;
   height: 36px;
+  min-height: 36px;
+  flex-shrink: 0;
+  box-sizing: border-box;
   padding: 0 10px;
   cursor: pointer;
   transition: background-color 0.1s ease;

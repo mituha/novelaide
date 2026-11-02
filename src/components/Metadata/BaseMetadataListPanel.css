@@ -263,6 +263,8 @@ body.base-metadata-resizing {
   border: 1px solid var(--border-color, #2d2d30);
   border-radius: 4px;
   cursor: pointer;
+  flex-shrink: 0;
+  box-sizing: border-box;
   transition: all 0.15s ease;
 }
 
