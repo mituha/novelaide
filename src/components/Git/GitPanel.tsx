@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   GitBranch,
   RefreshCw,
@@ -17,6 +17,15 @@ import './GitPanel.css';
 
 interface GitPanelProps {
   onOpenFileDiff?: (filePath: string, staged: boolean) => void;
+}
+
+interface ResizeState {
+  sectionAboveId: string;
+  sectionBelowId: string;
+  initialHeightAbove: number;
+  initialHeightBelow: number;
+  totalWeight: number;
+  startY: number;
 }
 
 export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
@@ -44,6 +53,16 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
   const [expandedChanges, setExpandedChanges] = useState(true);
   const [expandedHistory, setExpandedHistory] = useState(true);
 
+  // 各セクションの高さウェイト (複数展開時のflex-grow比率)
+  const [weights, setWeights] = useState<Record<string, number>>({
+    staged: 1,
+    changes: 1,
+    history: 1,
+  });
+
+  const sectionRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const resizeStateRef = useRef<ResizeState | null>(null);
+
   // 未ステージと未追跡の合算
   const allChanges = [...unstaged, ...untracked];
 
@@ -69,6 +88,75 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
     }
   };
 
+  // ドラッグリサイズ処理
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, sectionAboveId: string, sectionBelowId: string) => {
+      e.preventDefault();
+      const elAbove = sectionRefs.current[sectionAboveId];
+      const elBelow = sectionRefs.current[sectionBelowId];
+      if (!elAbove || !elBelow) return;
+
+      const rectAbove = elAbove.getBoundingClientRect();
+      const rectBelow = elBelow.getBoundingClientRect();
+
+      const wAbove = weights[sectionAboveId] ?? 1;
+      const wBelow = weights[sectionBelowId] ?? 1;
+      const totalWeight = wAbove + wBelow;
+
+      resizeStateRef.current = {
+        sectionAboveId,
+        sectionBelowId,
+        initialHeightAbove: rectAbove.height,
+        initialHeightBelow: rectBelow.height,
+        totalWeight,
+        startY: e.clientY,
+      };
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!resizeStateRef.current) return;
+        const {
+          sectionAboveId: aboveId,
+          sectionBelowId: belowId,
+          initialHeightAbove,
+          initialHeightBelow,
+          totalWeight: totalW,
+          startY,
+        } = resizeStateRef.current;
+
+        const deltaY = moveEvent.clientY - startY;
+        const totalH = initialHeightAbove + initialHeightBelow;
+        const minHeight = 48; // 最小高さ
+
+        const clampedHeightAbove = Math.max(
+          minHeight,
+          Math.min(totalH - minHeight, initialHeightAbove + deltaY)
+        );
+        const clampedHeightBelow = totalH - clampedHeightAbove;
+
+        const ratioAbove = clampedHeightAbove / totalH;
+        const ratioBelow = clampedHeightBelow / totalH;
+
+        setWeights((prev) => ({
+          ...prev,
+          [aboveId]: ratioAbove * totalW,
+          [belowId]: ratioBelow * totalW,
+        }));
+      };
+
+      const handleMouseUp = () => {
+        resizeStateRef.current = null;
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        document.body.classList.remove('git-resizing');
+      };
+
+      document.body.classList.add('git-resizing');
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    },
+    [weights]
+  );
+
   if (!isRepo) {
     return (
       <div className="git-panel-container">
@@ -82,6 +170,26 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
       </div>
     );
   }
+
+  // 展開中のセクションID一覧
+  const sectionDefs = [
+    { id: 'staged', isExpanded: expandedStaged },
+    { id: 'changes', isExpanded: expandedChanges },
+    { id: 'history', isExpanded: expandedHistory },
+  ];
+  const expandedSectionIds = sectionDefs.filter((s) => s.isExpanded).map((s) => s.id);
+
+  // staged の下にリサイザーが必要か（stagedが展開されており、その後に展開中のセクションがあるか）
+  const canResizeAfterStaged =
+    expandedStaged &&
+    expandedSectionIds.filter((id) => id === 'changes' || id === 'history').length > 0;
+  const nextExpandedAfterStaged = expandedSectionIds.find(
+    (id) => id === 'changes' || id === 'history'
+  );
+
+  // changes の下にリサイザーが必要か
+  const canResizeAfterChanges =
+    expandedChanges && expandedSectionIds.includes('history');
 
   return (
     <div className="git-panel-container">
@@ -118,7 +226,11 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
           type="button"
           className="git-commit-btn"
           onClick={handleCommit}
-          disabled={!commitMessage.trim() || isCommitting || (staged.length === 0 && allChanges.length === 0)}
+          disabled={
+            !commitMessage.trim() ||
+            isCommitting ||
+            (staged.length === 0 && allChanges.length === 0)
+          }
         >
           <Check size={14} />
           <span>{staged.length > 0 ? 'Commit (Staged)' : 'Commit All'}</span>
@@ -128,15 +240,27 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
       {/* ボディ（アコーディオンリスト） */}
       <div className="git-panel-body">
         {/* Staged Changes セクション */}
-        <div className="git-section">
-          <div className="git-section-header" onClick={() => setExpandedStaged((prev) => !prev)}>
+        <div
+          ref={(el) => {
+            sectionRefs.current['staged'] = el;
+          }}
+          className={`git-section ${expandedStaged ? 'expanded' : 'collapsed'}`}
+          style={expandedStaged ? { flex: `${weights.staged ?? 1} 1 0px` } : undefined}
+        >
+          <div
+            className="git-section-header"
+            onClick={() => setExpandedStaged((prev) => !prev)}
+          >
             <div className="git-section-title">
               {expandedStaged ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <span>STAGED CHANGES</span>
               <span className="git-badge">{staged.length}</span>
             </div>
             {staged.length > 0 && (
-              <div className="git-section-actions" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="git-section-actions"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   type="button"
                   className="git-action-icon-btn"
@@ -165,7 +289,10 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
                       {file.path}
                     </span>
                   </div>
-                  <div className="git-file-actions" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="git-file-actions"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       type="button"
                       className="git-action-icon-btn"
@@ -181,16 +308,36 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
           )}
         </div>
 
+        {canResizeAfterStaged && nextExpandedAfterStaged && (
+          <div
+            className="git-section-resizer"
+            onMouseDown={(e) => handleResizeStart(e, 'staged', nextExpandedAfterStaged)}
+            title="セクションの高さを変更"
+          />
+        )}
+
         {/* Changes セクション */}
-        <div className="git-section">
-          <div className="git-section-header" onClick={() => setExpandedChanges((prev) => !prev)}>
+        <div
+          ref={(el) => {
+            sectionRefs.current['changes'] = el;
+          }}
+          className={`git-section ${expandedChanges ? 'expanded' : 'collapsed'}`}
+          style={expandedChanges ? { flex: `${weights.changes ?? 1} 1 0px` } : undefined}
+        >
+          <div
+            className="git-section-header"
+            onClick={() => setExpandedChanges((prev) => !prev)}
+          >
             <div className="git-section-title">
               {expandedChanges ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <span>CHANGES</span>
               <span className="git-badge">{allChanges.length}</span>
             </div>
             {allChanges.length > 0 && (
-              <div className="git-section-actions" onClick={(e) => e.stopPropagation()}>
+              <div
+                className="git-section-actions"
+                onClick={(e) => e.stopPropagation()}
+              >
                 <button
                   type="button"
                   className="git-action-icon-btn"
@@ -212,14 +359,23 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
                   onClick={() => onOpenFileDiff?.(file.path, false)}
                 >
                   <div className="git-file-info">
-                    <span className={`git-file-badge ${file.status === 'untracked' ? 'u' : file.status[0]}`}>
-                      {file.status === 'untracked' ? 'U' : file.status[0].toUpperCase()}
+                    <span
+                      className={`git-file-badge ${
+                        file.status === 'untracked' ? 'u' : file.status[0]
+                      }`}
+                    >
+                      {file.status === 'untracked'
+                        ? 'U'
+                        : file.status[0].toUpperCase()}
                     </span>
                     <span className="git-file-name" title={file.path}>
                       {file.path}
                     </span>
                   </div>
-                  <div className="git-file-actions" onClick={(e) => e.stopPropagation()}>
+                  <div
+                    className="git-file-actions"
+                    onClick={(e) => e.stopPropagation()}
+                  >
                     <button
                       type="button"
                       className="git-action-icon-btn"
@@ -243,9 +399,26 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
           )}
         </div>
 
+        {canResizeAfterChanges && (
+          <div
+            className="git-section-resizer"
+            onMouseDown={(e) => handleResizeStart(e, 'changes', 'history')}
+            title="セクションの高さを変更"
+          />
+        )}
+
         {/* Commit History セクション */}
-        <div className="git-section">
-          <div className="git-section-header" onClick={() => setExpandedHistory((prev) => !prev)}>
+        <div
+          ref={(el) => {
+            sectionRefs.current['history'] = el;
+          }}
+          className={`git-section ${expandedHistory ? 'expanded' : 'collapsed'}`}
+          style={expandedHistory ? { flex: `${weights.history ?? 1} 1 0px` } : undefined}
+        >
+          <div
+            className="git-section-header"
+            onClick={() => setExpandedHistory((prev) => !prev)}
+          >
             <div className="git-section-title">
               {expandedHistory ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
               <GitCommit size={14} />
@@ -259,10 +432,16 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
               <GitGraph history={history} />
               <div className="git-history-list">
                 {history.map((commit) => (
-                  <div key={commit.hash} className="git-history-item" title={commit.message}>
+                  <div
+                    key={commit.hash}
+                    className="git-history-item"
+                    title={commit.message}
+                  >
                     <div className="git-history-message">{commit.message}</div>
                     <div className="git-history-meta">
-                      <span className="git-history-hash">{commit.shortHash}</span>
+                      <span className="git-history-hash">
+                        {commit.shortHash}
+                      </span>
                       <span>{commit.authorName}</span>
                     </div>
                   </div>

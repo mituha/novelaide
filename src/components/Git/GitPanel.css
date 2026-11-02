@@ -126,19 +126,37 @@
 /* スクロール領域 */
 .git-panel-body {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 /* アコーディオンセクション */
 .git-section {
+  display: flex;
+  flex-direction: column;
   border-bottom: 1px solid var(--border-color, #333333);
+}
+
+.git-section.collapsed {
+  flex: 0 0 auto;
+}
+
+.git-section.expanded {
+  min-height: 48px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .git-section-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 6px 10px 6px 6px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0 10px 0 6px;
   background-color: var(--bg-secondary, #252526);
   cursor: pointer;
   user-select: none;
@@ -146,6 +164,7 @@
   font-weight: 700;
   letter-spacing: 0.5px;
   color: var(--text-secondary, #999999);
+  flex-shrink: 0;
 }
 
 .git-section-header:hover {
@@ -174,8 +193,34 @@
 }
 
 .git-section-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
+}
+
+/* セクション間スプリッター (リサイズハンドル) */
+.git-section-resizer {
+  height: 4px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+  position: relative;
+  z-index: 10;
+  cursor: row-resize;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.git-section-resizer:hover,
+body.git-resizing .git-section-resizer {
+  background-color: var(--accent-color, #0e639c);
+}
+
+body.git-resizing {
+  cursor: row-resize !important;
+  user-select: none !important;
 }
 
 /* ファイル行 */
@@ -229,6 +274,10 @@
 
 /* コミット履歴アイテム */
 .git-history-container {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   padding: 4px 0;
 }

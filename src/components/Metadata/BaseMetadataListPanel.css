@@ -153,7 +153,8 @@
 /* スクロール本体 */
 .base-metadata-body {
   flex: 1;
-  overflow-y: auto;
+  min-height: 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -165,12 +166,25 @@
   border-bottom: 1px solid var(--border-color, #2a2d32);
 }
 
+.base-metadata-group.collapsed {
+  flex: 0 0 auto;
+}
+
+.base-metadata-group.expanded {
+  min-height: 48px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
 .base-metadata-group-header {
   display: flex;
   align-items: center;
   gap: 6px;
   width: 100%;
-  padding: 8px 12px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 12px;
   background: none;
   border: none;
   color: var(--text-primary, #cccccc);
@@ -179,6 +193,7 @@
   cursor: pointer;
   text-align: left;
   transition: background-color 0.15s ease;
+  flex-shrink: 0;
 }
 
 .base-metadata-group-header:hover {
@@ -199,10 +214,36 @@
 }
 
 .base-metadata-items {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 6px;
   padding: 4px 8px 10px 8px;
+}
+
+/* セクション間スプリッター (リサイズハンドル) */
+.base-metadata-group-resizer {
+  height: 4px;
+  margin-top: -2px;
+  margin-bottom: -2px;
+  position: relative;
+  z-index: 10;
+  cursor: row-resize;
+  background-color: transparent;
+  transition: background-color 0.15s ease;
+}
+
+.base-metadata-group-resizer:hover,
+body.base-metadata-resizing .base-metadata-group-resizer {
+  background-color: var(--accent-color, #007acc);
+}
+
+body.base-metadata-resizing {
+  cursor: row-resize !important;
+  user-select: none !important;
 }
 
 .base-metadata-empty {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   ChevronDown,
   ChevronRight,
@@ -10,6 +10,15 @@ import { useDocument } from '../../contexts/DocumentContext';
 import { useProject } from '../../contexts/ProjectContext';
 import { fileService } from '../../services/fileService';
 import './BaseMetadataListPanel.css';
+
+interface ResizeState {
+  groupAboveKey: string;
+  groupBelowKey: string;
+  initialHeightAbove: number;
+  initialHeightBelow: number;
+  totalWeight: number;
+  startY: number;
+}
 
 export interface NormalizedMetadataItem {
   path: string;
@@ -113,6 +122,10 @@ export const BaseMetadataListPanel: React.FC<BaseMetadataListPanelProps> = ({
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState<boolean>(true);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
+  const [weights, setWeights] = useState<Record<string, number>>({});
+
+  const groupRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const resizeStateRef = useRef<ResizeState | null>(null);
 
   const loadCache = useCallback(async () => {
     setIsLoading(true);
@@ -336,14 +349,17 @@ export const BaseMetadataListPanel: React.FC<BaseMetadataListPanelProps> = ({
     return groups;
   }, [filteredItems, defaultGrouping, targetCategory]);
 
-  // グループ初期展開設定
+  // グループ初期展開設定 & 初期ウェイト設定
   useEffect(() => {
     const initial: Record<string, boolean> = {};
+    const initialWeights: Record<string, number> = {};
     Object.keys(grouped).forEach((key) => {
       initial[key] = true;
+      initialWeights[key] = 1;
     });
     setExpandedGroups(initial);
-  }, [targetCategory, defaultGrouping]);
+    setWeights(initialWeights);
+  }, [targetCategory, defaultGrouping, Object.keys(grouped).join(',')]);
 
   const toggleGroup = (key: string) => {
     setExpandedGroups((prev) => ({
@@ -357,6 +373,88 @@ export const BaseMetadataListPanel: React.FC<BaseMetadataListPanelProps> = ({
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
     );
   };
+
+  // ドラッグリサイズ処理
+  const handleResizeStart = useCallback(
+    (e: React.MouseEvent, groupAboveKey: string, groupBelowKey: string) => {
+      e.preventDefault();
+      const elAbove = groupRefs.current[groupAboveKey];
+      const elBelow = groupRefs.current[groupBelowKey];
+      if (!elAbove || !elBelow) return;
+
+      const rectAbove = elAbove.getBoundingClientRect();
+      const rectBelow = elBelow.getBoundingClientRect();
+
+      const wAbove = weights[groupAboveKey] ?? 1;
+      const wBelow = weights[groupBelowKey] ?? 1;
+      const totalWeight = wAbove + wBelow;
+
+      resizeStateRef.current = {
+        groupAboveKey,
+        groupBelowKey,
+        initialHeightAbove: rectAbove.height,
+        initialHeightBelow: rectBelow.height,
+        totalWeight,
+        startY: e.clientY,
+      };
+
+      const handleMouseMove = (moveEvent: MouseEvent) => {
+        if (!resizeStateRef.current) return;
+        const {
+          groupAboveKey: aboveKey,
+          groupBelowKey: belowKey,
+          initialHeightAbove,
+          initialHeightBelow,
+          totalWeight: totalW,
+          startY,
+        } = resizeStateRef.current;
+
+        const deltaY = moveEvent.clientY - startY;
+        const totalH = initialHeightAbove + initialHeightBelow;
+        const minHeight = 48; // 最小高さ
+
+        const clampedHeightAbove = Math.max(
+          minHeight,
+          Math.min(totalH - minHeight, initialHeightAbove + deltaY)
+        );
+        const clampedHeightBelow = totalH - clampedHeightAbove;
+
+        const ratioAbove = clampedHeightAbove / totalH;
+        const ratioBelow = clampedHeightBelow / totalH;
+
+        setWeights((prev) => ({
+          ...prev,
+          [aboveKey]: ratioAbove * totalW,
+          [belowKey]: ratioBelow * totalW,
+        }));
+      };
+
+      const handleMouseUp = () => {
+        resizeStateRef.current = null;
+        window.removeEventListener('mousemove', handleMouseMove);
+        window.removeEventListener('mouseup', handleMouseUp);
+        document.body.classList.remove('base-metadata-resizing');
+      };
+
+      document.body.classList.add('base-metadata-resizing');
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    },
+    [weights]
+  );
+
+  // 表示対象のグループ一覧
+  const visibleGroupEntries = useMemo(() => {
+    return Object.entries(grouped).filter(([_, group]) => {
+      return !(group.items.length === 0 && targetCategory !== 'all');
+    });
+  }, [grouped, targetCategory]);
+
+  const expandedGroupKeys = useMemo(() => {
+    return visibleGroupEntries
+      .filter(([k]) => !!expandedGroups[k])
+      .map(([k]) => k);
+  }, [visibleGroupEntries, expandedGroups]);
 
   return (
     <div className="base-metadata-panel-root">
@@ -463,80 +561,99 @@ export const BaseMetadataListPanel: React.FC<BaseMetadataListPanelProps> = ({
 
       {/* リスト本体 */}
       <div className="base-metadata-body">
-        {Object.entries(grouped).map(([groupKey, group]) => {
-          if (group.items.length === 0 && targetCategory !== 'all') {
-            return null;
-          }
+        {visibleGroupEntries.map(([groupKey, group], index) => {
           const isExpanded = !!expandedGroups[groupKey];
+          const remainingExpandedKeys = expandedGroupKeys.filter(
+            (k) => visibleGroupEntries.findIndex(([entryK]) => entryK === k) > index
+          );
+          const canResizeBelow = isExpanded && remainingExpandedKeys.length > 0;
+          const nextExpandedGroupKey = remainingExpandedKeys[0];
+          const groupWeight = weights[groupKey] ?? 1;
 
           return (
-            <div key={groupKey} className="base-metadata-group">
-              <button
-                type="button"
-                className="base-metadata-group-header"
-                onClick={() => toggleGroup(groupKey)}
+            <React.Fragment key={groupKey}>
+              <div
+                ref={(el) => {
+                  groupRefs.current[groupKey] = el;
+                }}
+                className={`base-metadata-group ${isExpanded ? 'expanded' : 'collapsed'}`}
+                style={isExpanded ? { flex: `${groupWeight} 1 0px` } : undefined}
               >
-                {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-                <span className="base-metadata-group-name">{group.title}</span>
-                <span className="base-metadata-badge">{group.items.length}</span>
-              </button>
+                <button
+                  type="button"
+                  className="base-metadata-group-header"
+                  onClick={() => toggleGroup(groupKey)}
+                >
+                  {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                  <span className="base-metadata-group-name">{group.title}</span>
+                  <span className="base-metadata-badge">{group.items.length}</span>
+                </button>
 
-              {isExpanded && (
-                <div className="base-metadata-items">
-                  {group.items.length === 0 ? (
-                    <div className="base-metadata-empty">
-                      <span>該当する設定ファイルがありません</span>
-                    </div>
-                  ) : (
-                    group.items.map((item) => (
-                      <div
-                        key={item.path}
-                        className="base-metadata-card"
-                        onClick={() => openDocument(item.path)}
-                        title={`${item.title} (${item.fileName})\n${item.summary || ''}`}
-                      >
-                        <div className="base-metadata-card-top">
-                          <span className="base-metadata-card-title">{item.title}</span>
-                          <div className="base-metadata-card-badges">
-                            {item.role && (
-                              <span className="base-metadata-role-badge">{item.role}</span>
-                            )}
-                            {(item.series.length > 0 || item.books.length > 0) && (
-                              <div className="base-metadata-hierarchy-badges">
-                                {item.series.map((s) => (
-                                  <span key={s} className="base-metadata-series-badge">
-                                    {s}
-                                  </span>
-                                ))}
-                                {item.books.map((b) => (
-                                  <span key={b} className="base-metadata-book-badge">
-                                    {b}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        {item.summary && (
-                          <p className="base-metadata-card-summary">{item.summary}</p>
-                        )}
-
-                        {item.tags.length > 0 && (
-                          <div className="base-metadata-card-tags">
-                            {item.tags.map((t) => (
-                              <span key={t} className="base-metadata-tag-item">
-                                #{t}
-                              </span>
-                            ))}
-                          </div>
-                        )}
+                {isExpanded && (
+                  <div className="base-metadata-items">
+                    {group.items.length === 0 ? (
+                      <div className="base-metadata-empty">
+                        <span>該当する設定ファイルがありません</span>
                       </div>
-                    ))
-                  )}
-                </div>
+                    ) : (
+                      group.items.map((item) => (
+                        <div
+                          key={item.path}
+                          className="base-metadata-card"
+                          onClick={() => openDocument(item.path)}
+                          title={`${item.title} (${item.fileName})\n${item.summary || ''}`}
+                        >
+                          <div className="base-metadata-card-top">
+                            <span className="base-metadata-card-title">{item.title}</span>
+                            <div className="base-metadata-card-badges">
+                              {item.role && (
+                                <span className="base-metadata-role-badge">{item.role}</span>
+                              )}
+                              {(item.series.length > 0 || item.books.length > 0) && (
+                                <div className="base-metadata-hierarchy-badges">
+                                  {item.series.map((s) => (
+                                    <span key={s} className="base-metadata-series-badge">
+                                      {s}
+                                    </span>
+                                  ))}
+                                  {item.books.map((b) => (
+                                    <span key={b} className="base-metadata-book-badge">
+                                      {b}
+                                    </span>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {item.summary && (
+                            <p className="base-metadata-card-summary">{item.summary}</p>
+                          )}
+
+                          {item.tags.length > 0 && (
+                            <div className="base-metadata-card-tags">
+                              {item.tags.map((t) => (
+                                <span key={t} className="base-metadata-tag-item">
+                                  #{t}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {canResizeBelow && (
+                <div
+                  className="base-metadata-group-resizer"
+                  onMouseDown={(e) => handleResizeStart(e, groupKey, nextExpandedGroupKey)}
+                  title="セクションの高さを変更"
+                />
               )}
-            </div>
+            </React.Fragment>
           );
         })}
       </div>
