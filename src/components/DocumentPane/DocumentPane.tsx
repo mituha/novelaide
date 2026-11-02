@@ -4,6 +4,7 @@ import { viewRegistry } from '../../core/viewRegistry';
 import { useDocument } from '../../contexts/DocumentContext';
 import { FileNameHeader } from '../Editor/FileNameHeader';
 import { EpisodeNavigator } from '../Editor/EpisodeNavigator';
+import { UnsupportedFileView } from './UnsupportedFileView';
 import './DocumentPane.css';
 
 interface DocumentPaneProps {
@@ -22,20 +23,33 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
   const { renameDocument } = useDocument();
 
   // レジストリからプラグインを動的に解決
-  const plugin = viewRegistry.findPlugin(document.documentType, viewMode);
+  const plugin =
+    document.documentType === 'unknown'
+      ? undefined
+      : viewRegistry.findPlugin(document.documentType, viewMode);
+
+  const paneId: PaneId = paneSide === 'left' ? 'editor.left' : 'editor.right';
 
   if (!plugin) {
     return (
-      <div className="document-pane-empty">
-        <p>
-          「{document.documentType}」形式の「{viewMode}」表示に対応するプラグインが見つかりません。
-        </p>
+      <div className={`document-pane-container pane-${paneSide} view-mode-none`}>
+        <FileNameHeader
+          fileTitle={document.fileTitle}
+          activePath={document.path}
+          onRename={(newTitle) => renameDocument(document.path, newTitle)}
+          isReadOnly={true}
+        />
+        <div className="document-pane-content">
+          <UnsupportedFileView
+            path={document.path}
+            documentType={document.documentType}
+          />
+        </div>
       </div>
     );
   }
 
   const Component = plugin.component;
-  const paneId: PaneId = paneSide === 'left' ? 'editor.left' : 'editor.right';
 
   return (
     <div

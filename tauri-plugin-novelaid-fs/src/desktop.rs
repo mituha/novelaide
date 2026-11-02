@@ -166,34 +166,64 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
-    let content = std::fs::read_to_string(path).map_err(crate::Error::Io)?;
-    let (metadata, body) = self.extract_frontmatter(&content);
-    
     let document_type = self.get_document_type_internal(path);
-    
+    let base_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_title = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
     let mtime = std::fs::metadata(path)
         .and_then(|m| m.modified())
         .unwrap_or_else(|_| SystemTime::now());
     let mtime_ms = system_time_to_ms(mtime);
 
-    // Update cache
-    {
-      let mut cache = self.metadata_cache.lock().unwrap();
-      cache.insert(path.to_string_lossy().to_string(), CacheEntry {
-          metadata: metadata.clone(),
-          mtime,
+    // 画像ファイルはバイナリのためテキストとして読み込まず、安全に空本文で返却
+    if document_type == NovelaidDocumentType::Image {
+      return Ok(NovelaidDocument {
+        path: path.to_string_lossy().to_string(),
+        base_name,
+        file_title,
+        content: String::new(),
+        metadata: serde_json::json!({}),
+        document_type,
+        mtime_ms,
       });
     }
 
-    Ok(NovelaidDocument {
-      path: path.to_string_lossy().to_string(),
-      base_name: path.file_name().unwrap_or_default().to_string_lossy().to_string(),
-      file_title: path.file_stem().unwrap_or_default().to_string_lossy().to_string(),
-      content: body.to_string(),
-      metadata,
-      document_type,
-      mtime_ms,
-    })
+    // テキストファイル読み込み試行 (バイナリや未知の形式でUTF-8デコード失敗時はUnknownとして安全返却)
+    match std::fs::read_to_string(path) {
+      Ok(content) => {
+        let (metadata, body) = self.extract_frontmatter(&content);
+
+        // Update cache
+        {
+          let mut cache = self.metadata_cache.lock().unwrap();
+          cache.insert(path.to_string_lossy().to_string(), CacheEntry {
+              metadata: metadata.clone(),
+              mtime,
+          });
+        }
+
+        Ok(NovelaidDocument {
+          path: path.to_string_lossy().to_string(),
+          base_name,
+          file_title,
+          content: body.to_string(),
+          metadata,
+          document_type,
+          mtime_ms,
+        })
+      }
+      Err(_) => {
+        // 非テキストファイルまたは読み込み不可ファイル
+        Ok(NovelaidDocument {
+          path: path.to_string_lossy().to_string(),
+          base_name,
+          file_title,
+          content: String::new(),
+          metadata: serde_json::json!({}),
+          document_type: NovelaidDocumentType::Unknown,
+          mtime_ms,
+        })
+      }
+    }
   }
 
   pub fn write_document(&self, path: &Path, document: NovelaidDocument) -> crate::Result<u64> {

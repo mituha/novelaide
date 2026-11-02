@@ -217,7 +217,9 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
       <div className="editor-tabs-list" ref={tabsListRef} onWheel={handleWheel}>
         {tabs.map((tab) => {
           const isActive = tab.path === activePath;
-          const isTabPreview = tab.viewMode === 'preview' || tab.viewMode === 'reader';
+          const isTabPreview =
+            (tab.viewMode === 'preview' || tab.viewMode === 'reader') &&
+            tab.documentType !== 'image';
 
           return (
             <div

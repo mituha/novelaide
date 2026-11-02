@@ -8,7 +8,7 @@ export const TextEditorPlugin: DocumentViewPlugin = {
   id: 'novelaid.view.editor.text',
   name: 'エディター',
   viewMode: 'editor',
-  supportedDocumentTypes: ['novel', 'markdown', 'css', 'unknown', 'chat'],
+  supportedDocumentTypes: ['novel', 'markdown', 'css', 'chat'],
   priority: 10,
   component: CodeEditor as any,
 };

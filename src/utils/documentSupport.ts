@@ -29,6 +29,6 @@ export function getInitialViewMode(
   docType?: NovelaidDocumentType | string
 ): DocumentViewMode {
   if (docType === 'chat') return 'canvas';
-  if (docType === 'image') return 'reader';
+  if (docType === 'image') return 'preview';
   return 'editor';
 }

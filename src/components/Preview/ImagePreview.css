@@ -1,0 +1,103 @@
+.image-preview-container {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: var(--bg-primary, #1e1e1e);
+  /* 透過PNG/SVG用のチェッカーボード背景パターン */
+  background-image: 
+    linear-gradient(45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(255, 255, 255, 0.04) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(255, 255, 255, 0.04) 75%);
+  background-size: 20px 20px;
+  background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+  cursor: grab;
+  user-select: none;
+  box-sizing: border-box;
+}
+
+.image-preview-container.is-dragging {
+  cursor: grabbing;
+}
+
+.image-preview-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transform-origin: center center;
+  will-change: transform;
+  transition: transform 0.05s ease-out;
+  pointer-events: none;
+}
+
+.image-preview-element {
+  max-width: none;
+  max-height: none;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.35);
+  border-radius: 4px;
+  display: block;
+}
+
+/* 下部フローティングツールバー */
+.image-preview-toolbar {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background-color: rgba(30, 30, 30, 0.85);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border-color, #3a3a3a);
+  border-radius: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 10;
+  cursor: default;
+}
+
+.image-tool-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary, #cccccc);
+  padding: 4px 6px;
+  border-radius: 12px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s ease;
+}
+
+.image-tool-btn:hover {
+  background-color: var(--bg-hover, #444444);
+  color: var(--text-primary, #ffffff);
+}
+
+.image-zoom-indicator {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary, #ffffff);
+  min-width: 48px;
+  text-align: center;
+  padding: 2px 4px;
+  cursor: pointer;
+  border-radius: 4px;
+  transition: background-color 0.15s ease;
+}
+
+.image-zoom-indicator:hover {
+  background-color: var(--bg-hover, #444444);
+}
+
+.image-toolbar-separator {
+  width: 1px;
+  height: 14px;
+  background-color: var(--border-color, #444444);
+  margin: 0 2px;
+}
