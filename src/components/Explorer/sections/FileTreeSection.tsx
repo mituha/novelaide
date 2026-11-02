@@ -60,7 +60,7 @@ export const FileTreeHeaderActions: React.FC<{ sectionId: string }> = () => {
 
 export const FileTreeSection: React.FC<ExplorerSectionProps> = ({ projectPath }) => {
   return (
-    <div style={{ width: '100%' }}>
+    <div style={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
       <FileExplorer projectPath={projectPath} showToolbar={false} />
     </div>
   );
