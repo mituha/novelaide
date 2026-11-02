@@ -7,6 +7,129 @@
   border-bottom: 1px solid var(--border-color);
   user-select: none;
   box-sizing: border-box;
+  position: relative;
+  min-width: 0;
+}
+
+/* 開いているタブ一覧ドロップダウン */
+.editor-tabs-dropdown-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 100%;
+  flex-shrink: 0;
+  border-right: 1px solid var(--border-color);
+}
+
+.editor-tabs-dropdown-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  width: 28px;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.editor-tabs-dropdown-btn:hover,
+.editor-tabs-dropdown-btn.active {
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}
+
+.editor-tabs-dropdown-menu {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  min-width: 240px;
+  max-width: 360px;
+  max-height: 320px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-top: 2px;
+}
+
+.editor-tabs-dropdown-header {
+  padding: 6px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-color);
+  background-color: var(--bg-secondary);
+}
+
+.editor-tabs-dropdown-list {
+  overflow-y: auto;
+  overflow-x: hidden;
+  flex: 1;
+}
+
+.editor-tabs-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.editor-tabs-dropdown-item:hover {
+  background-color: var(--hover-color);
+  color: var(--text-primary);
+}
+
+.editor-tabs-dropdown-item.active {
+  background-color: var(--bg-secondary);
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+.editor-tabs-dropdown-item.is-dirty .dropdown-item-title {
+  color: #f87171;
+}
+
+.dropdown-item-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dropdown-dirty-indicator {
+  font-size: 8px;
+  color: #ef4444;
+  margin: 0 4px;
+}
+
+.dropdown-close-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 2px;
+  border-radius: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, background 0.15s ease;
+}
+
+.dropdown-close-btn:hover {
+  opacity: 1;
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
 }
 
 .editor-tabs-list {
@@ -16,15 +139,12 @@
   overflow-x: auto;
   overflow-y: hidden;
   flex: 1;
+  min-width: 0;
+  scrollbar-width: none; /* Firefox */
 }
 
 .editor-tabs-list::-webkit-scrollbar {
-  height: 3px;
-}
-
-.editor-tabs-list::-webkit-scrollbar-thumb {
-  background: var(--border-color);
-  border-radius: 2px;
+  display: none; /* Chrome, Safari, Edge */
 }
 
 .editor-tab-item {
@@ -39,6 +159,10 @@
   cursor: pointer;
   white-space: nowrap;
   transition: background-color 0.15s ease, color 0.15s ease;
+  flex-shrink: 0;
+  min-width: 100px;
+  max-width: 200px;
+  box-sizing: border-box;
 }
 
 .editor-tab-item:hover {
@@ -109,6 +233,8 @@
   padding: 0 8px;
   gap: 6px;
   height: 100%;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .editor-tab-action-btn {

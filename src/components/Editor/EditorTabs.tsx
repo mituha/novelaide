@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useDocument, PaneId } from '../../contexts/DocumentContext';
 import { DocumentIcon } from '../FileExplorer/DocumentIcon';
-import { X, Columns2, BookOpen, Eye, Edit3 } from 'lucide-react';
+import { X, Columns2, BookOpen, Eye, Edit3, ChevronDown } from 'lucide-react';
 import './EditorTabs.css';
 
 interface EditorTabsProps {
@@ -24,6 +24,48 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
   const tabs = getTabsForPane(paneId);
   const activeDoc = getActiveDocumentForPane(paneId);
   const activePath = activePathByPane[paneId];
+
+  const tabsListRef = useRef<HTMLDivElement>(null);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  // ドロップダウンメニューの外側クリック検知
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    };
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
+
+  // アクティブタブ変更時に可視領域へ自動スクロール
+  useEffect(() => {
+    if (!activePath || !tabsListRef.current) return;
+    const activeElem = tabsListRef.current.querySelector<HTMLElement>('.editor-tab-item.active');
+    if (activeElem) {
+      activeElem.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest',
+        inline: 'nearest',
+      });
+    }
+  }, [activePath]);
+
+  // マウスホイールによる水平スクロール
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    if (tabsListRef.current) {
+      const delta = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+      if (delta !== 0) {
+        tabsListRef.current.scrollLeft += delta;
+      }
+    }
+  };
 
   if (tabs.length === 0) {
     return null;
@@ -50,7 +92,63 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
 
   return (
     <div className={`editor-tabs-bar pane-bar-${paneId.replace('.', '-')}`}>
-      <div className="editor-tabs-list">
+      {/* 開いているタブ一覧ドロップダウンボタン */}
+      <div className="editor-tabs-dropdown-container" ref={dropdownRef}>
+        <button
+          type="button"
+          className={`editor-tabs-dropdown-btn ${isDropdownOpen ? 'active' : ''}`}
+          onClick={() => setIsDropdownOpen((prev) => !prev)}
+          title="開いているタブ一覧"
+          aria-label="開いているタブ一覧"
+        >
+          <ChevronDown size={14} />
+        </button>
+
+        {isDropdownOpen && (
+          <div className="editor-tabs-dropdown-menu">
+            <div className="editor-tabs-dropdown-header">
+              <span>開いているタブ ({tabs.length})</span>
+            </div>
+            <div className="editor-tabs-dropdown-list">
+              {tabs.map((tab) => {
+                const isActive = tab.path === activePath;
+                return (
+                  <div
+                    key={`dropdown-${tab.path}`}
+                    className={`editor-tabs-dropdown-item ${isActive ? 'active' : ''} ${tab.isDirty ? 'is-dirty' : ''}`}
+                    onClick={() => {
+                      switchTab(tab.path, paneId);
+                      setIsDropdownOpen(false);
+                    }}
+                    title={tab.path}
+                  >
+                    <DocumentIcon type={tab.documentType} isOpen={false} size={14} />
+                    <span className="dropdown-item-title">{tab.baseName}</span>
+                    {tab.isDirty && <span className="dropdown-dirty-indicator">●</span>}
+                    <button
+                      type="button"
+                      className="dropdown-close-btn"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        closeTab(tab.path, paneId);
+                        if (tabs.length <= 1) {
+                          setIsDropdownOpen(false);
+                        }
+                      }}
+                      title="閉じる"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* スクロール可能なタブ一覧 */}
+      <div className="editor-tabs-list" ref={tabsListRef} onWheel={handleWheel}>
         {tabs.map((tab) => {
           const isActive = tab.path === activePath;
           const isTabPreview = tab.viewMode === 'preview' || tab.viewMode === 'reader';
