@@ -155,14 +155,18 @@
   font-size: 0.85rem;
   color: var(--text-secondary);
   background-color: transparent;
+  border-top: 2px solid transparent;
+  border-bottom: 2px solid transparent;
+  border-left: 1px solid transparent;
   border-right: 1px solid var(--border-color);
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
   flex-shrink: 0;
   min-width: 100px;
   max-width: 200px;
   box-sizing: border-box;
+  position: relative;
 }
 
 .editor-tab-item:hover {
@@ -170,11 +174,16 @@
   color: var(--text-primary);
 }
 
+/* アクティブタブ: 上左右に明確な境界線を表示し、エディタ本文と自然に一体化 */
 .editor-tab-item.active {
   background-color: var(--bg-primary);
   color: var(--text-primary);
-  border-bottom: 2px solid var(--accent-color);
+  border-top: 2px solid var(--accent-color);
+  border-left: 1px solid var(--border-color);
+  border-right: 1px solid var(--border-color);
+  border-bottom: 2px solid var(--bg-primary);
   font-weight: 500;
+  z-index: 2;
 }
 
 .tab-title {
@@ -204,7 +213,8 @@
 }
 
 .editor-tab-item.is-dirty.active {
-  border-bottom: 2px solid #ef4444;
+  border-top: 2px solid #ef4444;
+  border-bottom: 2px solid var(--bg-primary);
 }
 
 .tab-close-btn {
@@ -271,4 +281,49 @@
 
 .pane-bar-editor-right {
   border-left: 1px solid var(--border-color);
+}
+
+/* 左右分割表示時のアクションボタンスリム化（タブ領域最大化） */
+.editor-tabs-bar.is-split .editor-tab-action-btn {
+  padding: 4px 6px;
+  gap: 0;
+}
+
+/* タブ右クリックコンテキストメニュー */
+.tab-context-menu {
+  position: fixed;
+  z-index: 1000;
+  min-width: 175px;
+  background-color: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+  padding: 4px 0;
+  font-size: 12px;
+  user-select: none;
+}
+
+.tab-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.tab-context-menu-item:hover {
+  background-color: var(--hover-color);
+}
+
+.tab-context-menu-item.danger:hover {
+  background-color: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.tab-context-menu-separator {
+  height: 1px;
+  background-color: var(--border-color);
+  margin: 4px 0;
 }

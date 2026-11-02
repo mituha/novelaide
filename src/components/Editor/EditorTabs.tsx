@@ -1,11 +1,26 @@
 import React, { useRef, useState, useEffect } from 'react';
-import { useDocument, PaneId } from '../../contexts/DocumentContext';
+import { useDocument, PaneId, TabItem } from '../../contexts/DocumentContext';
 import { DocumentIcon } from '../FileExplorer/DocumentIcon';
-import { X, Columns2, BookOpen, Eye, Edit3, ChevronDown } from 'lucide-react';
+import {
+  X,
+  Columns2,
+  BookOpen,
+  Eye,
+  Edit3,
+  ChevronDown,
+  Split,
+  PanelRightClose,
+} from 'lucide-react';
 import './EditorTabs.css';
 
 interface EditorTabsProps {
   paneId?: PaneId;
+}
+
+interface TabContextMenuState {
+  x: number;
+  y: number;
+  tab: TabItem;
 }
 
 export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }) => {
@@ -15,10 +30,14 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
     activePathByPane,
     switchTab,
     closeTab,
+    closeOtherTabs,
+    closeRightTabs,
+    closeAllTabs,
     changeViewMode,
     openPreviewInOtherPane,
     splitToOtherPane,
     closePane,
+    isSplit,
   } = useDocument();
 
   const tabs = getTabsForPane(paneId);
@@ -27,7 +46,10 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
 
   const tabsListRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const contextMenuRef = useRef<HTMLDivElement>(null);
+
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [contextMenu, setContextMenu] = useState<TabContextMenuState | null>(null);
 
   // ドロップダウンメニューの外側クリック検知
   useEffect(() => {
@@ -43,6 +65,30 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, [isDropdownOpen]);
+
+  // コンテキストメニューの外側クリックおよびEscapeキー検知
+  useEffect(() => {
+    if (!contextMenu) return;
+
+    const handleMouseDown = (e: MouseEvent) => {
+      if (contextMenuRef.current && !contextMenuRef.current.contains(e.target as Node)) {
+        setContextMenu(null);
+      }
+    };
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setContextMenu(null);
+      }
+    };
+
+    window.addEventListener('mousedown', handleMouseDown);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('mousedown', handleMouseDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [contextMenu]);
 
   // アクティブタブ変更時に可視領域へ自動スクロール
   useEffect(() => {
@@ -65,6 +111,26 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
         tabsListRef.current.scrollLeft += delta;
       }
     }
+  };
+
+  // タブの右クリックハンドラ
+  const handleTabContextMenu = (e: React.MouseEvent, tab: TabItem) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    let x = e.clientX;
+    let y = e.clientY;
+    const menuWidth = 200;
+    const menuHeight = 240;
+
+    if (x + menuWidth > window.innerWidth) {
+      x = Math.max(0, window.innerWidth - menuWidth - 8);
+    }
+    if (y + menuHeight > window.innerHeight) {
+      y = Math.max(0, window.innerHeight - menuHeight - 8);
+    }
+
+    setContextMenu({ x, y, tab });
   };
 
   if (tabs.length === 0) {
@@ -91,7 +157,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
   };
 
   return (
-    <div className={`editor-tabs-bar pane-bar-${paneId.replace('.', '-')}`}>
+    <div className={`editor-tabs-bar pane-bar-${paneId.replace('.', '-')} ${isSplit ? 'is-split' : ''}`}>
       {/* 開いているタブ一覧ドロップダウンボタン */}
       <div className="editor-tabs-dropdown-container" ref={dropdownRef}>
         <button
@@ -158,6 +224,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
               key={`${paneId}-${tab.path}`}
               className={`editor-tab-item ${isActive ? 'active' : ''} ${tab.isDirty ? 'is-dirty' : ''}`}
               onClick={() => switchTab(tab.path, paneId)}
+              onContextMenu={(e) => handleTabContextMenu(e, tab)}
               title={`${tab.path} (${tab.viewMode})${tab.isDirty ? ' - 未保存の変更あり' : ''}`}
             >
               <DocumentIcon
@@ -200,12 +267,12 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
             title={isPreviewMode ? '編集モードに切り替え' : 'プレビューモードに切り替え'}
           >
             {isPreviewMode ? <Edit3 size={13} /> : <Eye size={13} />}
-            <span>{isPreviewMode ? '編集へ' : '表示'}</span>
+            {!isSplit && <span>{isPreviewMode ? '編集へ' : '表示'}</span>}
           </button>
         )}
 
-        {/* 2. 単にドキュメントを分割表示する機能（同じ状態のまま反対ペインに表示/アクティブ化） */}
-        {activePath && (
+        {/* 2. 左ペイン時のみ: 単にドキュメントを分割表示する機能 */}
+        {paneId === 'editor.left' && activePath && (
           <button
             type="button"
             className="editor-tab-action-btn"
@@ -213,12 +280,12 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
             title="反対側のペインに分割表示（同じ状態で開く/既存ならアクティブ化）"
           >
             <Columns2 size={13} />
-            <span>横に分割</span>
+            {!isSplit && <span>横に分割</span>}
           </button>
         )}
 
-        {/* 3. 別サイドのビューにプレビュー状態で開く機能（既存ならアクティブ化） */}
-        {activePath && canPreview && (
+        {/* 3. 左ペイン時のみ: 別サイドのビューにプレビュー状態で開く機能 */}
+        {paneId === 'editor.left' && activePath && canPreview && (
           <button
             type="button"
             className="editor-tab-action-btn"
@@ -226,7 +293,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
             title="反対側のペインにプレビューとして開く（既存ならアクティブ化）"
           >
             <BookOpen size={13} />
-            <span>分割プレビュー</span>
+            {!isSplit && <span>分割プレビュー</span>}
           </button>
         )}
 
@@ -239,10 +306,100 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
             title="右ペインを閉じる"
           >
             <X size={13} />
-            <span>ペインを閉じる</span>
+            {!isSplit && <span>ペインを閉じる</span>}
           </button>
         )}
       </div>
+
+      {/* タブ右クリックコンテキストメニュー */}
+      {contextMenu && (
+        <div
+          ref={contextMenuRef}
+          className="tab-context-menu"
+          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
+        >
+          <div
+            className="tab-context-menu-item"
+            onClick={() => {
+              closeTab(contextMenu.tab.path, paneId);
+              setContextMenu(null);
+            }}
+          >
+            <X size={13} />
+            <span>閉じる</span>
+          </div>
+          <div
+            className="tab-context-menu-item"
+            onClick={() => {
+              closeOtherTabs(contextMenu.tab.path, paneId);
+              setContextMenu(null);
+            }}
+          >
+            <span>他のタブを閉じる</span>
+          </div>
+          <div
+            className="tab-context-menu-item"
+            onClick={() => {
+              closeRightTabs(contextMenu.tab.path, paneId);
+              setContextMenu(null);
+            }}
+          >
+            <span>右側のタブを閉じる</span>
+          </div>
+          <div
+            className="tab-context-menu-item"
+            onClick={() => {
+              closeAllTabs(paneId);
+              setContextMenu(null);
+            }}
+          >
+            <span>すべてのタブを閉じる</span>
+          </div>
+
+          <div className="tab-context-menu-separator" />
+
+          <div
+            className="tab-context-menu-item"
+            onClick={() => {
+              splitToOtherPane(contextMenu.tab.path, paneId);
+              setContextMenu(null);
+            }}
+          >
+            <Split size={13} />
+            <span>横に分割して開く</span>
+          </div>
+
+          {(contextMenu.tab.documentType === 'novel' ||
+            contextMenu.tab.documentType === 'markdown') && (
+            <div
+              className="tab-context-menu-item"
+              onClick={() => {
+                openPreviewInOtherPane(contextMenu.tab.path, paneId);
+                setContextMenu(null);
+              }}
+            >
+              <BookOpen size={13} />
+              <span>分割プレビューで開く</span>
+            </div>
+          )}
+
+          {isSplit && paneId === 'editor.right' && (
+            <>
+              <div className="tab-context-menu-separator" />
+              <div
+                className="tab-context-menu-item danger"
+                onClick={() => {
+                  closePane('editor.right');
+                  setContextMenu(null);
+                }}
+              >
+                <PanelRightClose size={13} />
+                <span>右ペインを閉じる</span>
+              </div>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };

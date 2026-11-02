@@ -42,6 +42,7 @@ interface DocumentContextType {
   closeTab: (path: string, paneId?: PaneId) => Promise<void>;
   closeDocument: (path: string) => Promise<void>;
   closeOtherTabs: (path: string, paneId?: PaneId) => Promise<void>;
+  closeRightTabs: (path: string, paneId?: PaneId) => Promise<void>;
   closeAllTabs: (paneId?: PaneId) => Promise<void>;
   switchTab: (path: string, paneId?: PaneId) => void;
   setActivePane: (paneId: PaneId) => void;
@@ -417,6 +418,17 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           return promotedDocs;
         }
 
+        // 4. 左ペインにタブがあり、右ペインのタブが0件になった場合：自動的に分割解除
+        if (hasLeft && !hasRight) {
+          setActivePathByPane((prevPaths) => ({
+            ...prevPaths,
+            'editor.right': null,
+          }));
+          setIsSplit(false);
+          setActivePane('editor.left');
+          return nextDocs;
+        }
+
         // 左右両方とも0件になった場合
         if (!hasLeft && !hasRight) {
           setActivePathByPane({ 'editor.left': null, 'editor.right': null });
@@ -469,6 +481,22 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       );
       for (const t of tabsToClose) {
         await closeTab(t.path, targetPane);
+      }
+    },
+    [activePane, openDocuments, closeTab]
+  );
+
+  // 指定したタブより右側のタブを閉じる
+  const closeRightTabs = useCallback(
+    async (path: string, paneId?: PaneId) => {
+      const targetPane = paneId || activePane;
+      const paneTabs = openDocuments.filter((d) => d.views.some((v) => v.viewId === targetPane));
+      const targetIndex = paneTabs.findIndex((d) => d.path === path);
+      if (targetIndex !== -1 && targetIndex < paneTabs.length - 1) {
+        const tabsToClose = paneTabs.slice(targetIndex + 1);
+        for (const t of tabsToClose) {
+          await closeTab(t.path, targetPane);
+        }
       }
     },
     [activePane, openDocuments, closeTab]
@@ -1083,6 +1111,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         closeTab,
         closeDocument,
         closeOtherTabs,
+        closeRightTabs,
         closeAllTabs,
         switchTab,
         setActivePane: handleSetActivePane,
