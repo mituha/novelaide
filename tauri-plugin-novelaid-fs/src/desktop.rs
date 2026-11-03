@@ -173,6 +173,18 @@ impl<R: Runtime> NovelaidFs<R> {
     let document_type = self.get_document_type_internal(path);
     let base_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
     let file_title = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let extension = path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_else(|| {
+            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
+            if name.starts_with('.') && !name[1..].contains('.') {
+                name[1..].to_lowercase()
+            } else {
+                String::new()
+            }
+        });
     let mtime = std::fs::metadata(path)
         .and_then(|m| m.modified())
         .unwrap_or_else(|_| SystemTime::now());
@@ -184,6 +196,7 @@ impl<R: Runtime> NovelaidFs<R> {
         path: path.to_string_lossy().to_string(),
         base_name,
         file_title,
+        extension,
         content: String::new(),
         metadata: serde_json::json!({}),
         document_type,
@@ -194,10 +207,15 @@ impl<R: Runtime> NovelaidFs<R> {
     // テキストファイル読み込み試行 (バイナリや未知の形式でUTF-8デコード失敗時はUnknownとして安全返却)
     match std::fs::read_to_string(path) {
       Ok(content) => {
-        let (metadata, body) = self.extract_frontmatter(&content);
+        // Code形式の場合はFrontmatter解析を行わず、純粋な生テキストとして扱う
+        let (metadata, body) = if document_type == NovelaidDocumentType::Code {
+          (serde_json::json!({}), content.as_str())
+        } else {
+          self.extract_frontmatter(&content)
+        };
 
         // Update cache
-        {
+        if document_type != NovelaidDocumentType::Code {
           let mut cache = self.metadata_cache.lock().unwrap();
           cache.insert(path.to_string_lossy().to_string(), CacheEntry {
               metadata: metadata.clone(),
@@ -209,6 +227,7 @@ impl<R: Runtime> NovelaidFs<R> {
           path: path.to_string_lossy().to_string(),
           base_name,
           file_title,
+          extension,
           content: body.to_string(),
           metadata,
           document_type,
@@ -221,6 +240,7 @@ impl<R: Runtime> NovelaidFs<R> {
           path: path.to_string_lossy().to_string(),
           base_name,
           file_title,
+          extension,
           content: String::new(),
           metadata: serde_json::json!({}),
           document_type: NovelaidDocumentType::Unknown,
@@ -231,7 +251,12 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn write_document(&self, path: &Path, document: NovelaidDocument) -> crate::Result<u64> {
-    let full_content = self.format_frontmatter(&document.metadata, &document.content);
+    // Code形式の場合はFrontmatterを付与せず、純粋な生テキストとして保存
+    let full_content = if document.document_type == NovelaidDocumentType::Code {
+      document.content
+    } else {
+      self.format_frontmatter(&document.metadata, &document.content)
+    };
     
     // 1. 保存開始前の現在時刻を取得 (A)
     let time_before_write = SystemTime::now();
@@ -314,12 +339,18 @@ impl<R: Runtime> NovelaidFs<R> {
     let file_doc_type = self.attributes_manager.get_document_type(&target_path);
     let base_name = next_file_name.clone();
     let file_title = target_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let extension = target_path
+        .extension()
+        .and_then(|s| s.to_str())
+        .map(|s| s.to_lowercase())
+        .unwrap_or_default();
 
     Ok(NovelaidDirEntry {
       name: next_file_name,
       path: target_path.to_string_lossy().to_string(),
       base_name,
       file_title,
+      extension,
       is_directory: false,
       document_type: file_doc_type,
       children: None,

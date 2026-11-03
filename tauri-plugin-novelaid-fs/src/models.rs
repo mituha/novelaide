@@ -12,6 +12,7 @@ pub enum NovelaidDocumentType {
     GitDiff,
     Browser,
     Css,
+    Code,
     Unknown,
     External,
 }
@@ -24,6 +25,7 @@ impl NovelaidDocumentType {
             "image" => Some(Self::Image),
             "chat" => Some(Self::Chat),
             "css" => Some(Self::Css),
+            "code" => Some(Self::Code),
             "gitdiff" | "git-diff" => Some(Self::GitDiff),
             "browser" => Some(Self::Browser),
             "external" => Some(Self::External),
@@ -41,6 +43,7 @@ pub struct NovelaidDirEntry {
     pub path: String,
     pub base_name: String,
     pub file_title: String,
+    pub extension: String,
     pub is_directory: bool,
     pub document_type: NovelaidDocumentType,
     pub children: Option<Vec<NovelaidDirEntry>>,
@@ -53,6 +56,7 @@ pub struct NovelaidDocument {
     pub path: String,
     pub base_name: String,
     pub file_title: String,
+    pub extension: String,
     pub content: String,
     #[ts(type = "any")]
     pub metadata: serde_json::Value,

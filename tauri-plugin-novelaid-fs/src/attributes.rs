@@ -110,6 +110,38 @@ impl AttributesManager {
 
     /// ファイルパスからドキュメントタイプを判定
     pub fn get_document_type(&self, file_path: &Path) -> NovelaidDocumentType {
+        let file_name = file_path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+
+        // 1. 親ディレクトリの .novelaidattributes ルールを最優先照合（全ファイル名対象）
+        if let Some(parent) = file_path.parent() {
+            if let Some(rules) = self.get_rules_for_dir(parent) {
+                for rule in &rules {
+                    if !rule.is_directory_pattern && matches_pattern(&rule.pattern, file_name) {
+                        return rule.target_type;
+                    }
+                }
+            }
+        }
+
+        let lower_name = file_name.to_lowercase();
+
+        // 2. ドットファイル（拡張子のない設定・エディタ関連ファイル）
+        if lower_name == ".gitignore"
+            || lower_name == ".gitattributes"
+            || lower_name == ".novelaidattributes"
+            || lower_name == ".editorconfig"
+            || lower_name == ".prettierrc"
+            || lower_name == ".eslintrc"
+            || lower_name == ".npmrc"
+            || lower_name.starts_with(".env")
+        {
+            return NovelaidDocumentType::Code;
+        }
+
+        // 3. 拡張子による標準判定
         let ext = file_path
             .extension()
             .and_then(|s| s.to_str())
@@ -118,29 +150,14 @@ impl AttributesManager {
 
         match ext.as_str() {
             "txt" => NovelaidDocumentType::Novel,
+            "md" | "markdown" => NovelaidDocumentType::Markdown,
             "png" | "jpg" | "jpeg" | "gif" | "webp" | "svg" | "bmp" | "tiff" | "ico" => {
                 NovelaidDocumentType::Image
             }
             "chat" | "ch" => NovelaidDocumentType::Chat,
-            "css" => NovelaidDocumentType::Css,
-            "md" | "markdown" => {
-                // 親ディレクトリの .novelaidattributes を確認
-                if let Some(parent) = file_path.parent() {
-                    if let Some(rules) = self.get_rules_for_dir(parent) {
-                        if let Some(file_name) = file_path.file_name().and_then(|n| n.to_str()) {
-                            // ファイル規則（!is_directory_pattern）と照合
-                            for rule in &rules {
-                                if !rule.is_directory_pattern
-                                    && matches_pattern(&rule.pattern, file_name)
-                                {
-                                    return rule.target_type;
-                                }
-                            }
-                        }
-                    }
-                }
-                NovelaidDocumentType::Markdown
-            }
+            "css" | "scss" | "less" | "json" | "yaml" | "yml" | "toml" | "js" | "mjs" | "cjs"
+            | "ts" | "tsx" | "jsx" | "html" | "xml" | "sh" | "bash" | "bat" | "cmd" | "ps1"
+            | "sql" | "ini" | "conf" | "properties" => NovelaidDocumentType::Code,
             _ => NovelaidDocumentType::Unknown,
         }
     }

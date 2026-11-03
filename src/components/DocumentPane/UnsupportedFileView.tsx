@@ -6,14 +6,16 @@ import './UnsupportedFileView.css';
 interface UnsupportedFileViewProps {
   path: string;
   documentType: string;
+  extension?: string;
 }
 
 export const UnsupportedFileView: React.FC<UnsupportedFileViewProps> = ({
   path,
   documentType,
+  extension,
 }) => {
   const fileName = path.split(/[/\\]/).pop() || path;
-  const ext = fileName.includes('.') ? fileName.split('.').pop()?.toUpperCase() : 'UNKNOWN';
+  const ext = (extension || (fileName.includes('.') ? fileName.split('.').pop() : 'UNKNOWN'))?.toUpperCase();
 
   const handleReveal = async () => {
     try {

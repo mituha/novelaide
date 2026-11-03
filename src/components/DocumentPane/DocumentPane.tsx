@@ -43,6 +43,7 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
           <UnsupportedFileView
             path={document.path}
             documentType={document.documentType}
+            extension={document.extension}
           />
         </div>
       </div>

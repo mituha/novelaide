@@ -36,6 +36,7 @@ export const DocumentIcon: React.FC<DocumentIconProps> = ({
       return <ImageIcon size={size} style={{ color: "#ec4899" }} />;
     case "chat":
       return <MessageSquare size={size} style={{ color: "#8b5cf6" }} />;
+    case "code":
     case "css":
     case "metadata":
       return <FileCode size={size} style={{ color: "#f59e0b" }} />;

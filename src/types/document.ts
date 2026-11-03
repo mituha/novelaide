@@ -39,6 +39,7 @@ export interface DocumentState {
   path: string;
   baseName: string;
   fileTitle: string;
+  extension: string;
   /** 原稿本文の単一実体（左右ペイン間で完全共有） */
   content: string;
   /** Frontmatter設定等のメタデータ実体 */

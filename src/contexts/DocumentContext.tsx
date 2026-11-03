@@ -319,6 +319,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             path: fileData.path,
             baseName: fileData.baseName,
             fileTitle: fileData.fileTitle,
+            extension: fileData.extension || '',
             content: fileData.content,
             metadata: fileData.metadata || {},
             documentType: fileData.documentType,

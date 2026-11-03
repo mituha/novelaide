@@ -4,10 +4,10 @@ export type DocumentStat = { path: string, exists: boolean, mtimeMs: number, siz
 
 export type FsChangeEvent = { action: string, path: string, newPath: string | null, };
 
-export type NovelaidDirEntry = { name: string, path: string, baseName: string, fileTitle: string, isDirectory: boolean, documentType: NovelaidDocumentType, children: Array<NovelaidDirEntry> | null, };
+export type NovelaidDirEntry = { name: string, path: string, baseName: string, fileTitle: string, extension: string, isDirectory: boolean, documentType: NovelaidDocumentType, children: Array<NovelaidDirEntry> | null, };
 
-export type NovelaidDocument = { path: string, baseName: string, fileTitle: string, content: string, metadata: any, documentType: NovelaidDocumentType, mtimeMs: number, };
+export type NovelaidDocument = { path: string, baseName: string, fileTitle: string, extension: string, content: string, metadata: any, documentType: NovelaidDocumentType, mtimeMs: number, };
 
-export type NovelaidDocumentType = "novel" | "markdown" | "image" | "chat" | "gitDiff" | "browser" | "css" | "unknown" | "external";
+export type NovelaidDocumentType = "novel" | "markdown" | "image" | "chat" | "gitDiff" | "browser" | "css" | "code" | "unknown" | "external";
 
 export type RemoveResult = { "status": "success" } | { "status": "needConfirm", fileName: string, isDirectory: boolean, } | { "status": "notFound" };

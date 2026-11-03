@@ -46,6 +46,72 @@ interface CodeEditorProps extends Partial<DocumentViewProps> {
   onChange?: (value: string | undefined) => void;
 }
 
+/**
+ * ファイルパス・拡張子およびDocumentTypeからMonaco Editorの言語IDを解決
+ */
+function detectMonacoLanguage(path: string, documentType?: string): string {
+  if (documentType === 'novel') return 'novel';
+  if (documentType === 'markdown') return 'markdown';
+  if (documentType === 'chat') return 'markdown';
+
+  const baseName = path.split(/[/\\]/).pop() || '';
+  const dotIndex = baseName.lastIndexOf('.');
+  let ext = dotIndex > 0 ? baseName.substring(dotIndex + 1).toLowerCase() : '';
+  if (!ext && baseName.startsWith('.') && !baseName.slice(1).includes('.')) {
+    ext = baseName.slice(1).toLowerCase();
+  }
+
+  switch (ext) {
+    case 'json':
+      return 'json';
+    case 'css':
+    case 'scss':
+    case 'less':
+      return 'css';
+    case 'yaml':
+    case 'yml':
+      return 'yaml';
+    case 'toml':
+    case 'ini':
+    case 'conf':
+    case 'properties':
+    case 'novelaidattributes':
+    case 'env':
+      return 'ini';
+    case 'gitignore':
+    case 'gitattributes':
+    case 'sh':
+    case 'bash':
+    case 'zsh':
+      return 'shell';
+    case 'bat':
+    case 'cmd':
+      return 'bat';
+    case 'js':
+    case 'mjs':
+    case 'cjs':
+    case 'jsx':
+      return 'javascript';
+    case 'ts':
+    case 'tsx':
+      return 'typescript';
+    case 'html':
+    case 'htm':
+      return 'html';
+    case 'xml':
+    case 'svg':
+      return 'xml';
+    case 'sql':
+      return 'sql';
+    case 'py':
+      return 'python';
+    case 'rs':
+      return 'rust';
+    default:
+      return documentType === 'code' ? 'plaintext' : 'novel';
+  }
+}
+
 export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   content,
@@ -80,8 +146,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   // 表示するテキスト（content または value）
   const textValue = content !== undefined ? content : (value ?? '');
 
-  // 言語の解決
-  const effectiveLanguage = language || (documentType === 'markdown' ? 'markdown' : 'novel');
+  // 言語の解決 (指定がなければパスとDocumentTypeから動的解決)
+  const effectiveLanguage = language || detectMonacoLanguage(path, documentType);
 
   useEffect(() => {
     saveDocumentRef.current = saveDocument;

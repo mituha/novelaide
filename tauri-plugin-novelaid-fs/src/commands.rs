@@ -66,6 +66,21 @@ fn read_dir_recursive<R: Runtime>(
         let path = path_buf.to_string_lossy().to_string();
         let base_name = path_buf.file_name().unwrap_or_default().to_string_lossy().to_string();
         let file_title = path_buf.file_stem().unwrap_or_default().to_string_lossy().to_string();
+        let extension = if is_directory {
+            String::new()
+        } else {
+            path_buf
+                .extension()
+                .and_then(|s| s.to_str())
+                .map(|s| s.to_lowercase())
+                .unwrap_or_else(|| {
+                    if base_name.starts_with('.') && !base_name[1..].contains('.') {
+                        base_name[1..].to_lowercase()
+                    } else {
+                        String::new()
+                    }
+                })
+        };
 
         let children = if is_directory && recursive {
             Some(read_dir_recursive(app, &path_buf, true, Some(document_type))?)
@@ -78,6 +93,7 @@ fn read_dir_recursive<R: Runtime>(
             path,
             base_name,
             file_title,
+            extension,
             is_directory,
             document_type,
             children,

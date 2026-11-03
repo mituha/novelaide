@@ -9,6 +9,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     path: "mock/01_プロローグ.md",
     baseName: "01_プロローグ.md",
     fileTitle: "01_プロローグ",
+    extension: "md",
     isDirectory: false,
     documentType: "novel",
     children: null,
@@ -18,6 +19,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     path: "mock/02_第1章_出会い.md",
     baseName: "02_第1章_出会い.md",
     fileTitle: "02_第1章_出会い",
+    extension: "md",
     isDirectory: false,
     documentType: "novel",
     children: null,
@@ -27,6 +29,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     path: "mock/03_第2章_旅立ち.md",
     baseName: "03_第2章_旅立ち.md",
     fileTitle: "03_第2章_旅立ち",
+    extension: "md",
     isDirectory: false,
     documentType: "novel",
     children: null,
@@ -36,6 +39,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     path: "mock/characters",
     baseName: "characters",
     fileTitle: "characters",
+    extension: "",
     isDirectory: true,
     documentType: "markdown",
     children: [
@@ -44,6 +48,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         path: "mock/characters/主人公_ソラ.md",
         baseName: "主人公_ソラ.md",
         fileTitle: "主人公_ソラ",
+        extension: "md",
         isDirectory: false,
         documentType: "markdown",
         children: null,
@@ -53,6 +58,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         path: "mock/characters/魔女_ルナ.md",
         baseName: "魔女_ルナ.md",
         fileTitle: "魔女_ルナ",
+        extension: "md",
         isDirectory: false,
         documentType: "markdown",
         children: null,
@@ -64,6 +70,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     path: "mock/settings",
     baseName: "settings",
     fileTitle: "settings",
+    extension: "",
     isDirectory: true,
     documentType: "markdown",
     children: [
@@ -72,6 +79,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         path: "mock/settings/世界観_帝国史.md",
         baseName: "世界観_帝国史.md",
         fileTitle: "世界観_帝国史",
+        extension: "md",
         isDirectory: false,
         documentType: "markdown",
         children: null,
@@ -83,6 +91,7 @@ const MOCK_ENTRIES: DirEntry[] = [
     path: "mock/assets",
     baseName: "assets",
     fileTitle: "assets",
+    extension: "",
     isDirectory: true,
     documentType: "image",
     children: [
@@ -91,6 +100,7 @@ const MOCK_ENTRIES: DirEntry[] = [
         path: "mock/assets/大陸地図.png",
         baseName: "大陸地図.png",
         fileTitle: "大陸地図",
+        extension: "png",
         isDirectory: false,
         documentType: "image",
         children: null,
@@ -152,7 +162,10 @@ export const fileService = {
       const baseName = path.split(/[/\\]/).pop() || "";
       const dotIndex = baseName.lastIndexOf('.');
       const fileTitle = dotIndex > 0 ? baseName.substring(0, dotIndex) : baseName;
-      const ext = dotIndex > 0 ? baseName.substring(dotIndex).toLowerCase() : "";
+      let extension = dotIndex > 0 ? baseName.substring(dotIndex + 1).toLowerCase() : "";
+      if (!extension && baseName.startsWith('.') && !baseName.slice(1).includes('.')) {
+        extension = baseName.slice(1).toLowerCase();
+      }
 
       // ブラウザ環境でのみモックデータを返却
       if (path.startsWith('mock/')) {
@@ -161,6 +174,7 @@ export const fileService = {
             path,
             baseName,
             fileTitle: "魔女_ルナ",
+            extension: "md",
             documentType: "markdown",
             metadata: { role: "ヒロイン", age: 17 },
             mtimeMs: Date.now(),
@@ -172,6 +186,7 @@ export const fileService = {
             path,
             baseName,
             fileTitle,
+            extension,
             documentType: "image",
             metadata: {},
             mtimeMs: Date.now(),
@@ -182,15 +197,15 @@ export const fileService = {
 
       // 拡張子から簡易判定
       let documentType: FileDocument['documentType'] = "unknown";
-      if (['.png', '.jpg', '.jpeg', '.gif', '.webp', '.svg', '.bmp', '.ico'].includes(ext)) {
+      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extension)) {
         documentType = "image";
-      } else if (ext === '.txt') {
+      } else if (extension === 'txt') {
         documentType = "novel";
-      } else if (ext === '.md' || ext === '.markdown') {
+      } else if (extension === 'md' || extension === 'markdown') {
         documentType = "markdown";
-      } else if (ext === '.css') {
-        documentType = "css";
-      } else if (ext === '.chat' || ext === '.ch') {
+      } else if (['gitignore', 'gitattributes', 'novelaidattributes', 'editorconfig', 'prettierrc', 'json', 'yaml', 'yml', 'toml', 'css', 'scss', 'less', 'js', 'ts', 'sh', 'bat', 'ini'].includes(extension)) {
+        documentType = "code";
+      } else if (extension === 'chat' || extension === 'ch') {
         documentType = "chat";
       }
 
@@ -198,6 +213,7 @@ export const fileService = {
         path,
         baseName,
         fileTitle,
+        extension,
         mtimeMs: Date.now(),
         content: "",
         metadata: {},
@@ -220,10 +236,18 @@ export const fileService = {
   // ファイル保存
   async writeFile(path: string, content: string, metadata: any = {}): Promise<number> {
     try {
+      const baseName = path.split(/[/\\]/).pop() || "";
+      const dotIndex = baseName.lastIndexOf('.');
+      let extension = dotIndex > 0 ? baseName.substring(dotIndex + 1).toLowerCase() : "";
+      if (!extension && baseName.startsWith('.') && !baseName.slice(1).includes('.')) {
+        extension = baseName.slice(1).toLowerCase();
+      }
+
       const doc: FileDocument = {
         path,
-        baseName: path.split(/[/\\]/).pop() || "",
-        fileTitle: (path.split(/[/\\]/).pop() || "").replace(/\.[^/.]+$/, ""),
+        baseName,
+        fileTitle: dotIndex > 0 ? baseName.substring(0, dotIndex) : baseName,
+        extension,
         content,
         metadata,
         documentType: "novel",
@@ -259,6 +283,7 @@ export const fileService = {
         path: targetPath,
         baseName: fileName,
         fileTitle: "0130_第13話",
+        extension: "txt",
         isDirectory: false,
         documentType: "novel",
         children: null,
