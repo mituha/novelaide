@@ -434,8 +434,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
         },
       };
       saveFile(next);
+
+      // アクティブなセッションが存在する場合、即座にモデル・プロバイダー・APIキーを同期
+      if (sessionRef.current) {
+        sessionRef.current.setModel(model, provider as any, provider === 'gemini' ? geminiApiKey : undefined);
+      }
     },
-    [fileData, saveFile]
+    [fileData, saveFile, geminiApiKey]
   );
 
   const handlePersonaChange = (id: string) => {

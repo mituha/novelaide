@@ -122,6 +122,16 @@ interface StreamFnOptions {
 }
 
 /**
+ * プロバイダーに応じたベースURLを安全に解決
+ */
+export function resolveBaseUrl(provider?: AiProviderType, customUrl?: string): string {
+  if (provider === 'gemini') {
+    return GEMINI_OPENAI_BASE_URL;
+  }
+  return customUrl && customUrl.trim().length > 0 ? customUrl.trim() : DEFAULT_LM_STUDIO_URL;
+}
+
+/**
  * LM Studio / Google Gemini / OpenAI 互換のブラウザセーフな StreamFn
  * pi-agent-core / pi-ai の AssistantMessageEventStream プロトコルに完全準拠
  */
@@ -129,7 +139,7 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
   const provider = options.provider || 'lm-studio';
   const defaultModel = options.defaultModel || (provider === 'gemini' ? 'gemini-2.5-flash' : 'qwen2.5-7b-instruct');
   
-  let baseUrl = options.baseUrl || (provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+  let baseUrl = resolveBaseUrl(provider, options.baseUrl);
   baseUrl = baseUrl.replace(/\/+$/, '');
 
   return (modelOrMessages: any, contextOrOptions: any, maybeOptions?: any) => {
@@ -245,6 +255,18 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
       const partial: any = { role: 'assistant', content: [] };
       stream.push({ type: 'start', partial });
 
+      // Gemini 選択時で API キーが未入力の場合は即座に案内して終了
+      if (provider === 'gemini' && (!options.apiKey || options.apiKey.trim().length === 0)) {
+        console.warn('%c[Novelaid AI] Google Gemini API キーが未設定です ⚠️', 'color: #ef4444; font-weight: bold;');
+        const errMsg = '【Google Gemini API キー未設定】\n設定画面（AI設定）で Google Gemini API キーを入力してください。';
+        partial.content = [{ type: 'text', text: errMsg }];
+        stream.push({ type: 'text_start', contentIndex: 0, partial: { ...partial } } as any);
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: errMsg, partial: { ...partial } } as any);
+        stream.push({ type: 'text_end', contentIndex: 0, content: errMsg, partial } as any);
+        stream.end({ role: 'assistant', content: [{ type: 'text', text: errMsg }], stopReason: 'stop' } as any);
+        return;
+      }
+
       let receivedTokenCount = 0;
       let fullThoughtText = '';
       let fullResponseText = '';
@@ -267,7 +289,8 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
           stream: true,
         };
 
-        if (options.useReasoning === false) {
+        // LM Studio のみ 推論無効化パラメータを付与（Gemini 等クラウド互換レイヤーでの 400 不正パラメータエラーを防止）
+        if (options.useReasoning === false && provider === 'lm-studio') {
           requestBody.chat_template_kwargs = { enable_reasoning: false };
           requestBody.reasoning_effort = 'none';
         }
@@ -292,7 +315,19 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
         });
 
         if (!res.ok || !res.body) {
-          throw new Error(`LM Studio HTTP ${res.status}: ${res.statusText}`);
+          let errorDetail = '';
+          try {
+            const errJson = await res.json();
+            errorDetail = errJson.error?.message || errJson.message || JSON.stringify(errJson);
+          } catch {
+            try {
+              errorDetail = await res.text();
+            } catch {
+              errorDetail = res.statusText;
+            }
+          }
+          const providerLabel = provider === 'gemini' ? 'Google Gemini' : 'LM Studio';
+          throw new Error(`${providerLabel} HTTP ${res.status}: ${errorDetail || res.statusText}`);
         }
 
         const reader = res.body.getReader();
@@ -539,12 +574,21 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
           stopReason: hasToolCalls ? 'toolUse' : 'stop',
         } as any);
       } catch (err: any) {
+        const isLmStudio = provider === 'lm-studio';
+        const providerLabel = isLmStudio ? 'LM Studio' : 'Google Gemini';
+
         console.warn(
-          `%c[Novelaid AI] LM Studio 通信エラー / オフラインフォールバック ⚠️: ${err.message}`,
+          `%c[Novelaid AI] ${providerLabel} 通信エラー ⚠️: ${err.message}`,
           'color: #f59e0b; font-weight: bold;'
         );
 
-        const fallbackText = `\n（※LM Studio への接続が検出されなかったため、ローカル補助モードで動作しています）\n\nご質問を受け付けました。執筆パートナーとして原稿を分析します。`;
+        let fallbackText = '';
+        if (isLmStudio) {
+          fallbackText = `\n（※LM Studio への接続が検出されなかったため、ローカル補助モードで動作しています）\n\nご質問を受け付けました。執筆パートナーとして原稿を分析します。`;
+        } else {
+          fallbackText = `\n【${providerLabel} 通信エラー】\n${err.message || '接続に失敗しました。'}\n\n※設定画面（AI設定）で API キーやモデル指定をご確認ください。`;
+        }
+
         fullResponseText = fallbackText;
         partial.content = [{ type: 'text', text: fullResponseText }];
 
@@ -601,8 +645,8 @@ export class PiWritingAgentSession {
    * ExtensionAPI を通じたツールの登録とセッション初期化
    */
   public async init(): Promise<Agent> {
-    const baseUrl = this.options.baseUrl || DEFAULT_LM_STUDIO_URL;
-    const modelId = this.options.model || 'lm-studio/qwen2.5-7b-instruct';
+    const baseUrl = resolveBaseUrl(this.options.provider, this.options.baseUrl);
+    const modelId = this.options.model || (this.options.provider === 'gemini' ? 'gemini-2.5-flash' : 'qwen2.5-7b-instruct');
 
     // 1. Novelaid Extension の生成と登録
     this.registeredTools.clear();
@@ -681,8 +725,21 @@ export class PiWritingAgentSession {
             return `現在のモデル: ${this.getModel()} (${this.getProvider()})`;
           }
           const target = args.trim();
-          this.setModel(target);
-          return `モデルを ${target} に切り替えました。`;
+          let targetProvider: AiProviderType = this.options.provider || 'lm-studio';
+          let targetModel = target;
+
+          if (target.includes(':')) {
+            const [p, m] = target.split(':');
+            if (p === 'gemini' || p === 'lm-studio') {
+              targetProvider = p as AiProviderType;
+              targetModel = m;
+            }
+          } else if (target.toLowerCase().startsWith('gemini')) {
+            targetProvider = 'gemini';
+          }
+
+          this.setModel(targetModel, targetProvider);
+          return `モデルを ${targetModel} (${targetProvider}) に切り替えました。`;
         },
       });
     }
@@ -917,13 +974,26 @@ export class PiWritingAgentSession {
    * 現在のセッションのモデルまたはプロバイダーを動的変更
    */
   public setModel(modelId: string, provider?: AiProviderType, apiKey?: string): void {
-    this.options.model = modelId;
-    if (provider) this.options.provider = provider;
+    // 引数に接頭辞（gemini:... / lm-studio:...）が含まれている場合のプロバイダー自動判別
+    let targetProvider = provider || this.options.provider;
+    let targetModel = modelId;
+    if (modelId.includes(':')) {
+      const [p, m] = modelId.split(':');
+      if (p === 'gemini' || p === 'lm-studio') {
+        targetProvider = p as AiProviderType;
+        targetModel = m;
+      }
+    } else if (modelId.toLowerCase().startsWith('gemini')) {
+      targetProvider = 'gemini';
+    }
+
+    this.options.model = targetModel;
+    if (targetProvider) this.options.provider = targetProvider;
     if (apiKey) this.options.apiKey = apiKey;
 
-    // agent が既に初期化されている場合、streamFn を再生成して反映
+    // agent が既に初期化されている場合、streamFunction を再生成して反映
     if (this.agent) {
-      const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+      const baseUrl = resolveBaseUrl(this.options.provider, this.options.baseUrl);
       const permission: ToolPermissionLevel =
         this.options.toolsPermission ?? (this.options.useTools === false ? 'none' : 'read');
       const tools = (this.agent as any).state?.tools || [];
@@ -931,16 +1001,18 @@ export class PiWritingAgentSession {
         baseUrl,
         provider: this.options.provider,
         apiKey: this.options.apiKey,
-        defaultModel: modelId,
+        defaultModel: targetModel,
         useReasoning: this.options.useReasoning,
         toolsPermission: permission,
         tools,
       });
+      // pi-agent-core Agent クラスの正規フィールドは streamFunction
+      (this.agent as any).streamFunction = streamFn;
       (this.agent as any).streamFn = streamFn;
       (this.agent as any).state.model = {
         ...(this.agent as any).state.model,
-        id: modelId,
-        name: modelId,
+        id: targetModel,
+        name: targetModel,
         provider: this.options.provider || 'lm-studio',
       };
     }
@@ -950,7 +1022,7 @@ export class PiWritingAgentSession {
     this.options.useReasoning = val;
     if (this.agent) {
       (this.agent as any).state.thinkingLevel = val ? 'medium' : 'off';
-      const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+      const baseUrl = resolveBaseUrl(this.options.provider, this.options.baseUrl);
       const permission: ToolPermissionLevel =
         this.options.toolsPermission ?? (this.options.useTools === false ? 'none' : 'read');
       const tools = (this.agent as any).state?.tools || [];
@@ -963,6 +1035,7 @@ export class PiWritingAgentSession {
         toolsPermission: permission,
         tools,
       });
+      (this.agent as any).streamFunction = streamFn;
       (this.agent as any).streamFn = streamFn;
     }
   }
@@ -1036,7 +1109,7 @@ export class PiWritingAgentSession {
     (this.agent as any).state.tools = toolsForAgent;
 
     // 2. streamFn の再構築（モデル・プロバイダー・ツール権限の反映）
-    const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+    const baseUrl = resolveBaseUrl(this.options.provider, this.options.baseUrl);
     const modelId = this.options.model || (this.options.provider === 'gemini' ? 'gemini-2.5-flash' : 'qwen2.5-7b-instruct');
     const streamFn = createBrowserStreamFn({
       baseUrl,
@@ -1048,6 +1121,7 @@ export class PiWritingAgentSession {
       tools: toolsForAgent,
     });
     (this.agent as any).streamFunction = streamFn;
+    (this.agent as any).streamFn = streamFn;
 
     // 3. システムプロンプトの動的反映（agent.state.messages[0] の更新）
     const systemPrompt = this.buildSystemPrompt();
