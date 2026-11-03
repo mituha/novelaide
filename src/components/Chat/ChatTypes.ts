@@ -10,6 +10,8 @@ export interface ChMetadata {
   updatedAt?: string;        // 'YYYYMMDDHHmmss'
   defaultPersonaId?: string; // 'partner' | 'editor' | 'proofreader' | 'character'
   defaultRoleId?: string;    // 'assistant'
+  contextMode?: ContextTargetMode;
+  includeFullText?: boolean;
   parameters?: {
     model?: string;
     provider?: string;
@@ -19,6 +21,13 @@ export interface ChMetadata {
     toolsPermission?: 'none' | 'read' | 'write';
     allowWrite?: boolean;
   };
+}
+
+export type ContextTargetMode = 'none' | 'active' | 'left' | 'right' | 'both';
+
+export interface ContextSelectionConfig {
+  mode: ContextTargetMode;
+  includeFullText: boolean;
 }
 
 export interface ChatMessagePart {

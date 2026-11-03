@@ -1,5 +1,7 @@
 import React, { useRef, useEffect } from 'react';
-import { Send, Square, Wrench, Sparkles, BookOpen, PenLine } from 'lucide-react';
+import { Send, Square, Wrench, Sparkles, PenLine } from 'lucide-react';
+import { ContextTargetMode } from './ChatTypes';
+import { AIContextSelector, DocSummary } from './AIContextSelector';
 import './AIChatInput.css';
 
 interface AIChatInputProps {
@@ -15,9 +17,19 @@ interface AIChatInputProps {
   onAllowWriteChange?: (val: boolean) => void;
   useReasoning?: boolean;
   onUseReasoningChange?: (val: boolean) => void;
+
+  // コンテキスト選択関連
+  contextMode?: ContextTargetMode;
+  onContextModeChange?: (mode: ContextTargetMode) => void;
+  includeFullText?: boolean;
+  onIncludeFullTextChange?: (include: boolean) => void;
+  leftDoc?: DocSummary | null;
+  rightDoc?: DocSummary | null;
+  activeDoc?: DocSummary | null;
+
+  // 互換用
   includeContext?: boolean;
   onIncludeContextChange?: (val: boolean) => void;
-  contextHint?: string;
 }
 
 export const AIChatInput: React.FC<AIChatInputProps> = ({
@@ -33,9 +45,13 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
   onAllowWriteChange,
   useReasoning = false,
   onUseReasoningChange,
-  includeContext = true,
-  onIncludeContextChange,
-  contextHint,
+  contextMode = 'active',
+  onContextModeChange,
+  includeFullText = true,
+  onIncludeFullTextChange,
+  leftDoc,
+  rightDoc,
+  activeDoc,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -64,18 +80,20 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
     <div className="chat-input-container">
       <div className="chat-input-toolbar">
         <div className="chat-toolbar-left">
-          {onIncludeContextChange && (
-            <button
-              type="button"
-              className={`chat-toggle-btn ${includeContext ? 'active' : ''}`}
-              onClick={() => onIncludeContextChange(!includeContext)}
-              title={contextHint ? `原稿コンテキスト: ${contextHint}` : '現在の原稿・設定をAIに参照させる'}
-            >
-              <BookOpen size={12} />
-              <span>原稿参照</span>
-            </button>
+          {/* コンテキスト選択ドロップダウン */}
+          {onContextModeChange && (
+            <AIContextSelector
+              mode={contextMode}
+              onModeChange={onContextModeChange}
+              includeFullText={includeFullText}
+              onIncludeFullTextChange={onIncludeFullTextChange || (() => {})}
+              leftDoc={leftDoc}
+              rightDoc={rightDoc}
+              activeDoc={activeDoc}
+            />
           )}
 
+          {/* ツール機能 ON/OFF */}
           {onUseToolsChange && (
             <button
               type="button"
@@ -88,6 +106,7 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
             </button>
           )}
 
+          {/* 書き込み・直接編集の許可 */}
           {useTools && onAllowWriteChange && (
             <button
               type="button"
@@ -104,6 +123,7 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
             </button>
           )}
 
+          {/* 思考プロセス・推論表示 */}
           {onUseReasoningChange && (
             <button
               type="button"

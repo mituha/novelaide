@@ -1,16 +1,21 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useDocument } from '../../contexts/DocumentContext';
+import { useProject } from '../../contexts/ProjectContext';
 import { useSettings } from 'restar-app-settings';
 import { fileService } from '../../services/fileService';
+import { DirEntry } from '../../types/document';
 import {
   ChFileStructure,
   ChatMessage,
   ChatMessagePart,
   DEFAULT_STATIC_PERSONAS,
+  ContextTargetMode,
 } from './ChatTypes';
 import { ChatHeader } from './ChatHeader';
 import { ChatMessageList } from './ChatMessageList';
 import { AIChatInput } from './AIChatInput';
+import { DocSummary } from './AIContextSelector';
+import { ProofreadActionToolbar } from './ProofreadActionToolbar';
 import { PiWritingAgentSession, UIDocumentContext } from 'tauri-plugin-novelaid-ai-api';
 import './ChatView.css';
 
@@ -118,6 +123,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   isExporting = false,
 }) => {
   const { openDocuments, activeDocument, activeLeftItem, activeRightItem, openDocument, updateContent } = useDocument();
+  const { projectPath } = useProject();
 
   const [input, setInput] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
@@ -145,7 +151,23 @@ export const ChatView: React.FC<ChatViewProps> = ({
       return true;
     }
   });
-  const [includeContext, setIncludeContext] = useState<boolean>(true);
+  const [contextMode, setContextMode] = useState<ContextTargetMode>(() => {
+    try {
+      const parsed = content ? JSON.parse(content) : null;
+      return parsed?.metadata?.contextMode ?? 'active';
+    } catch {
+      return 'active';
+    }
+  });
+  const [includeFullText, setIncludeFullText] = useState<boolean>(() => {
+    try {
+      const parsed = content ? JSON.parse(content) : null;
+      return parsed?.metadata?.includeFullText ?? true;
+    } catch {
+      return true;
+    }
+  });
+  const [availableFilesSummary, setAvailableFilesSummary] = useState<string>('');
 
   const activeAssistantMsgIdRef = useRef<string | null>(null);
 
@@ -181,10 +203,102 @@ export const ChatView: React.FC<ChatViewProps> = ({
       if (normalized.metadata?.parameters?.useReasoning !== undefined) {
         setUseReasoning(normalized.metadata.parameters.useReasoning);
       }
+      if (normalized.metadata?.contextMode !== undefined) {
+        setContextMode(normalized.metadata.contextMode);
+      }
+      if (normalized.metadata?.includeFullText !== undefined) {
+        setIncludeFullText(normalized.metadata.includeFullText);
+      }
     } catch (e) {
       console.warn('Failed to parse .ch content JSON:', e);
     }
   }, [content, defaultTitle]);
+
+  // プロジェクト内のファイル一覧（原稿・設定・プロット等）を収集して目次サマリーを生成
+  useEffect(() => {
+    let isMounted = true;
+    const loadProjectOverview = async () => {
+      if (!projectPath) {
+        // プロジェクト外の場合は開いているドキュメント一覧のみ
+        const openSummary = openDocuments
+          .map((d) => `- ${d.fileTitle} (${d.path}, 未保存: ${d.isDirty ? 'あり' : 'なし'})`)
+          .join('\n');
+        if (isMounted) setAvailableFilesSummary(openSummary ? `【現在開いているファイル】\n${openSummary}` : '');
+        return;
+      }
+
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const fileList: string[] = [];
+
+        const collectFiles = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (item.isDirectory) {
+              if (item.name === '.git' || item.name === 'node_modules') continue;
+              if (item.children) collectFiles(item.children);
+            } else {
+              const ext = (item.extension || '').toLowerCase();
+              if (['txt', 'md', 'json', 'ch', 'yaml', 'yml'].includes(ext)) {
+                const titlePart = item.fileTitle && item.fileTitle !== item.baseName ? ` [${item.fileTitle}]` : '';
+                fileList.push(`- ${item.relativePath || item.name}${titlePart}`);
+              }
+            }
+          }
+        };
+
+        collectFiles(entries);
+        if (isMounted) {
+          const summary = [
+            '【プロジェクト構造・参照可能ファイル一覧】',
+            ...fileList.slice(0, 50),
+            fileList.length > 50 ? `...他 ${fileList.length - 50} 件` : '',
+          ]
+            .filter(Boolean)
+            .join('\n');
+          setAvailableFilesSummary(summary);
+        }
+      } catch (e) {
+        console.warn('[ChatView] Failed to collect project overview:', e);
+      }
+    };
+
+    loadProjectOverview();
+    return () => {
+      isMounted = false;
+    };
+  }, [projectPath, openDocuments.length]);
+
+  // 各ペインのドキュメントサマリーの算出
+  const leftDocInfo: DocSummary | null = useMemo(() => {
+    if (!activeLeftItem) return null;
+    const doc = openDocuments.find((d) => d.path === activeLeftItem.path);
+    if (!doc) return null;
+    return {
+      title: doc.fileTitle || doc.baseName,
+      length: doc.content.length,
+      path: doc.path,
+    };
+  }, [activeLeftItem, openDocuments]);
+
+  const rightDocInfo: DocSummary | null = useMemo(() => {
+    if (!activeRightItem) return null;
+    const doc = openDocuments.find((d) => d.path === activeRightItem.path);
+    if (!doc) return null;
+    return {
+      title: doc.fileTitle || doc.baseName,
+      length: doc.content.length,
+      path: doc.path,
+    };
+  }, [activeRightItem, openDocuments]);
+
+  const activeDocInfo: DocSummary | null = useMemo(() => {
+    if (!activeDocument) return null;
+    return {
+      title: activeDocument.fileTitle || activeDocument.baseName,
+      length: activeDocument.content.length,
+      path: activeDocument.path,
+    };
+  }, [activeDocument]);
 
   // ファイルデータ保存
   const saveFile = useCallback(
@@ -205,6 +319,34 @@ export const ChatView: React.FC<ChatViewProps> = ({
       }
     },
     [onChangeContent]
+  );
+
+  const handleContextModeChange = useCallback(
+    (newMode: ContextTargetMode) => {
+      setContextMode(newMode);
+      saveFile({
+        ...fileData,
+        metadata: {
+          ...(fileData?.metadata || {}),
+          contextMode: newMode,
+        },
+      });
+    },
+    [fileData, saveFile]
+  );
+
+  const handleIncludeFullTextChange = useCallback(
+    (include: boolean) => {
+      setIncludeFullText(include);
+      saveFile({
+        ...fileData,
+        metadata: {
+          ...(fileData?.metadata || {}),
+          includeFullText: include,
+        },
+      });
+    },
+    [fileData, saveFile]
   );
 
   const currentPersonaId = fileData?.metadata?.defaultPersonaId || 'partner';
@@ -581,28 +723,59 @@ export const ChatView: React.FC<ChatViewProps> = ({
   );
 
   // メッセージ送信
-  const handleSend = async () => {
-    if (!input.trim() || isStreaming || isReadOnly) return;
+  const handleSend = async (overridePrompt?: string) => {
+    const rawText = overridePrompt !== undefined ? overridePrompt : input;
+    if (!rawText.trim() || isStreaming || isReadOnly) return;
 
-    const userText = input.trim();
-    setInput('');
+    const userText = rawText.trim();
+    if (overridePrompt === undefined) {
+      setInput('');
+    }
 
-    // コンテキストの収集（編集中原稿など）
+    // コンテキストの収集（contextMode および includeFullText に基づく）
     let contextContent = '';
-    if (includeContext) {
-      const contextDocs = [];
-      if (activeLeftItem && activeLeftItem.path !== path) {
-        const doc = openDocuments.find((d) => d.path === activeLeftItem.path);
-        if (doc) contextDocs.push(`【左ペイン (${doc.fileTitle})】\n${doc.content}`);
+    if (contextMode !== 'none') {
+      const selectedDocs: Array<{ title: string; path: string; content: string; label: string }> = [];
+
+      if (contextMode === 'left' || contextMode === 'both') {
+        if (activeLeftItem && activeLeftItem.path !== path) {
+          const doc = openDocuments.find((d) => d.path === activeLeftItem.path);
+          if (doc) selectedDocs.push({ label: '左ペイン原稿', title: doc.fileTitle, path: doc.path, content: doc.content });
+        }
       }
-      if (activeRightItem && activeRightItem.path !== path) {
-        const doc = openDocuments.find((d) => d.path === activeRightItem.path);
-        if (doc) contextDocs.push(`【右ペイン (${doc.fileTitle})】\n${doc.content}`);
+      if (contextMode === 'right' || contextMode === 'both') {
+        if (activeRightItem && activeRightItem.path !== path) {
+          const doc = openDocuments.find((d) => d.path === activeRightItem.path);
+          if (doc) selectedDocs.push({ label: '右ペイン原稿/設定', title: doc.fileTitle, path: doc.path, content: doc.content });
+        }
       }
-      if (contextDocs.length === 0 && activeDocument && activeDocument.path !== path) {
-        contextDocs.push(`【アクティブ原稿 (${activeDocument.fileTitle})】\n${activeDocument.content}`);
+      if (contextMode === 'active' || selectedDocs.length === 0) {
+        if (activeDocument && activeDocument.path !== path) {
+          selectedDocs.push({
+            label: 'アクティブ原稿',
+            title: activeDocument.fileTitle,
+            path: activeDocument.path,
+            content: activeDocument.content,
+          });
+        }
       }
-      contextContent = contextDocs.join('\n\n---\n\n');
+
+      if (selectedDocs.length > 0) {
+        if (includeFullText) {
+          // プッシュ型全文注入
+          contextContent = selectedDocs
+            .map((d) => `【${d.label}: ${d.title} (${d.path})】\n${d.content}`)
+            .join('\n\n---\n\n');
+        } else {
+          // 目次・参照案内のみ（プル型）
+          contextContent = [
+            '【参照対象ドキュメント概要 (本文は read ツール等で必要に応じて取得してください)】',
+            ...selectedDocs.map(
+              (d) => `- [${d.label}] ${d.title} (パス: ${d.path}, 文字数: ${d.content.length.toLocaleString()}文字)`
+            ),
+          ].join('\n');
+        }
+      }
     }
 
     const userMsg: ChatMessage = {
@@ -679,6 +852,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         toolsPermission,
         toolExecutor,
         contextContent,
+        availableFilesSummary,
         uiDocumentContext,
         onThoughtToken: (thoughtDelta) => {
           if (!useReasoning) return;
@@ -849,10 +1023,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
       />
 
       {!isReadOnly && (
+        <ProofreadActionToolbar
+          onTriggerAction={(prompt) => handleSend(prompt)}
+          disabled={isStreaming}
+          allowWrite={allowWrite}
+        />
+      )}
+
+      {!isReadOnly && (
         <AIChatInput
           value={input}
           onChange={setInput}
-          onSend={handleSend}
+          onSend={() => handleSend()}
           isStreaming={isStreaming}
           useTools={useTools}
           onUseToolsChange={!isReadOnly ? handleUseToolsChange : undefined}
@@ -860,13 +1042,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onAllowWriteChange={!isReadOnly ? handleAllowWriteChange : undefined}
           useReasoning={useReasoning}
           onUseReasoningChange={!isReadOnly ? handleUseReasoningChange : undefined}
-          includeContext={includeContext}
-          onIncludeContextChange={setIncludeContext}
-          contextHint={
-            activeDocument && activeDocument.path !== path
-              ? activeDocument.fileTitle
-              : undefined
-          }
+          contextMode={contextMode}
+          onContextModeChange={!isReadOnly ? handleContextModeChange : undefined}
+          includeFullText={includeFullText}
+          onIncludeFullTextChange={!isReadOnly ? handleIncludeFullTextChange : undefined}
+          leftDoc={leftDocInfo}
+          rightDoc={rightDocInfo}
+          activeDoc={activeDocInfo}
         />
       )}
     </div>
