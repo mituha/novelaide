@@ -8,6 +8,7 @@ import {
   User,
   Wrench,
   Sparkles,
+  Loader2,
 } from 'lucide-react';
 import { ChatMessage, PersonaDefinition } from './ChatTypes';
 import { MessageMarkdown } from './MessageMarkdown';
@@ -41,6 +42,24 @@ const displayTimestamp = (ts?: string | number): string => {
     return `${y}/${m}/${d} ${h}:${min}`;
   }
   return str;
+};
+
+/**
+ * 思考中テキストの最新行から短いスニペットを抽出
+ */
+const getLatestThoughtSnippet = (text?: string): string => {
+  if (!text || !text.trim()) return '';
+  const lines = text
+    .split('\n')
+    .map((l) => l.trim())
+    .filter(Boolean);
+  if (lines.length === 0) return '';
+  const lastLine = lines[lines.length - 1];
+  const cleaned = lastLine.replace(/^[-*#`>:\s]+/, '');
+  if (cleaned.length > 28) {
+    return cleaned.slice(0, 28) + '…';
+  }
+  return cleaned;
 };
 
 export const ChatMessageList: React.FC<ChatMessageListProps> = ({
@@ -120,11 +139,18 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
 
   return (
     <div ref={containerRef} className="chat-message-list" onScroll={handleScroll}>
-      {messages.map((msg) => {
+      {messages.map((msg, idx) => {
         const isUser = msg.role === 'user';
         const isSystem = msg.role === 'system';
         const personaId = msg.persona || msg.agentId;
         const persona = personas.find((p) => p.id === personaId);
+
+        const isLastMessage = idx === messages.length - 1;
+        const isRespondingNow = isStreaming && isLastMessage && msg.role === 'assistant';
+        const hasTextContent = (msg.parts || []).some(
+          (p) => p.type === 'text' && p.content && p.content.trim().length > 0
+        );
+        const isThinkingNow = isRespondingNow && !hasTextContent;
 
         if (isSystem) {
           return (
@@ -199,13 +225,38 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                         msg.parts.map((part, i) => (
                           <div key={`${msg.id}-part-${i}`} className={`chat-part part-${part.type}`}>
                             {part.type === 'thought' ? (
-                              <details className="chat-thought">
+                              <details
+                                className={`chat-thought ${isThinkingNow ? 'thinking' : 'completed'}`}
+                                open={isThinkingNow}
+                              >
                                 <summary>
-                                  <Sparkles size={13} />
-                                  <span>思考プロセス</span>
+                                  {isThinkingNow ? (
+                                    <>
+                                      <Loader2 size={13} className="thinking-spinner" />
+                                      <span className="thinking-status-text">思考中...</span>
+                                      {getLatestThoughtSnippet(part.content) && (
+                                        <span className="thinking-live-snippet" title={part.content}>
+                                          {getLatestThoughtSnippet(part.content)}
+                                        </span>
+                                      )}
+                                      <span className="thinking-pulse-dot" />
+                                    </>
+                                  ) : (
+                                    <>
+                                      <Sparkles size={13} className="thought-icon-done" />
+                                      <span>思考プロセス {part.content ? `(${part.content.length}文字)` : ''}</span>
+                                    </>
+                                  )}
                                 </summary>
                                 <div className="chat-thought-content">
-                                  <MessageMarkdown content={part.content} />
+                                  {part.content ? (
+                                    <>
+                                      <MessageMarkdown content={part.content} />
+                                      {isThinkingNow && <span className="thinking-cursor">▌</span>}
+                                    </>
+                                  ) : (
+                                    <span className="thinking-placeholder">思考を開始しています...</span>
+                                  )}
                                 </div>
                               </details>
                             ) : part.type === 'tool_call' ? (
@@ -222,6 +273,14 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                             )}
                           </div>
                         ))
+                      ) : isRespondingNow ? (
+                        <div className="chat-thought thinking" style={{ margin: 0 }}>
+                          <div className="chat-thought-summary-standalone">
+                            <Loader2 size={13} className="thinking-spinner" />
+                            <span className="thinking-status-text">思考中...</span>
+                            <span className="thinking-pulse-dot" />
+                          </div>
+                        </div>
                       ) : (
                         <MessageMarkdown content={msg.content || ''} />
                       )}

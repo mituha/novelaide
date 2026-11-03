@@ -182,6 +182,13 @@
   border-radius: 6px;
   background: rgba(0, 0, 0, 0.2);
   border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  transition: all 0.2s ease-in-out;
+}
+
+.chat-thought.thinking {
+  border-color: rgba(168, 85, 247, 0.45);
+  background: rgba(168, 85, 247, 0.08);
+  box-shadow: 0 0 10px rgba(168, 85, 247, 0.12);
 }
 
 .chat-thought summary {
@@ -195,8 +202,108 @@
   user-select: none;
 }
 
+.chat-thought.thinking summary {
+  color: #c084fc;
+  font-weight: 500;
+}
+
 .chat-thought summary:hover {
   color: var(--text-primary, #fff);
+}
+
+.chat-thought-summary-standalone {
+  padding: 6px 10px;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #c084fc;
+}
+
+.thinking-spinner {
+  animation: chat-spin 1s linear infinite;
+  color: #c084fc;
+}
+
+@keyframes chat-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.thinking-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #c084fc;
+  animation: chat-pulse 1.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  margin-left: 2px;
+  flex-shrink: 0;
+}
+
+.thinking-live-snippet {
+  color: var(--text-secondary, #cbd5e1);
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.3);
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  font-weight: normal;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: inline-block;
+  vertical-align: middle;
+  animation: fadeIn 0.2s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0.4;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes chat-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.3;
+    transform: scale(0.75);
+  }
+}
+
+.thinking-cursor {
+  display: inline-block;
+  margin-left: 2px;
+  color: #c084fc;
+  font-weight: bold;
+  animation: chat-blink 0.8s step-start infinite;
+}
+
+@keyframes chat-blink {
+  50% {
+    opacity: 0;
+  }
+}
+
+.thinking-placeholder {
+  font-size: 12px;
+  color: var(--text-secondary, #888);
+  font-style: italic;
+}
+
+.thought-icon-done {
+  color: #a855f7;
+  opacity: 0.85;
 }
 
 .chat-thought-content {
@@ -204,6 +311,8 @@
   border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
   font-size: 13px;
   color: var(--text-secondary, #bbb);
+  max-height: 280px;
+  overflow-y: auto;
 }
 
 .chat-tool-badge {
