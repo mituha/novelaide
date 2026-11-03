@@ -16,6 +16,8 @@ export interface ChMetadata {
     temperature?: number;
     useTools?: boolean;
     useReasoning?: boolean;
+    toolsPermission?: 'none' | 'read' | 'write';
+    allowWrite?: boolean;
   };
 }
 

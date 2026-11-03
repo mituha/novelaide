@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Send, Square, Wrench, Sparkles, BookOpen } from 'lucide-react';
+import { Send, Square, Wrench, Sparkles, BookOpen, PenLine } from 'lucide-react';
 import './AIChatInput.css';
 
 interface AIChatInputProps {
@@ -11,6 +11,8 @@ interface AIChatInputProps {
   placeholder?: string;
   useTools?: boolean;
   onUseToolsChange?: (val: boolean) => void;
+  allowWrite?: boolean;
+  onAllowWriteChange?: (val: boolean) => void;
   useReasoning?: boolean;
   onUseReasoningChange?: (val: boolean) => void;
   includeContext?: boolean;
@@ -27,6 +29,8 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
   placeholder = 'AIにメッセージを送信... (Shift+Enterで改行)',
   useTools = true,
   onUseToolsChange,
+  allowWrite = false,
+  onAllowWriteChange,
   useReasoning = false,
   onUseReasoningChange,
   includeContext = true,
@@ -77,10 +81,26 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
               type="button"
               className={`chat-toggle-btn ${useTools ? 'active' : ''}`}
               onClick={() => onUseToolsChange(!useTools)}
-              title="執筆支援ツールの利用 (ルビ抽出・校正スキャン等)"
+              title="執筆支援ツールの利用 (ファイル参照・校正・ルビ等)"
             >
               <Wrench size={12} />
               <span>ツール</span>
+            </button>
+          )}
+
+          {useTools && onAllowWriteChange && (
+            <button
+              type="button"
+              className={`chat-toggle-btn ${allowWrite ? 'active warn' : ''}`}
+              onClick={() => onAllowWriteChange(!allowWrite)}
+              title={
+                allowWrite
+                  ? '直接編集: 許可（AIが原稿の差分修正やファイル更新を行えます）'
+                  : '直接編集: 禁止（読み取り・校正・検索のみの安全モード）'
+              }
+            >
+              <PenLine size={12} />
+              <span>{allowWrite ? '直接編集: 許可' : '読み取り専用'}</span>
             </button>
           )}
 

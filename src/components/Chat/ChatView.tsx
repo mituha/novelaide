@@ -117,7 +117,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   onExportToFile,
   isExporting = false,
 }) => {
-  const { openDocuments, activeDocument, activeLeftItem, activeRightItem } = useDocument();
+  const { openDocuments, activeDocument, activeLeftItem, activeRightItem, openDocument, updateContent } = useDocument();
 
   const [input, setInput] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
@@ -127,6 +127,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
       return parsed?.metadata?.parameters?.useTools ?? true;
     } catch {
       return true;
+    }
+  });
+  const [allowWrite, setAllowWrite] = useState<boolean>(() => {
+    try {
+      const parsed = content ? JSON.parse(content) : null;
+      return parsed?.metadata?.parameters?.allowWrite ?? false;
+    } catch {
+      return false;
     }
   });
   const [useReasoning, setUseReasoning] = useState<boolean>(() => {
@@ -166,6 +174,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
       setFileData(normalized);
       if (normalized.metadata?.parameters?.useTools !== undefined) {
         setUseTools(normalized.metadata.parameters.useTools);
+      }
+      if (normalized.metadata?.parameters?.allowWrite !== undefined) {
+        setAllowWrite(normalized.metadata.parameters.allowWrite);
       }
       if (normalized.metadata?.parameters?.useReasoning !== undefined) {
         setUseReasoning(normalized.metadata.parameters.useReasoning);
@@ -312,6 +323,259 @@ export const ChatView: React.FC<ChatViewProps> = ({
     [fileData, saveFile]
   );
 
+  const handleAllowWriteChange = useCallback(
+    (newVal: boolean) => {
+      setAllowWrite(newVal);
+      const next: ChFileStructure = {
+        ...fileData,
+        metadata: {
+          ...(fileData?.metadata || {}),
+          parameters: {
+            ...(fileData?.metadata?.parameters || {}),
+            allowWrite: newVal,
+          },
+        },
+      };
+      saveFile(next);
+    },
+    [fileData, saveFile]
+  );
+
+  // ツール実行ハンドラー（DocumentState / DocumentContext を唯一の信頼源とする安全パイプライン）
+  const toolExecutor = useCallback(
+    async (toolName: string, args: Record<string, any>) => {
+      console.log(`%c[ChatView:ToolExecutor] ツール実行 🔧: ${toolName}`, 'color: #8b5cf6; font-weight: bold;', args);
+
+      // --- スコープ境界ガード ---
+      const validateScope = (targetPath: string): { allowed: boolean; reason?: string } => {
+        if (!targetPath) return { allowed: false, reason: '対象パスが指定されていません。' };
+        // プロジェクト外脱出防止
+        if (targetPath.includes('..') || targetPath.startsWith('/') || targetPath.match(/^[a-zA-Z]:/)) {
+          return { allowed: false, reason: 'プロジェクトルート外へのアクセスは禁止されています。' };
+        }
+
+        // 許可フォルダー: 設定資料フォルダー（00_settings, settings, plot, 10_plot, wiki 等）
+        const isSettings = /^(?:00_settings|settings|plot|10_plot|wiki|character|world)/i.test(targetPath);
+        if (isSettings) return { allowed: true };
+
+        // 許可フォルダー: 現在作業中のドキュメントと同一フォルダー
+        const currentActivePath = activeDocument?.path || path;
+        if (currentActivePath) {
+          const activeDir = fileService.dirname(currentActivePath);
+          const targetDir = fileService.dirname(targetPath);
+          if (activeDir === targetDir || targetPath.startsWith(activeDir)) {
+            return { allowed: true };
+          }
+        }
+
+        // 単一ファイル名のみの場合（カレントフォルダー内と判定）
+        if (!targetPath.includes('/') && !targetPath.includes('\\')) {
+          return { allowed: true };
+        }
+
+        return {
+          allowed: false,
+          reason: `アクセス制限: 現在の作業フォルダーおよび設定フォルダー外（${targetPath}）へのアクセスは遮断されています。`,
+        };
+      };
+
+      // 1. read ツール
+      if (toolName === 'read') {
+        const targetPath = args.path;
+        const scopeCheck = validateScope(targetPath);
+        if (!scopeCheck.allowed) {
+          return { status: 'error', message: scopeCheck.reason };
+        }
+
+        let doc = openDocuments.find(
+          (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
+        );
+
+        if (!doc) {
+          try {
+            await openDocument(targetPath);
+            doc = openDocuments.find(
+              (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
+            );
+          } catch (e: any) {
+            return { status: 'error', message: `ドキュメントのオープンに失敗しました: ${e.message}` };
+          }
+        }
+
+        const fullContent = doc ? doc.content : '';
+        const lines = fullContent.split('\n');
+        const offset = typeof args.offset === 'number' && args.offset > 0 ? args.offset - 1 : 0;
+        const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : lines.length;
+        const sliced = lines.slice(offset, offset + limit).join('\n');
+
+        return {
+          status: 'success',
+          path: targetPath,
+          totalLines: lines.length,
+          returnedLines: Math.min(limit, lines.length - offset),
+          content: sliced,
+        };
+      }
+
+      // 2. write ツール
+      if (toolName === 'write') {
+        if (!allowWrite) {
+          return { status: 'error', message: '書き込み権限がありません（直接編集が無効化されています）。' };
+        }
+        const targetPath = args.path;
+        const scopeCheck = validateScope(targetPath);
+        if (!scopeCheck.allowed) {
+          return { status: 'error', message: scopeCheck.reason };
+        }
+
+        let doc = openDocuments.find(
+          (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
+        );
+        if (!doc) {
+          try {
+            await openDocument(targetPath);
+            doc = openDocuments.find(
+              (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
+            );
+          } catch {
+            // 新規作成などの場合
+          }
+        }
+
+        const resolvedPath = doc?.path || targetPath;
+        updateContent(resolvedPath, args.content || '');
+
+        return {
+          status: 'success',
+          path: resolvedPath,
+          message: `ドキュメント [${resolvedPath}] の内容を更新しました（未保存状態・エディター即座同期）。`,
+        };
+      }
+
+      // 3. edit ツール
+      if (toolName === 'edit') {
+        if (!allowWrite) {
+          return { status: 'error', message: '書き込み権限がありません（直接編集が無効化されています）。' };
+        }
+        const targetPath = args.path;
+        const scopeCheck = validateScope(targetPath);
+        if (!scopeCheck.allowed) {
+          return { status: 'error', message: scopeCheck.reason };
+        }
+
+        let doc = openDocuments.find(
+          (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
+        );
+        if (!doc) {
+          try {
+            await openDocument(targetPath);
+            doc = openDocuments.find(
+              (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
+            );
+          } catch (e: any) {
+            return { status: 'error', message: `ドキュメント [${targetPath}] が見つかりませんでした。` };
+          }
+        }
+
+        if (!doc) {
+          return { status: 'error', message: `ドキュメント [${targetPath}] が見つかりませんでした。` };
+        }
+
+        let currentText = doc.content;
+        const edits = Array.isArray(args.edits) ? args.edits : [];
+        let appliedCount = 0;
+
+        for (const edit of edits) {
+          if (!edit.oldText) continue;
+          if (!currentText.includes(edit.oldText)) {
+            return {
+              status: 'error',
+              message: `差分置換エラー: 原稿内に指定されたテキスト [${edit.oldText.slice(0, 30)}...] が見つかりませんでした。`,
+              appliedEdits: appliedCount,
+            };
+          }
+          currentText = currentText.replace(edit.oldText, edit.newText || '');
+          appliedCount++;
+        }
+
+        updateContent(doc.path, currentText);
+
+        return {
+          status: 'success',
+          path: doc.path,
+          appliedEdits: appliedCount,
+          message: `${appliedCount} 件の差分編集を適用しました（未保存状態・エディター即座同期）。`,
+        };
+      }
+
+      // 4. search_metadata ツール
+      if (toolName === 'search_metadata') {
+        const query = String(args.query || '').trim().toLowerCase();
+        const matched = openDocuments.filter(
+          (d) =>
+            d.path.includes('setting') ||
+            d.path.includes('plot') ||
+            d.fileTitle.toLowerCase().includes(query) ||
+            d.content.toLowerCase().includes(query)
+        );
+
+        const results = matched.slice(0, 5).map((d) => ({
+          title: d.fileTitle,
+          path: d.path,
+          preview: d.content.slice(0, 200).replace(/\n/g, ' ') + '...',
+        }));
+
+        return {
+          status: 'success',
+          query,
+          matchCount: results.length,
+          results,
+        };
+      }
+
+      // 5. scan_proofread ツール
+      if (toolName === 'scan_proofread') {
+        const targetText = args.text || activeDocument?.content || '';
+        const lines = targetText.split('\n');
+        const issues: any[] = [];
+        let taStreak = 0;
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          if (line.endsWith('た。') || line.endsWith('だ。')) {
+            taStreak++;
+            if (taStreak >= 3) {
+              issues.push({
+                line: i + 1,
+                type: 'consecutive_past_tense',
+                message: `文末の過去形（〜た。/〜だ。）が ${taStreak} 回連続しています。`,
+                snippet: line,
+              });
+            }
+          } else if (line.length > 0) {
+            taStreak = 0;
+          }
+        }
+        return { status: 'success', issues, totalIssues: issues.length };
+      }
+
+      // 6. extract_ruby ツール
+      if (toolName === 'extract_ruby') {
+        const targetText = args.text || activeDocument?.content || '';
+        const kanjiMatch = targetText.match(/[\u4e00-\u9faf]{2,}/g) || [];
+        const uniqueWords = Array.from(new Set(kanjiMatch)).slice(0, 10);
+        const candidates = uniqueWords.map((w) => ({
+          word: w,
+          ruby: '？？',
+          formatted: `|${w}《？？》`,
+        }));
+        return { status: 'success', candidates, totalCandidates: candidates.length };
+      }
+
+      return { status: 'error', message: `未対応のツールです: ${toolName}` };
+    },
+    [openDocuments, openDocument, updateContent, activeDocument, path, allowWrite]
+  );
+
   // メッセージ送信
   const handleSend = async () => {
     if (!input.trim() || isStreaming || isReadOnly) return;
@@ -398,6 +662,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const targetProvider = parts.length > 1 ? parts[0] : 'gemini';
       const targetModel = parts.length > 1 ? parts[1] : parts[0];
 
+      const toolsPermission = !useTools ? 'none' : allowWrite ? 'write' : 'read';
+
       // PiWritingAgentSession の実行
       const session = new PiWritingAgentSession({
         persona: currentPersonaId as any,
@@ -406,6 +672,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
         baseUrl: targetProvider === 'lm-studio' ? lmStudioUrl : undefined,
         apiKey: targetProvider === 'gemini' ? geminiApiKey : undefined,
         useReasoning,
+        toolsPermission,
+        toolExecutor,
         contextContent,
         uiDocumentContext,
         onThoughtToken: (thoughtDelta) => {
@@ -491,6 +759,30 @@ export const ChatView: React.FC<ChatViewProps> = ({
               });
               return { ...prev, messages: updatedMessages };
             });
+          } else if (event.type === 'tool_call_end') {
+            setFileData((prev) => {
+              const updatedMessages = prev.messages.map((m) => {
+                if (m.id !== assistantMsgId) return m;
+                const parts = (m.parts || []).map((p) => {
+                  if (p.type === 'tool_call' && p.metadata?.tool_call?.id === event.callId) {
+                    return {
+                      ...p,
+                      content: `ツール完了: ${event.toolName}`,
+                      metadata: {
+                        ...p.metadata,
+                        tool_call: {
+                          ...p.metadata.tool_call,
+                          result: event.result,
+                        },
+                      },
+                    };
+                  }
+                  return p;
+                });
+                return { ...m, parts };
+              });
+              return { ...prev, messages: updatedMessages };
+            });
           }
         },
       });
@@ -560,6 +852,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           isStreaming={isStreaming}
           useTools={useTools}
           onUseToolsChange={!isReadOnly ? handleUseToolsChange : undefined}
+          allowWrite={allowWrite}
+          onAllowWriteChange={!isReadOnly ? handleAllowWriteChange : undefined}
           useReasoning={useReasoning}
           onUseReasoningChange={!isReadOnly ? handleUseReasoningChange : undefined}
           includeContext={includeContext}

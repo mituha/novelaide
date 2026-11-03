@@ -45,6 +45,12 @@
   color: var(--accent-color, #3b82f6);
 }
 
+.chat-toggle-btn.active.warn {
+  background: rgba(245, 158, 11, 0.18);
+  border-color: #f59e0b;
+  color: #fbbf24;
+}
+
 .chat-input-box {
   display: flex;
   align-items: flex-end;

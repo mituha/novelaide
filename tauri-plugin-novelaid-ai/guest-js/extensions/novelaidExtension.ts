@@ -2,6 +2,7 @@ import { invoke } from '@tauri-apps/api/core';
 import { Persona } from '../types';
 import { getPersonaPrompt } from '../domain/guidelines';
 import { DEFAULT_LM_STUDIO_URL, fetchLmStudioModels } from '../client/modelManager';
+import { PI_STANDARD_TOOLS, ToolPermissionLevel } from '../domain/tools';
 
 /**
  * Pi SDK 準拠のツール定義インターフェース
@@ -50,9 +51,12 @@ export interface UIDocumentContext {
 }
 
 /**
- * ツール実行プロキシ（GUI では Tauri IPC、CLI では直接実行に切り替え可能）
+ * ツール実行プロキシ（GUI では DocumentContext / Tauri IPC、CLI では直接実行に切り替え可能）
  */
 export interface NovelaidToolProxy {
+  read?: (args: { path: string; offset?: number; limit?: number }) => Promise<any>;
+  write?: (args: { path: string; content: string }) => Promise<any>;
+  edit?: (args: { path: string; edits: Array<{ oldText: string; newText: string }> }) => Promise<any>;
   scanProofread?: (args: { text?: string; fileName?: string }) => Promise<any>;
   extractRuby?: (args: { text?: string; fileName?: string }) => Promise<any>;
   searchMetadata?: (args: { query: string }) => Promise<any>;
@@ -62,6 +66,8 @@ export interface NovelaidExtensionOptions {
   lmStudioUrl?: string;
   persona?: Persona | string;
   contextContent?: string;
+  toolsPermission?: ToolPermissionLevel;
+  availableFilesSummary?: string;
   uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
   invokeTool?: (toolName: string, args: Record<string, any>) => Promise<any>;
@@ -74,6 +80,7 @@ export interface NovelaidExtensionOptions {
  */
 export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) {
   const lmStudioUrl = options.lmStudioUrl || DEFAULT_LM_STUDIO_URL;
+  const permission = options.toolsPermission ?? 'read';
 
   return {
     name: 'novelaid-extension',
@@ -124,7 +131,17 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
           }
         }
 
+        // プロキシ経由の実行優先
         if (options.toolProxy) {
+          if (name === 'read' && options.toolProxy.read) {
+            return await options.toolProxy.read(resolvedArgs as any);
+          }
+          if (name === 'write' && options.toolProxy.write) {
+            return await options.toolProxy.write(resolvedArgs as any);
+          }
+          if (name === 'edit' && options.toolProxy.edit) {
+            return await options.toolProxy.edit(resolvedArgs as any);
+          }
           if (name === 'scan_proofread' && options.toolProxy.scanProofread) {
             return await options.toolProxy.scanProofread(resolvedArgs);
           }
@@ -136,13 +153,27 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
           }
         }
 
+        // 外部 invokeTool ハンドラー
         if (options.invokeTool) {
           return await options.invokeTool(name, resolvedArgs);
         }
 
+        // Tauri IPC フォールバック
         try {
           return await invoke('plugin:novelaid-ai|ai_run_tool', { toolName: name, args: resolvedArgs });
         } catch {
+          if (name === 'read') {
+            return {
+              status: 'error',
+              message: `ファイル [${resolvedArgs.path}] を読み込めませんでした。`,
+            };
+          }
+          if (name === 'write' || name === 'edit') {
+            return {
+              status: 'error',
+              message: `ファイル [${resolvedArgs.path}] の書き込み・編集に失敗しました。`,
+            };
+          }
           if (name === 'scan_proofread') {
             return {
               status: 'success',
@@ -171,113 +202,145 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
         }
       };
 
-      // 2. UI・未保存バッファ連携ツールの登録 (フロントエンド完結)
-      api.registerTool({
-        name: 'get_open_documents',
-        description: '現在エディターで開かれているドキュメント（タブ）一覧と未保存状態を取得します。',
-        parameters: {
-          type: 'object',
-          properties: {},
-          required: [],
-        },
-        execute: async () => {
-          if (options.uiDocumentContext) {
-            const docs = options.uiDocumentContext.getOpenDocuments();
-            return {
-              status: 'success',
-              documents: docs,
-              count: docs.length,
-            };
-          }
-          return { status: 'success', documents: [], count: 0 };
-        },
-      });
+      // 2. ツールの登録（permission に基づくフィルタリング）
+      if (permission !== 'none') {
+        // --- 読み取り系ツール (Read-only / Edit 共通) ---
 
-      api.registerTool({
-        name: 'get_active_document',
-        description: '現在フォーカスされている原稿の最新バッファ（未保存テキスト含む）を取得します。',
-        parameters: {
-          type: 'object',
-          properties: {
-            side: {
-              type: 'string',
-              enum: ['left', 'right'],
-              description: '左右ペインの指定（省略時は左またはアクティブペイン）',
-            },
+        // Pi SDK 標準互換: read
+        const readDef = PI_STANDARD_TOOLS.find((t) => t.name === 'read')!;
+        api.registerTool({
+          name: readDef.name,
+          description: readDef.description,
+          parameters: readDef.parameters,
+          execute: async (args: any) => await runTool('read', args || {}),
+        });
+
+        // get_open_documents
+        api.registerTool({
+          name: 'get_open_documents',
+          description: '現在エディターで開かれているドキュメント（タブ）一覧と未保存状態を取得します。',
+          parameters: {
+            type: 'object',
+            properties: {},
+            required: [],
           },
-          required: [],
-        },
-        execute: async (args: any) => {
-          if (options.uiDocumentContext) {
-            const doc = options.uiDocumentContext.getActiveDocument(args?.side);
-            if (doc) {
+          execute: async () => {
+            if (options.uiDocumentContext) {
+              const docs = options.uiDocumentContext.getOpenDocuments();
               return {
                 status: 'success',
-                document: doc,
+                documents: docs,
+                count: docs.length,
               };
             }
-          }
-          return {
-            status: 'not_found',
-            message: 'アクティブなドキュメントが見つかりませんでした。',
-          };
-        },
-      });
-
-      // 3. 執筆支援ツールの登録 (api.registerTool)
-      api.registerTool({
-        name: 'scan_proofread',
-        description: '現在開いている原稿テキストの文末重複（「〜た。」の3連続など）、誤字脱字、表記揺れ、ら抜き言葉を高速スキャンします。',
-        parameters: {
-          type: 'object',
-          properties: {
-            text: {
-              type: 'string',
-              description: 'スキャン対象の本文テキスト。省略時は現在アクティブな原稿（未保存含む）が対象になります。',
-            },
+            return { status: 'success', documents: [], count: 0 };
           },
-          required: [],
-        },
-        execute: async (args: any) => {
-          return await runTool('scan_proofread', args || {});
-        },
-      });
+        });
 
-      api.registerTool({
-        name: 'extract_ruby',
-        description: '原稿内の難読漢字、作中固有名詞、当て字の候補を検出し、|親文字《ルビ》 形式のルビ候補一覧を抽出します。',
-        parameters: {
-          type: 'object',
-          properties: {
-            text: {
-              type: 'string',
-              description: 'ルビ抽出対象の本文テキスト。省略時は現在アクティブな原稿（未保存含む）が対象になります。',
+        // get_active_document
+        api.registerTool({
+          name: 'get_active_document',
+          description: '現在フォーカスされている原稿の最新バッファ（未保存テキスト含む）を取得します。',
+          parameters: {
+            type: 'object',
+            properties: {
+              side: {
+                type: 'string',
+                enum: ['left', 'right'],
+                description: '左右ペインの指定（省略時は左またはアクティブペイン）',
+              },
             },
+            required: [],
           },
-          required: [],
-        },
-        execute: async (args: any) => {
-          return await runTool('extract_ruby', args || {});
-        },
-      });
+          execute: async (args: any) => {
+            if (options.uiDocumentContext) {
+              const doc = options.uiDocumentContext.getActiveDocument(args?.side);
+              if (doc) {
+                return {
+                  status: 'success',
+                  document: doc,
+                };
+              }
+            }
+            return {
+              status: 'not_found',
+              message: 'アクティブなドキュメントが見つかりませんでした。',
+            };
+          },
+        });
 
-      api.registerTool({
-        name: 'search_metadata',
-        description: '作品内のFrontmatter設定資料（登場人物、世界観、舞台設定、伏線・プロット）をキーワード検索し、関連設定を要約して取得します。',
-        parameters: {
-          type: 'object',
-          properties: {
-            query: {
-              type: 'string',
-              description: '検索するキーワードやキャラクター名（例: "主人公", "世界観", "魔法"）',
+        // scan_proofread
+        api.registerTool({
+          name: 'scan_proofread',
+          description: '現在開いている原稿テキストの文末重複（「〜た。」の3連続など）、誤字脱字、表記揺れ、ら抜き言葉を高速スキャンします。',
+          parameters: {
+            type: 'object',
+            properties: {
+              text: {
+                type: 'string',
+                description: 'スキャン対象の本文テキスト。省略時は現在アクティブな原稿（未保存含む）が対象になります。',
+              },
             },
+            required: [],
           },
-          required: ['query'],
-        },
-        execute: async (args: any) => {
-          return await runTool('search_metadata', args || {});
-        },
-      });
+          execute: async (args: any) => await runTool('scan_proofread', args || {}),
+        });
+
+        // extract_ruby
+        api.registerTool({
+          name: 'extract_ruby',
+          description: '原稿内の難読漢字、作中固有名詞、当て字の候補を検出し、|親文字《ルビ》 形式のルビ候補一覧を抽出します。',
+          parameters: {
+            type: 'object',
+            properties: {
+              text: {
+                type: 'string',
+                description: 'ルビ抽出対象の本文テキスト。省略時は現在アクティブな原稿（未保存含む）が対象になります。',
+              },
+            },
+            required: [],
+          },
+          execute: async (args: any) => await runTool('extract_ruby', args || {}),
+        });
+
+        // search_metadata
+        api.registerTool({
+          name: 'search_metadata',
+          description: '作品内のFrontmatter設定資料（登場人物、世界観、舞台設定、伏線・プロット）をキーワード検索し、関連設定を要約して取得します。',
+          parameters: {
+            type: 'object',
+            properties: {
+              query: {
+                type: 'string',
+                description: '検索するキーワードやキャラクター名（例: "主人公", "世界観", "魔法"）',
+              },
+            },
+            required: ['query'],
+          },
+          execute: async (args: any) => await runTool('search_metadata', args || {}),
+        });
+
+        // --- 書き込み系ツール (Edit 権限時のみ登録) ---
+        if (permission === 'write') {
+          // Pi SDK 標準互換: write
+          const writeDef = PI_STANDARD_TOOLS.find((t) => t.name === 'write')!;
+          api.registerTool({
+            name: writeDef.name,
+            description: writeDef.description,
+            parameters: writeDef.parameters,
+            execute: async (args: any) => await runTool('write', args || {}),
+          });
+
+          // Pi SDK 標準互換: edit
+          const editDef = PI_STANDARD_TOOLS.find((t) => t.name === 'edit')!;
+          api.registerTool({
+            name: editDef.name,
+            description: editDef.description,
+            parameters: editDef.parameters,
+            execute: async (args: any) => await runTool('edit', args || {}),
+          });
+        }
+      }
 
       // 3. スラッシュコマンドの登録 (api.registerCommand)
       api.registerCommand('ruby', {
@@ -322,8 +385,7 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             '【novelaid AI 執筆支援ステータス】',
             `・接続エンドポイント: ${lmStudioUrl}`,
             `・現在のペルソナ: ${options.persona || 'partner'}`,
-            '・登録ツール: get_open_documents, get_active_document, scan_proofread, extract_ruby, search_metadata',
-            '・登録コマンド: /ruby, /proofread, /check, /info, /help',
+            `・ツール権限レベル: ${permission} (${permission === 'none' ? 'ツール無効' : permission === 'read' ? '安全・読み取り専用' : '直接編集許可'})`,
             '・基盤アーキテクチャ: Pi Coding Agent SDK (Extension / registerTool)',
           ].join('\n');
         },
@@ -362,9 +424,17 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
 
         if (options.contextContent && options.contextContent.trim().length > 0) {
           event.systemPromptOptions.sections['novelaid_context'] = [
-            '【現在エディターで参照中の原稿・設定資料コンテキスト】',
+            '【現在エディターで参照中の原稿・設定資料コンテキスト（全文注入）】',
             options.contextContent.trim(),
             '※回答を作成する際は、上記の原稿文脈や設定資料の記述を最優先で考慮してください。',
+          ].join('\n');
+        }
+
+        if (options.availableFilesSummary && options.availableFilesSummary.trim().length > 0) {
+          event.systemPromptOptions.sections['novelaid_workspace'] = [
+            '【プロジェクト参照スコープ（目次一覧）】',
+            options.availableFilesSummary.trim(),
+            '※必要に応じて、上記のファイル内容を `read` ツールまたは `search_metadata` ツールで確認してください。',
           ].join('\n');
         }
       });

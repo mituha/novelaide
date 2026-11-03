@@ -3,6 +3,7 @@ import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';
 import { DEFAULT_LM_STUDIO_URL, GEMINI_OPENAI_BASE_URL } from './modelManager';
 import { Persona, AiPersonaType, AgentSessionEvent, AiProviderType } from '../types';
 import { getPersonaPrompt } from '../domain/guidelines';
+import { ToolPermissionLevel } from '../domain/tools';
 import {
   createNovelaidExtension,
   ExtensionToolDefinition,
@@ -23,6 +24,9 @@ export interface PiAgentSessionOptions {
   persona?: Persona | AiPersonaType | string;
   contextContent?: string;
   useReasoning?: boolean;
+  useTools?: boolean;
+  toolsPermission?: ToolPermissionLevel;
+  availableFilesSummary?: string;
   uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
   toolExecutor?: ToolExecutor;
@@ -37,6 +41,7 @@ interface StreamFnOptions {
   apiKey?: string;
   defaultModel?: string;
   useReasoning?: boolean;
+  toolsPermission?: ToolPermissionLevel;
 }
 
 /**
@@ -81,10 +86,16 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
       tool_call_id: m.tool_call_id || m.toolCallId,
     }));
 
+    let toolsList: any[] = [];
+    if (contextOrOptions && Array.isArray(contextOrOptions.tools)) {
+      toolsList = contextOrOptions.tools;
+    }
+
     (async () => {
       console.groupCollapsed(`%c[Novelaid AI] リクエスト送信 🚀 (${provider} / ${modelName})`, 'color: #3b82f6; font-weight: bold;');
       console.log('エンドポイント:', endpoint);
       console.log('メッセージ履歴:', apiMessages);
+      console.log('ツール定義:', toolsList);
       console.groupEnd();
 
       const partial: any = { role: 'assistant', content: [] };
@@ -95,6 +106,7 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
       let fullResponseText = '';
       let isThinkingActive = false;
       let isTextActive = false;
+      const toolCallsMap: Record<number, { id: string; name: string; arguments: string }> = {};
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -114,6 +126,18 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
         if (options.useReasoning === false) {
           requestBody.chat_template_kwargs = { enable_reasoning: false };
           requestBody.reasoning_effort = 'none';
+        }
+
+        // ツール権限が none 以外でツール一覧が存在する場合は tools を付与
+        if (options.toolsPermission !== 'none' && Array.isArray(toolsList) && toolsList.length > 0) {
+          requestBody.tools = toolsList.map((t: any) => ({
+            type: 'function',
+            function: {
+              name: t.name,
+              description: t.description,
+              parameters: t.parameters,
+            },
+          }));
         }
 
         const res = await fetch(endpoint, {
@@ -219,6 +243,59 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
                   partial: { ...partial },
                 } as any);
               }
+
+              // 3. ツール呼び出し（Tool Calls）の検出と組み立て
+              if (Array.isArray(delta?.tool_calls)) {
+                if (isThinkingActive) {
+                  isThinkingActive = false;
+                  stream.push({
+                    type: 'thinking_end',
+                    contentIndex: 0,
+                    content: fullThoughtText,
+                    partial: { ...partial },
+                  } as any);
+                }
+                for (const tc of delta.tool_calls) {
+                  const idx = tc.index ?? 0;
+                  if (!toolCallsMap[idx]) {
+                    toolCallsMap[idx] = {
+                      id: tc.id || `call_${Date.now()}_${idx}`,
+                      name: tc.function?.name || '',
+                      arguments: tc.function?.arguments || '',
+                    };
+                    partial.content.push({
+                      type: 'tool_call',
+                      id: toolCallsMap[idx].id,
+                      name: toolCallsMap[idx].name,
+                      arguments: toolCallsMap[idx].arguments,
+                    });
+                    const cIdx = partial.content.length - 1;
+                    stream.push({
+                      type: 'tool_call_start',
+                      contentIndex: cIdx,
+                      partial: { ...partial },
+                    } as any);
+                  } else {
+                    if (tc.function?.name) {
+                      toolCallsMap[idx].name += tc.function.name;
+                    }
+                    if (tc.function?.arguments) {
+                      toolCallsMap[idx].arguments += tc.function.arguments;
+                      const callItem = partial.content.find((c: any) => c.id === toolCallsMap[idx].id);
+                      if (callItem) {
+                        callItem.arguments = toolCallsMap[idx].arguments;
+                      }
+                      const cIdx = partial.content.findIndex((c: any) => c.id === toolCallsMap[idx].id);
+                      stream.push({
+                        type: 'tool_call_delta',
+                        contentIndex: cIdx !== -1 ? cIdx : 0,
+                        delta: tc.function.arguments,
+                        partial: { ...partial },
+                      } as any);
+                    }
+                  }
+                }
+              }
             } catch {
               // JSON パースエラーはスキップ
             }
@@ -245,8 +322,25 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
           } as any);
         }
 
+        const hasToolCalls = Object.keys(toolCallsMap).length > 0;
+        if (hasToolCalls) {
+          for (const tc of Object.values(toolCallsMap)) {
+            const cIdx = partial.content.findIndex((c: any) => c.id === tc.id);
+            stream.push({
+              type: 'tool_call_end',
+              contentIndex: cIdx !== -1 ? cIdx : 0,
+              toolCall: {
+                id: tc.id,
+                name: tc.name,
+                arguments: tc.arguments,
+              },
+              partial: { ...partial },
+            } as any);
+          }
+        }
+
         console.log(
-          `%c[Novelaid AI] 受信完了 ✅ (思考文字数: ${fullThoughtText.length}, 本文トークン数: ${receivedTokenCount}, 本文文字数: ${fullResponseText.length})`,
+          `%c[Novelaid AI] 受信完了 ✅ (思考文字数: ${fullThoughtText.length}, 本文トークン数: ${receivedTokenCount}, 本文文字数: ${fullResponseText.length}, ツール呼出: ${Object.keys(toolCallsMap).length})`,
           'color: #10b981; font-weight: bold;',
           '\n応答本文プレビュー:',
           fullResponseText.slice(0, 100) + (fullResponseText.length > 100 ? '...' : '')
@@ -256,12 +350,24 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
         if (fullThoughtText) {
           finalContent.push({ type: 'thinking', thinking: fullThoughtText });
         }
-        finalContent.push({ type: 'text', text: fullResponseText });
+        if (fullResponseText) {
+          finalContent.push({ type: 'text', text: fullResponseText });
+        }
+        if (hasToolCalls) {
+          for (const tc of Object.values(toolCallsMap)) {
+            finalContent.push({
+              type: 'tool_call',
+              id: tc.id,
+              name: tc.name,
+              arguments: tc.arguments,
+            });
+          }
+        }
 
         stream.end({
           role: 'assistant',
           content: finalContent,
-          stopReason: 'stop',
+          stopReason: hasToolCalls ? 'tool_use' : 'stop',
         } as any);
       } catch (err: any) {
         console.warn(
@@ -351,10 +457,15 @@ export class PiWritingAgentSession {
       },
     };
 
+    const permission: ToolPermissionLevel =
+      this.options.toolsPermission ?? (this.options.useTools === false ? 'none' : 'read');
+
     const novelaidExt = createNovelaidExtension({
       lmStudioUrl: baseUrl,
       persona: this.options.persona,
       contextContent: this.options.contextContent,
+      toolsPermission: permission,
+      availableFilesSummary: this.options.availableFilesSummary,
       uiDocumentContext: this.options.uiDocumentContext,
       toolProxy: this.options.toolProxy,
       invokeTool: this.options.toolExecutor,
@@ -381,6 +492,10 @@ export class PiWritingAgentSession {
       systemPrompt += `\n\n【現在エディターで参照中の原稿・設定資料コンテキスト】\n${this.options.contextContent.trim()}\n※上記の原稿・資料を最優先で考慮して回答してください。`;
     }
 
+    if (systemPromptOptions.sections['novelaid_workspace']) {
+      systemPrompt += `\n\n${systemPromptOptions.sections['novelaid_workspace']}`;
+    }
+
     if (this.options.useReasoning === false) {
       systemPrompt += `\n\n【出力指示】思考プロセス（推論ログや手順）は出力せず、直接結論・回答本文のみを出力してください。`;
     }
@@ -391,14 +506,18 @@ export class PiWritingAgentSession {
       apiKey: this.options.apiKey,
       defaultModel: modelId,
       useReasoning: this.options.useReasoning,
+      toolsPermission: permission,
     });
 
     // 3. Extension から登録されたツール配列（registerTool）を取得
-    const toolsForAgent = Array.from(this.registeredTools.values()).map((t) => ({
-      name: t.name,
-      description: t.description,
-      parameters: t.parameters,
-    }));
+    const toolsForAgent =
+      permission === 'none'
+        ? []
+        : Array.from(this.registeredTools.values()).map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+          }));
 
     // pi 標準互換の /model コマンドを登録
     if (!this.registeredCommands.has('model')) {

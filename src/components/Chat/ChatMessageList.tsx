@@ -260,14 +260,40 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                 </div>
                               </details>
                             ) : part.type === 'tool_call' ? (
-                              <div className="chat-tool-badge">
-                                <Wrench size={13} className="tool-icon" />
-                                <span className="tool-name">
-                                  {part.metadata?.tool_call?.name
-                                    ? `${part.metadata.tool_call.name} を実行中...`
-                                    : 'ツールを実行中...'}
-                                </span>
-                              </div>
+                              <details className="chat-tool-call-details">
+                                <summary className="chat-tool-badge">
+                                  <Wrench size={12} className="tool-icon" />
+                                  <span className="tool-name">
+                                    {part.metadata?.tool_call?.name
+                                      ? part.metadata?.tool_call?.result
+                                        ? `ツール完了: ${part.metadata.tool_call.name}`
+                                        : `ツール実行中: ${part.metadata.tool_call.name}`
+                                      : 'ツール実行中...'}
+                                  </span>
+                                </summary>
+                                <div className="chat-tool-payload">
+                                  {part.metadata?.tool_call?.arguments && (
+                                    <div className="chat-tool-section">
+                                      <span className="chat-tool-label">引数:</span>
+                                      <pre className="chat-tool-json">
+                                        {typeof part.metadata.tool_call.arguments === 'string'
+                                          ? part.metadata.tool_call.arguments
+                                          : JSON.stringify(part.metadata.tool_call.arguments, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                  {part.metadata?.tool_call?.result && (
+                                    <div className="chat-tool-section">
+                                      <span className="chat-tool-label">実行結果:</span>
+                                      <pre className="chat-tool-json">
+                                        {typeof part.metadata.tool_call.result === 'string'
+                                          ? part.metadata.tool_call.result
+                                          : JSON.stringify(part.metadata.tool_call.result, null, 2)}
+                                      </pre>
+                                    </div>
+                                  )}
+                                </div>
+                              </details>
                             ) : (
                               <MessageMarkdown content={part.content} />
                             )}
