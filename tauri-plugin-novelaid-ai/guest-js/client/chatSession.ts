@@ -22,6 +22,7 @@ export interface PiAgentSessionOptions {
   apiKey?: string;
   persona?: Persona | AiPersonaType | string;
   contextContent?: string;
+  useReasoning?: boolean;
   uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
   toolExecutor?: ToolExecutor;
@@ -35,6 +36,7 @@ interface StreamFnOptions {
   provider?: AiProviderType;
   apiKey?: string;
   defaultModel?: string;
+  useReasoning?: boolean;
 }
 
 /**
@@ -103,14 +105,21 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
       }
 
       try {
+        const requestBody: Record<string, any> = {
+          model: modelName,
+          messages: apiMessages,
+          stream: true,
+        };
+
+        if (options.useReasoning === false) {
+          requestBody.chat_template_kwargs = { enable_reasoning: false };
+          requestBody.reasoning_effort = 'none';
+        }
+
         const res = await fetch(endpoint, {
           method: 'POST',
           headers,
-          body: JSON.stringify({
-            model: modelName,
-            messages: apiMessages,
-            stream: true,
-          }),
+          body: JSON.stringify(requestBody),
           signal,
         });
 
@@ -145,7 +154,7 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
 
               // 1. 思考トークン（Reasoning / Thinking）の検出と送出
               const reasoningToken = delta?.reasoning_content || delta?.reasoning || delta?.thought;
-              if (reasoningToken) {
+              if (reasoningToken && options.useReasoning !== false) {
                 if (!isThinkingActive) {
                   isThinkingActive = true;
                   partial.content.push({ type: 'thinking', thinking: '' });
@@ -372,11 +381,16 @@ export class PiWritingAgentSession {
       systemPrompt += `\n\n【現在エディターで参照中の原稿・設定資料コンテキスト】\n${this.options.contextContent.trim()}\n※上記の原稿・資料を最優先で考慮して回答してください。`;
     }
 
+    if (this.options.useReasoning === false) {
+      systemPrompt += `\n\n【出力指示】思考プロセス（推論ログや手順）は出力せず、直接結論・回答本文のみを出力してください。`;
+    }
+
     const streamFn = createBrowserStreamFn({
       baseUrl,
       provider: this.options.provider,
       apiKey: this.options.apiKey,
       defaultModel: modelId,
+      useReasoning: this.options.useReasoning,
     });
 
     // 3. Extension から登録されたツール配列（registerTool）を取得
@@ -426,6 +440,7 @@ export class PiWritingAgentSession {
         systemPrompt,
         tools: toolsForAgent as any,
         model: modelObj as any,
+        thinkingLevel: this.options.useReasoning === false ? 'off' : 'medium',
       },
       streamFn,
       beforeToolCall: async (context: any) => {
@@ -622,6 +637,7 @@ export class PiWritingAgentSession {
         provider: this.options.provider,
         apiKey: this.options.apiKey,
         defaultModel: modelId,
+        useReasoning: this.options.useReasoning,
       });
       (this.agent as any).streamFn = streamFn;
       (this.agent as any).state.model = {
@@ -630,6 +646,22 @@ export class PiWritingAgentSession {
         name: modelId,
         provider: this.options.provider || 'lm-studio',
       };
+    }
+  }
+
+  public setUseReasoning(val: boolean): void {
+    this.options.useReasoning = val;
+    if (this.agent) {
+      (this.agent as any).state.thinkingLevel = val ? 'medium' : 'off';
+      const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+      const streamFn = createBrowserStreamFn({
+        baseUrl,
+        provider: this.options.provider,
+        apiKey: this.options.apiKey,
+        defaultModel: this.options.model,
+        useReasoning: val,
+      });
+      (this.agent as any).streamFn = streamFn;
     }
   }
 

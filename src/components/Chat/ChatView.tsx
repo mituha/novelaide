@@ -121,8 +121,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const [input, setInput] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
-  const [useTools, setUseTools] = useState<boolean>(true);
-  const [useReasoning, setUseReasoning] = useState<boolean>(true);
+  const [useTools, setUseTools] = useState<boolean>(() => {
+    try {
+      const parsed = content ? JSON.parse(content) : null;
+      return parsed?.metadata?.parameters?.useTools ?? true;
+    } catch {
+      return true;
+    }
+  });
+  const [useReasoning, setUseReasoning] = useState<boolean>(() => {
+    try {
+      const parsed = content ? JSON.parse(content) : null;
+      return parsed?.metadata?.parameters?.useReasoning ?? true;
+    } catch {
+      return true;
+    }
+  });
   const [includeContext, setIncludeContext] = useState<boolean>(true);
 
   const activeAssistantMsgIdRef = useRef<string | null>(null);
@@ -148,7 +162,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
     try {
       const parsed = JSON.parse(content);
-      setFileData(normalizeChData(parsed, defaultTitle));
+      const normalized = normalizeChData(parsed, defaultTitle);
+      setFileData(normalized);
+      if (normalized.metadata?.parameters?.useTools !== undefined) {
+        setUseTools(normalized.metadata.parameters.useTools);
+      }
+      if (normalized.metadata?.parameters?.useReasoning !== undefined) {
+        setUseReasoning(normalized.metadata.parameters.useReasoning);
+      }
     } catch (e) {
       console.warn('Failed to parse .ch content JSON:', e);
     }
@@ -255,6 +276,42 @@ export const ChatView: React.FC<ChatViewProps> = ({
     saveFile(next);
   };
 
+  const handleUseReasoningChange = useCallback(
+    (newVal: boolean) => {
+      setUseReasoning(newVal);
+      const next: ChFileStructure = {
+        ...fileData,
+        metadata: {
+          ...(fileData?.metadata || {}),
+          parameters: {
+            ...(fileData?.metadata?.parameters || {}),
+            useReasoning: newVal,
+          },
+        },
+      };
+      saveFile(next);
+    },
+    [fileData, saveFile]
+  );
+
+  const handleUseToolsChange = useCallback(
+    (newVal: boolean) => {
+      setUseTools(newVal);
+      const next: ChFileStructure = {
+        ...fileData,
+        metadata: {
+          ...(fileData?.metadata || {}),
+          parameters: {
+            ...(fileData?.metadata?.parameters || {}),
+            useTools: newVal,
+          },
+        },
+      };
+      saveFile(next);
+    },
+    [fileData, saveFile]
+  );
+
   // メッセージ送信
   const handleSend = async () => {
     if (!input.trim() || isStreaming || isReadOnly) return;
@@ -348,9 +405,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
         provider: targetProvider as any,
         baseUrl: targetProvider === 'lm-studio' ? lmStudioUrl : undefined,
         apiKey: targetProvider === 'gemini' ? geminiApiKey : undefined,
+        useReasoning,
         contextContent,
         uiDocumentContext,
         onThoughtToken: (thoughtDelta) => {
+          if (!useReasoning) return;
+
           setFileData((prev) => {
             const updatedMessages = prev.messages.map((m) => {
               if (m.id !== assistantMsgId) return m;
@@ -498,9 +558,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onSend={handleSend}
           isStreaming={isStreaming}
           useTools={useTools}
-          onUseToolsChange={setUseTools}
+          onUseToolsChange={!isReadOnly ? handleUseToolsChange : undefined}
           useReasoning={useReasoning}
-          onUseReasoningChange={setUseReasoning}
+          onUseReasoningChange={!isReadOnly ? handleUseReasoningChange : undefined}
           includeContext={includeContext}
           onIncludeContextChange={setIncludeContext}
           contextHint={
