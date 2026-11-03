@@ -16,7 +16,11 @@ import { ChatMessageList } from './ChatMessageList';
 import { AIChatInput } from './AIChatInput';
 import { DocSummary } from './AIContextSelector';
 import { ProofreadActionToolbar } from './ProofreadActionToolbar';
-import { PiWritingAgentSession, UIDocumentContext } from 'tauri-plugin-novelaid-ai-api';
+import {
+  PiWritingAgentSession,
+  UIDocumentContext,
+  convertChMessagesToPiMessages,
+} from 'tauri-plugin-novelaid-ai-api';
 import './ChatView.css';
 
 interface ChatViewProps {
@@ -127,22 +131,21 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const [input, setInput] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
-  const [useTools, setUseTools] = useState<boolean>(() => {
+  const [toolsPermission, setToolsPermission] = useState<'none' | 'read' | 'write'>(() => {
     try {
       const parsed = content ? JSON.parse(content) : null;
-      return parsed?.metadata?.parameters?.useTools ?? true;
+      if (parsed?.metadata?.parameters?.toolsPermission) {
+        return parsed.metadata.parameters.toolsPermission;
+      }
+      if (parsed?.metadata?.parameters?.useTools === false) return 'none';
+      if (parsed?.metadata?.parameters?.allowWrite) return 'write';
+      return 'read';
     } catch {
-      return true;
+      return 'read';
     }
   });
-  const [allowWrite, setAllowWrite] = useState<boolean>(() => {
-    try {
-      const parsed = content ? JSON.parse(content) : null;
-      return parsed?.metadata?.parameters?.allowWrite ?? false;
-    } catch {
-      return false;
-    }
-  });
+  const allowWrite = toolsPermission === 'write';
+
   const [useReasoning, setUseReasoning] = useState<boolean>(() => {
     try {
       const parsed = content ? JSON.parse(content) : null;
@@ -151,6 +154,30 @@ export const ChatView: React.FC<ChatViewProps> = ({
       return true;
     }
   });
+
+  const sessionRef = useRef<PiWritingAgentSession | null>(null);
+  const currentSessionPathRef = useRef<string | undefined>(path);
+
+  // ドキュメント切り替え時にセッションをリセット
+  useEffect(() => {
+    if (currentSessionPathRef.current !== path) {
+      if (sessionRef.current) {
+        sessionRef.current.destroy();
+        sessionRef.current = null;
+      }
+      currentSessionPathRef.current = path;
+    }
+  }, [path]);
+
+  // コンポーネント破棄時のクリーンアップ
+  useEffect(() => {
+    return () => {
+      if (sessionRef.current) {
+        sessionRef.current.destroy();
+        sessionRef.current = null;
+      }
+    };
+  }, []);
   const [contextMode, setContextMode] = useState<ContextTargetMode>(() => {
     try {
       const parsed = content ? JSON.parse(content) : null;
@@ -194,11 +221,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const parsed = JSON.parse(content);
       const normalized = normalizeChData(parsed, defaultTitle);
       setFileData(normalized);
-      if (normalized.metadata?.parameters?.useTools !== undefined) {
-        setUseTools(normalized.metadata.parameters.useTools);
-      }
-      if (normalized.metadata?.parameters?.allowWrite !== undefined) {
-        setAllowWrite(normalized.metadata.parameters.allowWrite);
+      if (normalized.metadata?.parameters?.toolsPermission !== undefined) {
+        setToolsPermission(normalized.metadata.parameters.toolsPermission);
+      } else {
+        if (normalized.metadata?.parameters?.useTools === false) {
+          setToolsPermission('none');
+        } else if (normalized.metadata?.parameters?.allowWrite) {
+          setToolsPermission('write');
+        }
       }
       if (normalized.metadata?.parameters?.useReasoning !== undefined) {
         setUseReasoning(normalized.metadata.parameters.useReasoning);
@@ -427,6 +457,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
       messages: newMessages,
     };
     saveFile(next);
+    if (sessionRef.current) {
+      sessionRef.current.setHistoryMessages(newMessages);
+    }
   };
 
   const handleUseReasoningChange = useCallback(
@@ -447,34 +480,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
     [fileData, saveFile]
   );
 
-  const handleUseToolsChange = useCallback(
-    (newVal: boolean) => {
-      setUseTools(newVal);
+  const handleToolsPermissionChange = useCallback(
+    (newPerm: 'none' | 'read' | 'write') => {
+      setToolsPermission(newPerm);
       const next: ChFileStructure = {
         ...fileData,
         metadata: {
           ...(fileData?.metadata || {}),
           parameters: {
             ...(fileData?.metadata?.parameters || {}),
-            useTools: newVal,
-          },
-        },
-      };
-      saveFile(next);
-    },
-    [fileData, saveFile]
-  );
-
-  const handleAllowWriteChange = useCallback(
-    (newVal: boolean) => {
-      setAllowWrite(newVal);
-      const next: ChFileStructure = {
-        ...fileData,
-        metadata: {
-          ...(fileData?.metadata || {}),
-          parameters: {
-            ...(fileData?.metadata?.parameters || {}),
-            allowWrite: newVal,
+            toolsPermission: newPerm,
+            useTools: newPerm !== 'none',
+            allowWrite: newPerm === 'write',
           },
         },
       };
@@ -848,10 +865,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
       const targetProvider = parts.length > 1 ? parts[0] : 'gemini';
       const targetModel = parts.length > 1 ? parts[1] : parts[0];
 
-      const toolsPermission = !useTools ? 'none' : allowWrite ? 'write' : 'read';
-
-      // PiWritingAgentSession の実行
-      const session = new PiWritingAgentSession({
+      // PiWritingAgentSession のコールバックとオプション構成
+      const sessionOptions = {
         persona: currentPersonaId as any,
         model: targetModel,
         provider: targetProvider as any,
@@ -863,7 +878,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         contextContent,
         availableFilesSummary,
         uiDocumentContext,
-        onThoughtToken: (thoughtDelta) => {
+        onThoughtToken: (thoughtDelta: string) => {
           if (!useReasoning) return;
 
           setFileData((prev) => {
@@ -895,7 +910,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
             };
           });
         },
-        onToken: (delta) => {
+        onToken: (delta: string) => {
           setFileData((prev) => {
             const updatedMessages = prev.messages.map((m) => {
               if (m.id !== assistantMsgId) return m;
@@ -925,18 +940,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
             };
           });
         },
-        onEvent: (event) => {
+        onEvent: (event: any) => {
           if (event.type === 'tool_call_start') {
             setFileData((prev) => {
               const updatedMessages = prev.messages.map((m) => {
                 if (m.id !== assistantMsgId) return m;
-                const parts = [...(m.parts || [])];
+                const parts: ChatMessagePart[] = [...(m.parts || [])];
                 parts.push({
                   type: 'tool_call',
                   content: `ツール実行: ${event.toolName}`,
                   metadata: {
                     tool_call: {
-                      id: event.callId,
+                      id: String(event.callId || `call_${Date.now()}`),
                       name: event.toolName,
                       arguments: event.args,
                     },
@@ -950,15 +965,22 @@ export const ChatView: React.FC<ChatViewProps> = ({
             setFileData((prev) => {
               const updatedMessages = prev.messages.map((m) => {
                 if (m.id !== assistantMsgId) return m;
-                const parts = (m.parts || []).map((p) => {
-                  if (p.type === 'tool_call' && p.metadata?.tool_call?.id === event.callId) {
+                const parts: ChatMessagePart[] = (m.parts || []).map((p) => {
+                  if (
+                    p.type === 'tool_call' &&
+                    p.metadata &&
+                    p.metadata.tool_call &&
+                    p.metadata.tool_call.id === event.callId
+                  ) {
+                    const existingCall = p.metadata.tool_call;
                     return {
-                      ...p,
+                      type: 'tool_call' as const,
                       content: `ツール完了: ${event.toolName}`,
                       metadata: {
-                        ...p.metadata,
                         tool_call: {
-                          ...p.metadata.tool_call,
+                          id: existingCall.id,
+                          name: existingCall.name,
+                          arguments: existingCall.arguments,
                           result: event.result,
                         },
                       },
@@ -972,7 +994,25 @@ export const ChatView: React.FC<ChatViewProps> = ({
             });
           }
         },
-      });
+      };
+
+      // 永続セッションの取得または復元初期化
+      let session = sessionRef.current;
+      if (!session) {
+        // 現在の発話直前までの会話ログを復元
+        const previousMessages = fileData?.messages || [];
+        const initialMessages = convertChMessagesToPiMessages(previousMessages);
+        console.log(`[ChatView] 新規PiWritingAgentSession初期化 (復元メッセージ数: ${initialMessages.length})`);
+        session = new PiWritingAgentSession({
+          ...sessionOptions,
+          initialMessages,
+        });
+        await session.init();
+        sessionRef.current = session;
+      } else {
+        // 既存セッションが存在する場合はモデルや設定、最新コンテキストのみを更新（会話メモリは保持）
+        await session.updateOptions(sessionOptions);
+      }
 
       await session.prompt(userText, contextContent);
     } catch (err: any) {
@@ -1045,10 +1085,8 @@ export const ChatView: React.FC<ChatViewProps> = ({
           onChange={setInput}
           onSend={() => handleSend()}
           isStreaming={isStreaming}
-          useTools={useTools}
-          onUseToolsChange={!isReadOnly ? handleUseToolsChange : undefined}
-          allowWrite={allowWrite}
-          onAllowWriteChange={!isReadOnly ? handleAllowWriteChange : undefined}
+          toolsPermission={toolsPermission}
+          onToolsPermissionChange={!isReadOnly ? handleToolsPermissionChange : undefined}
           useReasoning={useReasoning}
           onUseReasoningChange={!isReadOnly ? handleUseReasoningChange : undefined}
           contextMode={contextMode}

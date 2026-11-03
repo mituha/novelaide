@@ -1,5 +1,5 @@
 import React, { useRef, useEffect } from 'react';
-import { Send, Square, Wrench, Sparkles, PenLine } from 'lucide-react';
+import { Send, Square, Wrench, Sparkles, PenLine, ShieldCheck } from 'lucide-react';
 import { ContextTargetMode } from './ChatTypes';
 import { AIContextSelector, DocSummary } from './AIContextSelector';
 import './AIChatInput.css';
@@ -11,6 +11,8 @@ interface AIChatInputProps {
   onStop?: () => void;
   isStreaming: boolean;
   placeholder?: string;
+  toolsPermission?: 'none' | 'read' | 'write';
+  onToolsPermissionChange?: (permission: 'none' | 'read' | 'write') => void;
   useTools?: boolean;
   onUseToolsChange?: (val: boolean) => void;
   allowWrite?: boolean;
@@ -39,6 +41,8 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
   onStop,
   isStreaming,
   placeholder = 'AIにメッセージを送信... (Shift+Enterで改行)',
+  toolsPermission,
+  onToolsPermissionChange,
   useTools = true,
   onUseToolsChange,
   allowWrite = false,
@@ -54,6 +58,25 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
   activeDoc,
 }) => {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // ツール権限レベルの解決（新プロパティ優先、フォールバックとして旧フラグ）
+  const resolvedPermission: 'none' | 'read' | 'write' =
+    toolsPermission !== undefined
+      ? toolsPermission
+      : !useTools
+      ? 'none'
+      : allowWrite
+      ? 'write'
+      : 'read';
+
+  const handlePermissionSelect = (perm: 'none' | 'read' | 'write') => {
+    if (onToolsPermissionChange) {
+      onToolsPermissionChange(perm);
+    } else {
+      if (onUseToolsChange) onUseToolsChange(perm !== 'none');
+      if (onAllowWriteChange) onAllowWriteChange(perm === 'write');
+    }
+  };
 
   // 入力内容に合わせて高さを自動伸縮
   useEffect(() => {
@@ -93,34 +116,27 @@ export const AIChatInput: React.FC<AIChatInputProps> = ({
             />
           )}
 
-          {/* ツール機能 ON/OFF */}
-          {onUseToolsChange && (
-            <button
-              type="button"
-              className={`chat-toggle-btn ${useTools ? 'active' : ''}`}
-              onClick={() => onUseToolsChange(!useTools)}
-              title="執筆支援ツールの利用 (ファイル参照・校正・ルビ等)"
+          {/* ツール権限統合コンボボックス */}
+          {(onToolsPermissionChange || onUseToolsChange) && (
+            <div
+              className={`chat-select-wrapper ${
+                resolvedPermission !== 'none' ? 'active' : ''
+              } ${resolvedPermission === 'write' ? 'warn' : ''}`}
             >
-              <Wrench size={12} />
-              <span>ツール</span>
-            </button>
-          )}
-
-          {/* 書き込み・直接編集の許可 */}
-          {useTools && onAllowWriteChange && (
-            <button
-              type="button"
-              className={`chat-toggle-btn ${allowWrite ? 'active warn' : ''}`}
-              onClick={() => onAllowWriteChange(!allowWrite)}
-              title={
-                allowWrite
-                  ? '直接編集: 許可（AIが原稿の差分修正やファイル更新を行えます）'
-                  : '直接編集: 禁止（読み取り・校正・検索のみの安全モード）'
-              }
-            >
-              <PenLine size={12} />
-              <span>{allowWrite ? '直接編集: 許可' : '読み取り専用'}</span>
-            </button>
+              {resolvedPermission === 'none' && <Wrench size={12} className="select-icon muted" />}
+              {resolvedPermission === 'read' && <ShieldCheck size={12} className="select-icon read" />}
+              {resolvedPermission === 'write' && <PenLine size={12} className="select-icon write" />}
+              <select
+                className="chat-permission-select"
+                value={resolvedPermission}
+                onChange={(e) => handlePermissionSelect(e.target.value as 'none' | 'read' | 'write')}
+                title="AIのツール利用権限（安全モード / 直接編集許可 / 無効）"
+              >
+                <option value="none">ツール: OFF（対話のみ）</option>
+                <option value="read">ツール: 読み取り専用（安全）</option>
+                <option value="write">ツール: 直接編集を許可（書込）</option>
+              </select>
+            </div>
           )}
 
           {/* 思考プロセス・推論表示 */}

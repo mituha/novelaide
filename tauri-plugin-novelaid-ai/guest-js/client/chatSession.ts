@@ -30,9 +30,85 @@ export interface PiAgentSessionOptions {
   uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
   toolExecutor?: ToolExecutor;
+  initialMessages?: any[];
   onEvent?: (event: AgentSessionEvent) => void;
   onToken?: (delta: string) => void;
   onThoughtToken?: (delta: string) => void;
+}
+
+/**
+ * .ch ドキュメントのメッセージ配列（ChatMessage[]）を Pi SDK Agent のメッセージ配列に変換
+ */
+export function convertChMessagesToPiMessages(messages: any[]): any[] {
+  if (!Array.isArray(messages) || messages.length === 0) return [];
+
+  const piMessages: any[] = [];
+
+  for (const m of messages) {
+    if (!m || !m.role) continue;
+    // welcome メッセージ等のダミー挨拶はスキップ
+    if (m.id === 'welcome') continue;
+
+    if (m.role === 'user') {
+      const textContent = m.content || (m.parts?.find((p: any) => p.type === 'text')?.content ?? '');
+      if (textContent) {
+        piMessages.push({
+          role: 'user',
+          content: textContent,
+          timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
+        });
+      }
+    } else if (m.role === 'assistant') {
+      const parts = Array.isArray(m.parts) ? m.parts : [];
+      const contentParts: any[] = [];
+      const toolResults: any[] = [];
+
+      for (const p of parts) {
+        if (p.type === 'thought' && p.content) {
+          contentParts.push({ type: 'thought', text: p.content });
+        } else if (p.type === 'text' && p.content) {
+          contentParts.push({ type: 'text', text: p.content });
+        } else if (p.type === 'tool_call' && p.metadata?.tool_call) {
+          const tc = p.metadata.tool_call;
+          const callId = tc.id || `call_${Date.now()}`;
+          contentParts.push({
+            type: 'toolCall',
+            id: callId,
+            name: tc.name,
+            arguments: tc.arguments || {},
+          });
+          if (tc.result !== undefined) {
+            toolResults.push({
+              role: 'toolResult',
+              toolCallId: callId,
+              toolName: tc.name,
+              content: [{ type: 'text', text: typeof tc.result === 'string' ? tc.result : JSON.stringify(tc.result) }],
+              isError: tc.result?.status === 'error',
+            });
+          }
+        }
+      }
+
+      // parts が空で content がある場合
+      if (contentParts.length === 0 && m.content) {
+        contentParts.push({ type: 'text', text: m.content });
+      }
+
+      if (contentParts.length > 0) {
+        piMessages.push({
+          role: 'assistant',
+          content: contentParts,
+          timestamp: typeof m.timestamp === 'number' ? m.timestamp : Date.now(),
+        });
+        // 紐づく toolResult があれば直後に追加
+        for (const tr of toolResults) {
+          piMessages.push(tr);
+        }
+      }
+    }
+  }
+
+  return piMessages;
 }
 
 interface StreamFnOptions {
@@ -573,25 +649,7 @@ export class PiWritingAgentSession {
       await h({ systemPromptOptions });
     }
 
-    const persona = this.options.persona || 'partner';
-    const personaPrompt = getPersonaPrompt(persona);
-    let systemPrompt = personaPrompt;
-    if (systemPromptOptions.sections['novelaid_persona']) {
-      systemPrompt = systemPromptOptions.sections['novelaid_persona'];
-    }
-    if (systemPromptOptions.sections['novelaid_context']) {
-      systemPrompt += `\n\n${systemPromptOptions.sections['novelaid_context']}`;
-    } else if (this.options.contextContent && this.options.contextContent.trim().length > 0) {
-      systemPrompt += `\n\n【現在エディターで参照中の原稿・設定資料コンテキスト】\n${this.options.contextContent.trim()}\n※上記の原稿・資料を最優先で考慮して回答してください。`;
-    }
-
-    if (systemPromptOptions.sections['novelaid_workspace']) {
-      systemPrompt += `\n\n${systemPromptOptions.sections['novelaid_workspace']}`;
-    }
-
-    if (this.options.useReasoning === false) {
-      systemPrompt += `\n\n【出力指示】思考プロセス（推論ログや手順）は出力せず、直接結論・回答本文のみを出力してください。`;
-    }
+    const systemPrompt = this.buildSystemPrompt(systemPromptOptions);
 
     // 3. Extension から登録されたツール配列（registerTool）を取得
     const toolsForAgent =
@@ -632,7 +690,7 @@ export class PiWritingAgentSession {
     console.log(
       '%c[Novelaid AI] Extension ツール・コマンド登録完了 ⚙️:',
       'color: #10b981;',
-      `ツール数: ${toolsForAgent.length}, コマンド数: ${this.registeredCommands.size}`
+      `ツール数: ${toolsForAgent.length}, コマンド数: ${this.registeredCommands.size}, 復元履歴数: ${this.options.initialMessages?.length || 0}`
     );
 
     const modelObj = {
@@ -648,10 +706,12 @@ export class PiWritingAgentSession {
       maxTokens: 16384,
     };
 
-    // 4. pi-agent-core Agent インスタンスの生成
+    // 4. pi-agent-core Agent インスタンスの生成（過去メッセージ履歴を initialState.messages に復元）
+    const initialMessages = this.options.initialMessages ? [...this.options.initialMessages] : [];
     this.agent = new Agent({
       initialState: {
         systemPrompt,
+        messages: initialMessages,
         tools: toolsForAgent as any,
         model: modelObj as any,
         thinkingLevel: this.options.useReasoning === false ? 'off' : 'medium',
@@ -913,6 +973,102 @@ export class PiWritingAgentSession {
 
   public getProvider(): AiProviderType {
     return this.options.provider || 'lm-studio';
+  }
+
+  /**
+   * システムプロンプトの構築
+   */
+  public buildSystemPrompt(systemPromptOptions?: { sections: Record<string, string> }): string {
+    const persona = this.options.persona || 'partner';
+    const personaPrompt = getPersonaPrompt(persona);
+    let systemPrompt = personaPrompt;
+
+    if (systemPromptOptions?.sections?.['novelaid_persona']) {
+      systemPrompt = systemPromptOptions.sections['novelaid_persona'];
+    }
+    if (systemPromptOptions?.sections?.['novelaid_context']) {
+      systemPrompt += `\n\n${systemPromptOptions.sections['novelaid_context']}`;
+    } else if (this.options.contextContent && this.options.contextContent.trim().length > 0) {
+      systemPrompt += `\n\n【現在エディターで参照中の原稿・設定資料コンテキスト】\n${this.options.contextContent.trim()}\n※上記の原稿・資料を最優先で考慮して回答してください。`;
+    }
+
+    if (systemPromptOptions?.sections?.['novelaid_workspace']) {
+      systemPrompt += `\n\n${systemPromptOptions.sections['novelaid_workspace']}`;
+    } else if (this.options.availableFilesSummary && this.options.availableFilesSummary.trim().length > 0) {
+      systemPrompt += `\n\n${this.options.availableFilesSummary.trim()}`;
+    }
+
+    if (this.options.useReasoning === false) {
+      systemPrompt += `\n\n【出力指示】思考プロセス（推論ログや手順）は出力せず、直接結論・回答本文のみを出力してください。`;
+    }
+
+    return systemPrompt;
+  }
+
+  /**
+   * セッション設定（モデル、ペルソナ、ツール権限、コンテキスト、コールバック等）の動的同期
+   * エージェントの会話履歴（Agent._state.messages）を失わずに状態を更新
+   */
+  public async updateOptions(newOptions: Partial<PiAgentSessionOptions>): Promise<void> {
+    Object.assign(this.options, newOptions);
+    if (newOptions.onToken) this.onToken = newOptions.onToken;
+    if (newOptions.onThoughtToken) this.onThoughtToken = newOptions.onThoughtToken;
+    if (newOptions.onEvent) this.onEvent = newOptions.onEvent;
+
+    if (!this.agent) {
+      await this.init();
+      return;
+    }
+
+    const permission: ToolPermissionLevel =
+      this.options.toolsPermission ?? (this.options.useTools === false ? 'none' : 'read');
+
+    // 1. ツールのフィルタリング更新
+    const toolsForAgent =
+      permission === 'none'
+        ? []
+        : Array.from(this.registeredTools.values()).map((t) => ({
+            name: t.name,
+            description: t.description,
+            parameters: t.parameters,
+            execute: t.execute,
+          }));
+    (this.agent as any).state.tools = toolsForAgent;
+
+    // 2. streamFn の再構築（モデル・プロバイダー・ツール権限の反映）
+    const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+    const modelId = this.options.model || (this.options.provider === 'gemini' ? 'gemini-2.5-flash' : 'qwen2.5-7b-instruct');
+    const streamFn = createBrowserStreamFn({
+      baseUrl,
+      provider: this.options.provider,
+      apiKey: this.options.apiKey,
+      defaultModel: modelId,
+      useReasoning: this.options.useReasoning,
+      toolsPermission: permission,
+      tools: toolsForAgent,
+    });
+    (this.agent as any).streamFunction = streamFn;
+
+    // 3. システムプロンプトの動的反映（agent.state.messages[0] の更新）
+    const systemPrompt = this.buildSystemPrompt();
+    const stateMessages = (this.agent as any).state?.messages;
+    if (Array.isArray(stateMessages) && stateMessages.length > 0 && stateMessages[0]?.role === 'system') {
+      stateMessages[0].content = systemPrompt;
+    }
+  }
+
+  /**
+   * 外部（.ch ファイル等）からのメッセージ履歴の強制再同期
+   */
+  public setHistoryMessages(chMessages: any[]): void {
+    const piMessages = convertChMessagesToPiMessages(chMessages);
+    if (this.agent) {
+      const systemMsg = (this.agent as any).state?.messages?.[0];
+      const nextMessages = systemMsg?.role === 'system' ? [systemMsg, ...piMessages] : piMessages;
+      (this.agent as any).state.messages = nextMessages;
+    } else {
+      this.options.initialMessages = piMessages;
+    }
   }
 
   public destroy(): void {
