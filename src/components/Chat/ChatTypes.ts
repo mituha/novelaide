@@ -12,6 +12,7 @@ export interface ChMetadata {
   defaultRoleId?: string;    // 'assistant'
   parameters?: {
     model?: string;
+    provider?: string;
     temperature?: number;
     useTools?: boolean;
     useReasoning?: boolean;

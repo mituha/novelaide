@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Bot, Save, FileText, Check } from 'lucide-react';
+import { Bot, Save, FileText, Check, Cpu } from 'lucide-react';
 import { PersonaDefinition } from './ChatTypes';
 import './ChatHeader.css';
 
@@ -9,6 +9,9 @@ interface ChatHeaderProps {
   selectedPersonaId: string;
   onPersonaChange: (personaId: string) => void;
   personas: PersonaDefinition[];
+  selectedModelKey?: string;
+  onModelChange?: (modelKey: string) => void;
+  scopedModels?: string[];
   onExportToFile?: () => void;
   isExporting?: boolean;
 }
@@ -19,6 +22,9 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
   selectedPersonaId,
   onPersonaChange,
   personas,
+  selectedModelKey = 'gemini:gemini-2.5-flash',
+  onModelChange,
+  scopedModels = [],
   onExportToFile,
   isExporting,
 }) => {
@@ -41,6 +47,22 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       setIsEditingTitle(false);
       setTempTitle(title);
     }
+  };
+
+  // Scoped Models をプロバイダー別に分類
+  const effectiveModels = scopedModels.length > 0 ? scopedModels : [
+    'gemini:gemini-2.5-flash',
+    'gemini:gemini-2.5-pro',
+    'lm-studio:qwen2.5-7b-instruct',
+  ];
+
+  const geminiList = effectiveModels.filter((m) => m.startsWith('gemini:'));
+  const lmStudioList = effectiveModels.filter((m) => m.startsWith('lm-studio:'));
+  const otherList = effectiveModels.filter((m) => !m.startsWith('gemini:') && !m.startsWith('lm-studio:'));
+
+  const formatModelLabel = (key: string): string => {
+    const parts = key.split(':');
+    return parts.length > 1 ? parts[1] : key;
   };
 
   return (
@@ -89,6 +111,45 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
       </div>
 
       <div className="chat-header-right">
+        {onModelChange && (
+          <div className="chat-header-model-wrapper" title="使用するAIモデル（プロバイダー別）">
+            <Cpu size={13} className="chat-model-icon" />
+            <select
+              className="chat-header-model-select"
+              value={selectedModelKey}
+              onChange={(e) => onModelChange(e.target.value)}
+            >
+              {geminiList.length > 0 && (
+                <optgroup label="Google Gemini">
+                  {geminiList.map((m) => (
+                    <option key={m} value={m}>
+                      {formatModelLabel(m)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {lmStudioList.length > 0 && (
+                <optgroup label="LM Studio (ローカル)">
+                  {lmStudioList.map((m) => (
+                    <option key={m} value={m}>
+                      {formatModelLabel(m)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+              {otherList.length > 0 && (
+                <optgroup label="その他">
+                  {otherList.map((m) => (
+                    <option key={m} value={m}>
+                      {formatModelLabel(m)}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </div>
+        )}
+
         {onExportToFile && (
           <button
             type="button"

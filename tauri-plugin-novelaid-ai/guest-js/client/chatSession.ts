@@ -1,7 +1,7 @@
 import { Agent, type AgentEvent, type StreamFn } from '@earendil-works/pi-agent-core';
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';
-import { DEFAULT_LM_STUDIO_URL } from './modelManager';
-import { Persona, AiPersonaType, AgentSessionEvent } from '../types';
+import { DEFAULT_LM_STUDIO_URL, GEMINI_OPENAI_BASE_URL } from './modelManager';
+import { Persona, AiPersonaType, AgentSessionEvent, AiProviderType } from '../types';
 import { getPersonaPrompt } from '../domain/guidelines';
 import {
   createNovelaidExtension,
@@ -17,7 +17,9 @@ export type ToolExecutor = (toolName: string, args: Record<string, any>) => Prom
 
 export interface PiAgentSessionOptions {
   model?: string;
+  provider?: AiProviderType;
   baseUrl?: string;
+  apiKey?: string;
   persona?: Persona | AiPersonaType | string;
   contextContent?: string;
   uiDocumentContext?: UIDocumentContext;
@@ -27,14 +29,24 @@ export interface PiAgentSessionOptions {
   onToken?: (delta: string) => void;
 }
 
+interface StreamFnOptions {
+  baseUrl?: string;
+  provider?: AiProviderType;
+  apiKey?: string;
+  defaultModel?: string;
+}
+
 /**
- * LM Studio / OpenAI 互換のブラウザセーフな StreamFn
+ * LM Studio / Google Gemini / OpenAI 互換のブラウザセーフな StreamFn
  * pi-agent-core / pi-ai の AssistantMessageEventStream プロトコルに完全準拠
  */
-function createBrowserStreamFn(
-  baseUrl: string = DEFAULT_LM_STUDIO_URL,
-  defaultModel: string = 'lm-studio/qwen2.5-7b-instruct'
-): StreamFn {
+function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
+  const provider = options.provider || 'lm-studio';
+  const defaultModel = options.defaultModel || (provider === 'gemini' ? 'gemini-2.5-flash' : 'qwen2.5-7b-instruct');
+  
+  let baseUrl = options.baseUrl || (provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+  baseUrl = baseUrl.replace(/\/+$/, '');
+
   return (modelOrMessages: any, contextOrOptions: any, maybeOptions?: any) => {
     const stream = createAssistantMessageEventStream();
 
@@ -51,7 +63,7 @@ function createBrowserStreamFn(
       signal = contextOrOptions?.signal;
     }
 
-    const endpoint = baseUrl.replace(/\/+$/, '') + '/chat/completions';
+    const endpoint = `${baseUrl}/chat/completions`;
     const apiMessages = messagesList.map((m: any) => ({
       role: m.role || 'user',
       content:
@@ -65,7 +77,7 @@ function createBrowserStreamFn(
     }));
 
     (async () => {
-      console.groupCollapsed(`%c[Novelaid AI] リクエスト送信 🚀 (${modelName})`, 'color: #3b82f6; font-weight: bold;');
+      console.groupCollapsed(`%c[Novelaid AI] リクエスト送信 🚀 (${provider} / ${modelName})`, 'color: #3b82f6; font-weight: bold;');
       console.log('エンドポイント:', endpoint);
       console.log('メッセージ履歴:', apiMessages);
       console.groupEnd();
@@ -77,10 +89,18 @@ function createBrowserStreamFn(
       let receivedTokenCount = 0;
       let fullResponseText = '';
 
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+
+      if (options.apiKey && options.apiKey.trim().length > 0) {
+        headers['Authorization'] = `Bearer ${options.apiKey.trim()}`;
+      }
+
       try {
         const res = await fetch(endpoint, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers,
           body: JSON.stringify({
             model: modelName,
             messages: apiMessages,
@@ -261,7 +281,12 @@ export class PiWritingAgentSession {
       systemPrompt += `\n\n【現在エディターで参照中の原稿・設定資料コンテキスト】\n${this.options.contextContent.trim()}\n※上記の原稿・資料を最優先で考慮して回答してください。`;
     }
 
-    const streamFn = createBrowserStreamFn(baseUrl, modelId);
+    const streamFn = createBrowserStreamFn({
+      baseUrl,
+      provider: this.options.provider,
+      apiKey: this.options.apiKey,
+      defaultModel: modelId,
+    });
 
     // 3. Extension から登録されたツール配列（registerTool）を取得
     const toolsForAgent = Array.from(this.registeredTools.values()).map((t) => ({
@@ -269,6 +294,21 @@ export class PiWritingAgentSession {
       description: t.description,
       parameters: t.parameters,
     }));
+
+    // pi 標準互換の /model コマンドを登録
+    if (!this.registeredCommands.has('model')) {
+      this.registeredCommands.set('model', {
+        description: 'AIモデルまたはプロバイダーを変更します (/model <モデルID>)',
+        handler: async (args?: string) => {
+          if (!args || args.trim().length === 0) {
+            return `現在のモデル: ${this.getModel()} (${this.getProvider()})`;
+          }
+          const target = args.trim();
+          this.setModel(target);
+          return `モデルを ${target} に切り替えました。`;
+        },
+      });
+    }
 
     console.log(
       '%c[Novelaid AI] Extension ツール・コマンド登録完了 ⚙️:',
@@ -438,6 +478,35 @@ export class PiWritingAgentSession {
       });
       return '';
     }
+  }
+
+  /**
+   * 現在のセッションのモデルまたはプロバイダーを動的変更
+   */
+  public setModel(modelId: string, provider?: AiProviderType, apiKey?: string): void {
+    this.options.model = modelId;
+    if (provider) this.options.provider = provider;
+    if (apiKey) this.options.apiKey = apiKey;
+
+    // agent が既に初期化されている場合、streamFn を再生成して反映
+    if (this.agent) {
+      const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+      const streamFn = createBrowserStreamFn({
+        baseUrl,
+        provider: this.options.provider,
+        apiKey: this.options.apiKey,
+        defaultModel: modelId,
+      });
+      (this.agent as any).streamFn = streamFn;
+    }
+  }
+
+  public getModel(): string {
+    return this.options.model || (this.options.provider === 'gemini' ? 'gemini-2.5-flash' : 'qwen2.5-7b-instruct');
+  }
+
+  public getProvider(): AiProviderType {
+    return this.options.provider || 'lm-studio';
   }
 
   public destroy(): void {

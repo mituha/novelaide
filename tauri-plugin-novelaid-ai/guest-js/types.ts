@@ -1,8 +1,12 @@
+export type AiProviderType = 'lm-studio' | 'gemini' | 'openai' | string;
+
 export interface AiModelInfo {
   id: string;
   name: string;
-  provider: string;
+  provider: AiProviderType;
   contextWindow?: number;
+  description?: string;
+  reasoning?: boolean;
 }
 
 export type AiPersonaType = 'partner' | 'editor' | 'proofreader' | 'character';

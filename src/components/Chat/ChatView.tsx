@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useDocument } from '../../contexts/DocumentContext';
+import { useSettings } from 'restar-app-settings';
 import { fileService } from '../../services/fileService';
 import {
   ChFileStructure,
@@ -178,6 +179,52 @@ export const ChatView: React.FC<ChatViewProps> = ({
   const currentPersona =
     DEFAULT_STATIC_PERSONAS.find((p) => p.id === currentPersonaId) || DEFAULT_STATIC_PERSONAS[0];
 
+  const { settings } = useSettings();
+  const scopedModels: string[] = useMemo(() => {
+    if (Array.isArray(settings.aiScopedModels) && settings.aiScopedModels.length > 0) {
+      return settings.aiScopedModels;
+    }
+    return ['gemini:gemini-2.5-flash', 'gemini:gemini-2.5-pro', 'lm-studio:qwen2.5-7b-instruct'];
+  }, [settings.aiScopedModels]);
+
+  const defaultModelKey = settings.aiDefaultModel || scopedModels[0] || 'gemini:gemini-2.5-flash';
+  const lmStudioUrl = settings.aiLmStudioUrl || 'http://localhost:1234/v1';
+  const geminiApiKey = settings.aiGeminiApiKey || '';
+
+  // ドキュメントに保存されているモデルまたは設定のデフォルト
+  const currentModelKey = useMemo(() => {
+    const params = fileData?.metadata?.parameters;
+    if (params?.model) {
+      if (params.provider) {
+        return `${params.provider}:${params.model}`;
+      }
+      return params.model.includes(':') ? params.model : `gemini:${params.model}`;
+    }
+    return defaultModelKey;
+  }, [fileData?.metadata?.parameters, defaultModelKey]);
+
+  const handleModelChange = useCallback(
+    (newKey: string) => {
+      const parts = newKey.split(':');
+      const provider = parts.length > 1 ? parts[0] : 'gemini';
+      const model = parts.length > 1 ? parts[1] : parts[0];
+
+      const next: ChFileStructure = {
+        ...fileData,
+        metadata: {
+          ...(fileData?.metadata || {}),
+          parameters: {
+            ...(fileData?.metadata?.parameters || {}),
+            provider,
+            model,
+          },
+        },
+      };
+      saveFile(next);
+    },
+    [fileData, saveFile]
+  );
+
   const handlePersonaChange = (id: string) => {
     const next: ChFileStructure = {
       ...fileData,
@@ -289,9 +336,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
             : null,
       };
 
+      // 選択中のプロバイダー・モデルの解決
+      const parts = currentModelKey.split(':');
+      const targetProvider = parts.length > 1 ? parts[0] : 'gemini';
+      const targetModel = parts.length > 1 ? parts[1] : parts[0];
+
       // PiWritingAgentSession の実行
       const session = new PiWritingAgentSession({
         persona: currentPersonaId as any,
+        model: targetModel,
+        provider: targetProvider as any,
+        baseUrl: targetProvider === 'lm-studio' ? lmStudioUrl : undefined,
+        apiKey: targetProvider === 'gemini' ? geminiApiKey : undefined,
         contextContent,
         uiDocumentContext,
         onToken: (delta) => {
@@ -384,6 +440,9 @@ export const ChatView: React.FC<ChatViewProps> = ({
         selectedPersonaId={currentPersonaId}
         onPersonaChange={!isReadOnly ? handlePersonaChange : () => {}}
         personas={DEFAULT_STATIC_PERSONAS}
+        selectedModelKey={currentModelKey}
+        onModelChange={!isReadOnly ? handleModelChange : undefined}
+        scopedModels={scopedModels}
         onExportToFile={showExportButton ? onExportToFile : undefined}
         isExporting={isExporting}
       />

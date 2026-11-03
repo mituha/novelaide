@@ -47,6 +47,7 @@ export default {
   ],
   external: [
     /^@tauri-apps\/api/,
+    /^@earendil-works\//,
     'react',
     'react-dom',
     'react/jsx-runtime',
