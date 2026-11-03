@@ -34,17 +34,89 @@ const formatTimestamp = (d: Date = new Date()): string => {
   return `${y}${m}${day}${h}${min}${s}`;
 };
 
+// 初期の空ドキュメント用ファクトリ
+function createDefaultStructure(fallbackTitle?: string): ChFileStructure {
+  const now = formatTimestamp();
+  return {
+    version: '1.0',
+    metadata: {
+      title: fallbackTitle || 'AI執筆相談',
+      createdAt: now,
+      updatedAt: now,
+      defaultPersonaId: 'partner',
+      defaultRoleId: 'assistant',
+      parameters: {
+        useTools: true,
+        useReasoning: true,
+      },
+    },
+    messages: [
+      {
+        id: 'welcome',
+        role: 'assistant',
+        persona: 'partner',
+        content: 'こんにちは！執筆パートナーです。プロットの構想やセリフの推敲、ルビ振りなど何でもお気軽にご相談ください。',
+        parts: [
+          {
+            type: 'text',
+            content: 'こんにちは！執筆パートナーです。プロットの構想やセリフの推敲、ルビ振りなど何でもお気軽にご相談ください。',
+          },
+        ],
+        timestamp: now,
+      },
+    ],
+  };
+}
+
+/**
+ * 読み込んだ生のJSONや旧形式データを安全に ChFileStructure に正規化する
+ */
+function normalizeChData(raw: any, fallbackTitle?: string): ChFileStructure {
+  const defaultStruct = createDefaultStructure(fallbackTitle);
+  if (!raw || typeof raw !== 'object') {
+    return defaultStruct;
+  }
+
+  // 以前のチャットデータ形式（単なるメッセージ配列 []）の救済
+  if (Array.isArray(raw)) {
+    return {
+      ...defaultStruct,
+      messages: raw.length > 0 ? raw : defaultStruct.messages,
+    };
+  }
+
+  const metadata = raw.metadata && typeof raw.metadata === 'object' ? raw.metadata : {};
+  const messages = Array.isArray(raw.messages) ? raw.messages : defaultStruct.messages;
+
+  return {
+    version: typeof raw.version === 'string' ? raw.version : '1.0',
+    metadata: {
+      title: metadata.title || fallbackTitle || 'AI執筆相談',
+      createdAt: metadata.createdAt || defaultStruct.metadata.createdAt,
+      updatedAt: metadata.updatedAt || defaultStruct.metadata.updatedAt,
+      defaultPersonaId: metadata.defaultPersonaId || 'partner',
+      defaultRoleId: metadata.defaultRoleId || 'assistant',
+      parameters: {
+        useTools: metadata.parameters?.useTools ?? true,
+        useReasoning: metadata.parameters?.useReasoning ?? true,
+        ...metadata.parameters,
+      },
+    },
+    messages,
+  };
+}
+
 export const ChatView: React.FC<ChatViewProps> = ({
   content,
   path = '',
   baseName = '',
-  onChangeContent,
   isReadOnly = false,
-  onExportToFile,
+  onChangeContent,
   showExportButton = false,
+  onExportToFile,
   isExporting = false,
 }) => {
-  const { activeDocument, activeLeftItem, activeRightItem, openDocuments } = useDocument();
+  const { openDocuments, activeDocument, activeLeftItem, activeRightItem } = useDocument();
 
   const [input, setInput] = useState<string>('');
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
@@ -54,47 +126,17 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const activeAssistantMsgIdRef = useRef<string | null>(null);
 
-  // 初期の空ドキュメント用ファクトリ
-  const createDefaultStructure = useCallback((): ChFileStructure => {
-    return {
-      version: '1.0',
-      metadata: {
-        title: baseName ? fileService.stem(baseName) : 'AI執筆相談',
-        createdAt: formatTimestamp(),
-        updatedAt: formatTimestamp(),
-        defaultPersonaId: 'partner',
-        defaultRoleId: 'assistant',
-        parameters: {
-          useTools: true,
-          useReasoning: true,
-        },
-      },
-      messages: [
-        {
-          id: 'welcome',
-          role: 'assistant',
-          persona: 'partner',
-          content: 'こんにちは！執筆パートナーです。プロットの構想やセリフの推敲、ルビ振りなど何でもお気軽にご相談ください。',
-          parts: [
-            {
-              type: 'text',
-              content: 'こんにちは！執筆パートナーです。プロットの構想やセリフの推敲、ルビ振りなど何でもお気軽にご相談ください。',
-            },
-          ],
-          timestamp: formatTimestamp(),
-        },
-      ],
-    };
-  }, [baseName]);
+  const defaultTitle = baseName ? fileService.stem(baseName) : 'AI執筆相談';
 
   const [fileData, setFileData] = useState<ChFileStructure>(() => {
     if (!content || !content.trim()) {
-      return createDefaultStructure();
+      return createDefaultStructure(defaultTitle);
     }
     try {
-      return JSON.parse(content);
+      const parsed = JSON.parse(content);
+      return normalizeChData(parsed, defaultTitle);
     } catch {
-      return createDefaultStructure();
+      return createDefaultStructure(defaultTitle);
     }
   });
 
@@ -105,21 +147,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
     }
     try {
       const parsed = JSON.parse(content);
-      setFileData(parsed);
+      setFileData(normalizeChData(parsed, defaultTitle));
     } catch (e) {
       console.warn('Failed to parse .ch content JSON:', e);
     }
-  }, [content]);
+  }, [content, defaultTitle]);
 
   // ファイルデータ保存
   const saveFile = useCallback(
     (newData: ChFileStructure) => {
+      const currentMeta = newData?.metadata || {};
       const updated: ChFileStructure = {
         ...newData,
+        version: newData?.version || '1.0',
         metadata: {
-          ...newData.metadata,
+          ...currentMeta,
           updatedAt: formatTimestamp(),
         },
+        messages: newData?.messages || [],
       };
       setFileData(updated);
       if (onChangeContent) {
@@ -129,7 +174,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     [onChangeContent]
   );
 
-  const currentPersonaId = fileData.metadata.defaultPersonaId || 'partner';
+  const currentPersonaId = fileData?.metadata?.defaultPersonaId || 'partner';
   const currentPersona =
     DEFAULT_STATIC_PERSONAS.find((p) => p.id === currentPersonaId) || DEFAULT_STATIC_PERSONAS[0];
 
@@ -137,7 +182,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const next: ChFileStructure = {
       ...fileData,
       metadata: {
-        ...fileData.metadata,
+        ...(fileData?.metadata || {}),
         defaultPersonaId: id,
       },
     };
@@ -148,7 +193,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
     const next: ChFileStructure = {
       ...fileData,
       metadata: {
-        ...fileData.metadata,
+        ...(fileData?.metadata || {}),
         title: newTitle,
       },
     };
@@ -218,7 +263,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
     const nextData: ChFileStructure = {
       ...fileData,
-      messages: [...fileData.messages, userMsg, assistantMsg],
+      messages: [...(fileData?.messages || []), userMsg, assistantMsg],
     };
 
     setFileData(nextData);
@@ -334,7 +379,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
   return (
     <div className="chat-view-container">
       <ChatHeader
-        title={fileData.metadata.title || fileService.stem(baseName) || 'チャット'}
+        title={fileData?.metadata?.title || fileService.stem(baseName) || 'チャット'}
         onTitleChange={!isReadOnly ? handleTitleChange : undefined}
         selectedPersonaId={currentPersonaId}
         onPersonaChange={!isReadOnly ? handlePersonaChange : () => {}}
@@ -344,7 +389,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       />
 
       <ChatMessageList
-        messages={fileData.messages}
+        messages={fileData?.messages || []}
         personas={DEFAULT_STATIC_PERSONAS}
         onMessagesChange={!isReadOnly ? handleMessagesChange : undefined}
       />
