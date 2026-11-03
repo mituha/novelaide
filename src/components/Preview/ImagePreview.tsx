@@ -5,8 +5,8 @@ import { DocumentViewProps } from '../../types/viewPlugin';
 import { fileService } from '../../services/fileService';
 import './ImagePreview.css';
 
-function getMimeType(filePath: string): string {
-  const ext = filePath.split('.').pop()?.toLowerCase();
+function getMimeType(extension?: string): string {
+  const ext = extension?.toLowerCase();
   switch (ext) {
     case 'png':
       return 'image/png';
@@ -31,7 +31,12 @@ function getMimeType(filePath: string): string {
   }
 }
 
-export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
+export const ImagePreview: React.FC<DocumentViewProps> = ({
+  path,
+  baseName,
+  extension,
+  absolutePath,
+}) => {
   const [imageSrc, setImageSrc] = useState<string>('');
   const [hasError, setHasError] = useState<boolean>(false);
   const blobUrlRef = useRef<string | null>(null);
@@ -43,6 +48,8 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
 
   const containerRef = useRef<HTMLDivElement>(null);
   const imageRef = useRef<HTMLImageElement>(null);
+
+  const targetPath = absolutePath || path;
 
   // パス変更時のリセットおよび画像ソース初期化
   useEffect(() => {
@@ -57,7 +64,7 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
     }
 
     try {
-      const src = convertFileSrc(path);
+      const src = convertFileSrc(targetPath);
       setImageSrc(src);
     } catch {
       // convertFileSrc失敗時は最初からバイナリBlob読み込みを試みる
@@ -70,17 +77,17 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
         blobUrlRef.current = null;
       }
     };
-  }, [path]);
+  }, [targetPath]);
 
   // バイナリ読み込みによるBlob URLフォールバック
   const loadAsBlob = useCallback(async () => {
     try {
-      const bytes = await fileService.readFileBinary(path);
+      const bytes = await fileService.readFileBinary(targetPath);
       if (!bytes || bytes.length === 0) {
         setHasError(true);
         return;
       }
-      const mime = getMimeType(path);
+      const mime = getMimeType(extension || fileService.extname(targetPath));
       const blob = new Blob([bytes as unknown as BlobPart], { type: mime });
       const url = URL.createObjectURL(blob);
       if (blobUrlRef.current) {
@@ -92,7 +99,7 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
       console.error("Failed to load image as blob:", e);
       setHasError(true);
     }
-  }, [path]);
+  }, [targetPath, extension]);
 
   // 画像読み込みエラー時のフォールバック処理
   const handleImageError = useCallback(() => {
@@ -173,7 +180,7 @@ export const ImagePreview: React.FC<DocumentViewProps> = ({ path }) => {
     setScale((prev) => Math.max(0.1, Math.round(prev * 0.8 * 100) / 100));
   };
 
-  const fileName = path.split(/[/\\]/).pop() || '';
+  const fileName = baseName || (path ? fileService.basename(path) : '');
 
   if (hasError) {
     return (

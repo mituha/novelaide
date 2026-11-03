@@ -1,25 +1,30 @@
 import React from 'react';
 import { FileQuestion, FolderOpen } from 'lucide-react';
 import { revealItemInDir } from '@tauri-apps/plugin-opener';
+import { fileService } from '../../services/fileService';
 import './UnsupportedFileView.css';
 
 interface UnsupportedFileViewProps {
   path: string;
   documentType: string;
+  baseName?: string;
   extension?: string;
+  absolutePath?: string;
 }
 
 export const UnsupportedFileView: React.FC<UnsupportedFileViewProps> = ({
   path,
   documentType,
+  baseName,
   extension,
+  absolutePath,
 }) => {
-  const fileName = path.split(/[/\\]/).pop() || path;
-  const ext = (extension || (fileName.includes('.') ? fileName.split('.').pop() : 'UNKNOWN'))?.toUpperCase();
+  const fileName = baseName || (path ? fileService.basename(path) : '');
+  const ext = (extension || (fileName ? fileService.extname(fileName) : '') || 'UNKNOWN').toUpperCase();
 
   const handleReveal = async () => {
     try {
-      await revealItemInDir(path);
+      await revealItemInDir(absolutePath || path);
     } catch (e) {
       console.warn('revealItemInDir fallback:', e);
     }

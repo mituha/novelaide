@@ -63,24 +63,18 @@ fn read_dir_recursive<R: Runtime>(
             }
         }
 
-        let path = path_buf.to_string_lossy().to_string();
-        let base_name = path_buf.file_name().unwrap_or_default().to_string_lossy().to_string();
-        let file_title = path_buf.file_stem().unwrap_or_default().to_string_lossy().to_string();
-        let extension = if is_directory {
-            String::new()
-        } else {
-            path_buf
-                .extension()
-                .and_then(|s| s.to_str())
-                .map(|s| s.to_lowercase())
-                .unwrap_or_else(|| {
-                    if base_name.starts_with('.') && !base_name[1..].contains('.') {
-                        base_name[1..].to_lowercase()
-                    } else {
-                        String::new()
-                    }
-                })
-        };
+        let (
+            relative_path,
+            absolute_path,
+            project_path,
+            relative_parent_dir,
+            parent_dir,
+            base_name,
+            file_title,
+            extension,
+        ) = novelaid_fs.parse_path_info(&path_buf);
+
+        let final_extension = if is_directory { String::new() } else { extension };
 
         let children = if is_directory && recursive {
             Some(read_dir_recursive(app, &path_buf, true, Some(document_type))?)
@@ -90,10 +84,15 @@ fn read_dir_recursive<R: Runtime>(
 
         entries.push(NovelaidDirEntry {
             name,
-            path,
+            path: relative_path.clone(),
+            relative_path,
+            absolute_path,
+            project_path,
+            relative_parent_dir,
+            parent_dir,
             base_name,
             file_title,
-            extension,
+            extension: final_extension,
             is_directory,
             document_type,
             children,

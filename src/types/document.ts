@@ -37,6 +37,11 @@ export interface DocumentViewRef {
  */
 export interface DocumentState {
   path: string;
+  relativePath: string;
+  absolutePath: string;
+  projectPath: string;
+  relativeParentDir: string;
+  parentDir: string;
   baseName: string;
   fileTitle: string;
   extension: string;

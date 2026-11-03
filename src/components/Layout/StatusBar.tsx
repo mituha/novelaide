@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { DetailedCountResult } from "tauri-plugin-novelaid-ruby-api";
 import { NovelaidDocumentType } from "tauri-plugin-novelaid-fs-api";
+import { fileService } from "../../services/fileService";
 import { DocumentIcon } from "../FileExplorer/DocumentIcon";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useNotification } from "../../contexts/NotificationContext";
@@ -60,7 +61,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     };
   }, [showPopup]);
 
-  const fileName = activePath ? activePath.split(/[/\\]/).pop() : null;
+  const fileName = activePath ? fileService.basename(activePath) : null;
 
   // セリフと地の文の比率計算
   const dialogueCharCount = detailedMetrics?.dialogue.charCount || 0;

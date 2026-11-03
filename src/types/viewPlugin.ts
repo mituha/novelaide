@@ -11,6 +11,20 @@ export interface DocumentViewProps {
   content: string;
   /** ドキュメント種別 */
   documentType: NovelaidDocumentType;
+  /** ファイル名（拡張子あり） */
+  baseName?: string;
+  /** 拡張子を除いたファイル名 */
+  fileTitle?: string;
+  /** 小文字の拡張子（ドットなし） */
+  extension?: string;
+  /** 実ファイルの絶対パス */
+  absolutePath?: string;
+  /** 親ディレクトリの絶対パス */
+  parentDir?: string;
+  /** 親ディレクトリの相対パス */
+  relativeParentDir?: string;
+  /** 所属プロジェクトの絶対パス */
+  projectPath?: string;
   /** 読み取り専用かどうか (プレビューやリーダーでは true) */
   isReadOnly?: boolean;
   /** テキスト内容変更時のコールバック */

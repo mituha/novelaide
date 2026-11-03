@@ -41,6 +41,11 @@ impl NovelaidDocumentType {
 pub struct NovelaidDirEntry {
     pub name: String,
     pub path: String,
+    pub relative_path: String,
+    pub absolute_path: String,
+    pub project_path: String,
+    pub relative_parent_dir: String,
+    pub parent_dir: String,
     pub base_name: String,
     pub file_title: String,
     pub extension: String,
@@ -54,6 +59,11 @@ pub struct NovelaidDirEntry {
 #[serde(rename_all = "camelCase")]
 pub struct NovelaidDocument {
     pub path: String,
+    pub relative_path: String,
+    pub absolute_path: String,
+    pub project_path: String,
+    pub relative_parent_dir: String,
+    pub parent_dir: String,
     pub base_name: String,
     pub file_title: String,
     pub extension: String,

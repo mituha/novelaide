@@ -43,7 +43,9 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
           <UnsupportedFileView
             path={document.path}
             documentType={document.documentType}
+            baseName={document.baseName}
             extension={document.extension}
+            absolutePath={document.absolutePath}
           />
         </div>
       </div>
@@ -67,6 +69,13 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
           path={document.path}
           content={document.content}
           documentType={document.documentType}
+          baseName={document.baseName}
+          fileTitle={document.fileTitle}
+          extension={document.extension}
+          absolutePath={document.absolutePath}
+          parentDir={document.parentDir}
+          relativeParentDir={document.relativeParentDir}
+          projectPath={document.projectPath}
           isReadOnly={viewMode !== 'editor'}
           onChangeContent={onChangeContent}
           paneSide={paneSide}
@@ -76,6 +85,7 @@ export const DocumentPane: React.FC<DocumentPaneProps> = ({
       <EpisodeNavigator
         activePath={document.path}
         documentType={document.documentType}
+        parentDir={document.parentDir}
         paneId={paneId}
         viewMode={viewMode}
       />

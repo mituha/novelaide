@@ -49,16 +49,24 @@ interface CodeEditorProps extends Partial<DocumentViewProps> {
 /**
  * ファイルパス・拡張子およびDocumentTypeからMonaco Editorの言語IDを解決
  */
-function detectMonacoLanguage(path: string, documentType?: string): string {
+function detectMonacoLanguage(
+  path: string,
+  documentType?: string,
+  extension?: string,
+  baseName?: string
+): string {
   if (documentType === 'novel') return 'novel';
   if (documentType === 'markdown') return 'markdown';
   if (documentType === 'chat') return 'markdown';
 
-  const baseName = path.split(/[/\\]/).pop() || '';
-  const dotIndex = baseName.lastIndexOf('.');
-  let ext = dotIndex > 0 ? baseName.substring(dotIndex + 1).toLowerCase() : '';
-  if (!ext && baseName.startsWith('.') && !baseName.slice(1).includes('.')) {
-    ext = baseName.slice(1).toLowerCase();
+  let ext = extension?.toLowerCase();
+  if (!ext) {
+    const base = (baseName || (path ? fileService.basename(path) : '')).toLowerCase();
+    if (base.startsWith('.')) {
+      ext = base.slice(1);
+    } else if (path) {
+      ext = fileService.extname(path).toLowerCase();
+    }
   }
 
   switch (ext) {
@@ -116,6 +124,8 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   value,
   content,
   path = '',
+  baseName,
+  extension,
   language,
   documentType = 'novel',
   isReadOnly = false,
@@ -147,7 +157,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
   const textValue = content !== undefined ? content : (value ?? '');
 
   // 言語の解決 (指定がなければパスとDocumentTypeから動的解決)
-  const effectiveLanguage = language || detectMonacoLanguage(path, documentType);
+  const effectiveLanguage = language || detectMonacoLanguage(path, documentType, extension, baseName);
 
   useEffect(() => {
     saveDocumentRef.current = saveDocument;

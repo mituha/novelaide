@@ -169,22 +169,78 @@ impl<R: Runtime> NovelaidFs<R> {
     std::fs::read(path).map_err(crate::Error::Io)
   }
 
-  pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
-    let document_type = self.get_document_type_internal(path);
-    let base_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
-    let file_title = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let extension = path
+  pub fn parse_path_info(&self, target_path: &Path) -> (String, String, String, String, String, String, String, String) {
+    let project_dir = self.get_project_directory();
+    let absolute_path = target_path.to_string_lossy().replace('\\', "/");
+    let project_path_str = project_dir
+        .as_ref()
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default();
+
+    let parent_dir = target_path
+        .parent()
+        .map(|p| p.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_default();
+
+    let (relative_path, relative_parent_dir) = if let Some(ref proj) = project_dir {
+        let rel = target_path
+            .strip_prefix(proj)
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| target_path.file_name().unwrap_or_default().to_string_lossy().to_string());
+
+        let rel_parent = target_path
+            .parent()
+            .and_then(|p| p.strip_prefix(proj).ok())
+            .map(|p| p.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_default();
+
+        (rel, rel_parent)
+    } else {
+        (
+            target_path.file_name().unwrap_or_default().to_string_lossy().to_string(),
+            String::new(),
+        )
+    };
+
+    let base_name = target_path.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_title = target_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let extension = target_path
         .extension()
         .and_then(|s| s.to_str())
         .map(|s| s.to_lowercase())
         .unwrap_or_else(|| {
-            let name = path.file_name().and_then(|s| s.to_str()).unwrap_or("");
-            if name.starts_with('.') && !name[1..].contains('.') {
-                name[1..].to_lowercase()
+            if base_name.starts_with('.') && !base_name[1..].contains('.') {
+                base_name[1..].to_lowercase()
             } else {
                 String::new()
             }
         });
+
+    (
+        relative_path,
+        absolute_path,
+        project_path_str,
+        relative_parent_dir,
+        parent_dir,
+        base_name,
+        file_title,
+        extension,
+    )
+  }
+
+  pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
+    let document_type = self.get_document_type_internal(path);
+    let (
+        relative_path,
+        absolute_path,
+        project_path,
+        relative_parent_dir,
+        parent_dir,
+        base_name,
+        file_title,
+        extension,
+    ) = self.parse_path_info(path);
+
     let mtime = std::fs::metadata(path)
         .and_then(|m| m.modified())
         .unwrap_or_else(|_| SystemTime::now());
@@ -193,7 +249,12 @@ impl<R: Runtime> NovelaidFs<R> {
     // 画像ファイルはバイナリのためテキストとして読み込まず、安全に空本文で返却
     if document_type == NovelaidDocumentType::Image {
       return Ok(NovelaidDocument {
-        path: path.to_string_lossy().to_string(),
+        path: relative_path.clone(),
+        relative_path,
+        absolute_path,
+        project_path,
+        relative_parent_dir,
+        parent_dir,
         base_name,
         file_title,
         extension,
@@ -217,14 +278,19 @@ impl<R: Runtime> NovelaidFs<R> {
         // Update cache
         if document_type != NovelaidDocumentType::Code {
           let mut cache = self.metadata_cache.lock().unwrap();
-          cache.insert(path.to_string_lossy().to_string(), CacheEntry {
+          cache.insert(absolute_path.clone(), CacheEntry {
               metadata: metadata.clone(),
               mtime,
           });
         }
 
         Ok(NovelaidDocument {
-          path: path.to_string_lossy().to_string(),
+          path: relative_path.clone(),
+          relative_path,
+          absolute_path,
+          project_path,
+          relative_parent_dir,
+          parent_dir,
           base_name,
           file_title,
           extension,
@@ -237,7 +303,12 @@ impl<R: Runtime> NovelaidFs<R> {
       Err(_) => {
         // 非テキストファイルまたは読み込み不可ファイル
         Ok(NovelaidDocument {
-          path: path.to_string_lossy().to_string(),
+          path: relative_path.clone(),
+          relative_path,
+          absolute_path,
+          project_path,
+          relative_parent_dir,
+          parent_dir,
           base_name,
           file_title,
           extension,
@@ -337,17 +408,25 @@ impl<R: Runtime> NovelaidFs<R> {
     self.attributes_manager.invalidate_if_attributes_file(&target_path);
 
     let file_doc_type = self.attributes_manager.get_document_type(&target_path);
-    let base_name = next_file_name.clone();
-    let file_title = target_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let extension = target_path
-        .extension()
-        .and_then(|s| s.to_str())
-        .map(|s| s.to_lowercase())
-        .unwrap_or_default();
+    let (
+        relative_path,
+        absolute_path,
+        project_path,
+        relative_parent_dir,
+        parent_dir,
+        base_name,
+        file_title,
+        extension,
+    ) = self.parse_path_info(&target_path);
 
     Ok(NovelaidDirEntry {
       name: next_file_name,
-      path: target_path.to_string_lossy().to_string(),
+      path: relative_path.clone(),
+      relative_path,
+      absolute_path,
+      project_path,
+      relative_parent_dir,
+      parent_dir,
       base_name,
       file_title,
       extension,

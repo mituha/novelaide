@@ -2,11 +2,27 @@ import * as novelaidFs from "tauri-plugin-novelaid-fs-api";
 import * as novelaidMetadata from "tauri-plugin-novelaid-metadata-api";
 import { DirEntry, FileDocument } from "../types/document";
 
+// パス操作ユーティリティの公開
+export const {
+  basename,
+  dirname,
+  extname,
+  stem,
+  joinPath,
+  normalizePath,
+  isSubPath,
+} = novelaidFs;
+
 // ブラウザ環境やプレビュー撮影用のモックデータ
 const MOCK_ENTRIES: DirEntry[] = [
   {
     name: "01_プロローグ.md",
     path: "mock/01_プロローグ.md",
+    relativePath: "01_プロローグ.md",
+    absolutePath: "mock/01_プロローグ.md",
+    projectPath: "mock",
+    relativeParentDir: "",
+    parentDir: "mock",
     baseName: "01_プロローグ.md",
     fileTitle: "01_プロローグ",
     extension: "md",
@@ -17,6 +33,11 @@ const MOCK_ENTRIES: DirEntry[] = [
   {
     name: "02_第1章_出会い.md",
     path: "mock/02_第1章_出会い.md",
+    relativePath: "02_第1章_出会い.md",
+    absolutePath: "mock/02_第1章_出会い.md",
+    projectPath: "mock",
+    relativeParentDir: "",
+    parentDir: "mock",
     baseName: "02_第1章_出会い.md",
     fileTitle: "02_第1章_出会い",
     extension: "md",
@@ -27,6 +48,11 @@ const MOCK_ENTRIES: DirEntry[] = [
   {
     name: "03_第2章_旅立ち.md",
     path: "mock/03_第2章_旅立ち.md",
+    relativePath: "03_第2章_旅立ち.md",
+    absolutePath: "mock/03_第2章_旅立ち.md",
+    projectPath: "mock",
+    relativeParentDir: "",
+    parentDir: "mock",
     baseName: "03_第2章_旅立ち.md",
     fileTitle: "03_第2章_旅立ち",
     extension: "md",
@@ -37,6 +63,11 @@ const MOCK_ENTRIES: DirEntry[] = [
   {
     name: "characters",
     path: "mock/characters",
+    relativePath: "characters",
+    absolutePath: "mock/characters",
+    projectPath: "mock",
+    relativeParentDir: "",
+    parentDir: "mock",
     baseName: "characters",
     fileTitle: "characters",
     extension: "",
@@ -46,6 +77,11 @@ const MOCK_ENTRIES: DirEntry[] = [
       {
         name: "主人公_ソラ.md",
         path: "mock/characters/主人公_ソラ.md",
+        relativePath: "characters/主人公_ソラ.md",
+        absolutePath: "mock/characters/主人公_ソラ.md",
+        projectPath: "mock",
+        relativeParentDir: "characters",
+        parentDir: "mock/characters",
         baseName: "主人公_ソラ.md",
         fileTitle: "主人公_ソラ",
         extension: "md",
@@ -56,6 +92,11 @@ const MOCK_ENTRIES: DirEntry[] = [
       {
         name: "魔女_ルナ.md",
         path: "mock/characters/魔女_ルナ.md",
+        relativePath: "characters/魔女_ルナ.md",
+        absolutePath: "mock/characters/魔女_ルナ.md",
+        projectPath: "mock",
+        relativeParentDir: "characters",
+        parentDir: "mock/characters",
         baseName: "魔女_ルナ.md",
         fileTitle: "魔女_ルナ",
         extension: "md",
@@ -68,6 +109,11 @@ const MOCK_ENTRIES: DirEntry[] = [
   {
     name: "settings",
     path: "mock/settings",
+    relativePath: "settings",
+    absolutePath: "mock/settings",
+    projectPath: "mock",
+    relativeParentDir: "",
+    parentDir: "mock",
     baseName: "settings",
     fileTitle: "settings",
     extension: "",
@@ -77,6 +123,11 @@ const MOCK_ENTRIES: DirEntry[] = [
       {
         name: "世界観_帝国史.md",
         path: "mock/settings/世界観_帝国史.md",
+        relativePath: "settings/世界観_帝国史.md",
+        absolutePath: "mock/settings/世界観_帝国史.md",
+        projectPath: "mock",
+        relativeParentDir: "settings",
+        parentDir: "mock/settings",
         baseName: "世界観_帝国史.md",
         fileTitle: "世界観_帝国史",
         extension: "md",
@@ -89,6 +140,11 @@ const MOCK_ENTRIES: DirEntry[] = [
   {
     name: "assets",
     path: "mock/assets",
+    relativePath: "assets",
+    absolutePath: "mock/assets",
+    projectPath: "mock",
+    relativeParentDir: "",
+    parentDir: "mock",
     baseName: "assets",
     fileTitle: "assets",
     extension: "",
@@ -98,6 +154,11 @@ const MOCK_ENTRIES: DirEntry[] = [
       {
         name: "大陸地図.png",
         path: "mock/assets/大陸地図.png",
+        relativePath: "assets/大陸地図.png",
+        absolutePath: "mock/assets/大陸地図.png",
+        projectPath: "mock",
+        relativeParentDir: "assets",
+        parentDir: "mock/assets",
         baseName: "大陸地図.png",
         fileTitle: "大陸地図",
         extension: "png",
@@ -110,6 +171,15 @@ const MOCK_ENTRIES: DirEntry[] = [
 ];
 
 export const fileService = {
+  // パス操作ユーティリティ（novelaid-fs プラグインから標準委譲）
+  basename,
+  dirname,
+  extname,
+  stem,
+  joinPath,
+  normalizePath,
+  isSubPath,
+
   // プロジェクトディレクトリの設定
   async setProjectDirectory(path: string | null): Promise<void> {
     try {
@@ -154,72 +224,31 @@ export const fileService = {
     }
   },
 
-  // ファイル読み込み（フロントマター付きMarkdownやテキスト、画像、非対応ファイル）
+  // ファイル読み込み（Tauri バックエンドが安全に確定情報を返すため、無理なフォールバックは完全撤廃）
   async readFile(path: string): Promise<FileDocument> {
-    try {
-      return await novelaidFs.readDocument(path);
-    } catch {
-      const baseName = path.split(/[/\\]/).pop() || "";
-      const dotIndex = baseName.lastIndexOf('.');
-      const fileTitle = dotIndex > 0 ? baseName.substring(0, dotIndex) : baseName;
-      let extension = dotIndex > 0 ? baseName.substring(dotIndex + 1).toLowerCase() : "";
-      if (!extension && baseName.startsWith('.') && !baseName.slice(1).includes('.')) {
-        extension = baseName.slice(1).toLowerCase();
+    // ブラウザ単体テスト環境向けモックチェック
+    if (path.startsWith('mock/')) {
+      const found = MOCK_ENTRIES.find(e => e.path === path);
+      if (found) {
+        return {
+          path: found.path,
+          relativePath: found.relativePath,
+          absolutePath: found.absolutePath,
+          projectPath: found.projectPath,
+          relativeParentDir: found.relativeParentDir,
+          parentDir: found.parentDir,
+          baseName: found.baseName,
+          fileTitle: found.fileTitle,
+          extension: found.extension,
+          documentType: found.documentType,
+          metadata: {},
+          mtimeMs: Date.now(),
+          content: `# ${found.fileTitle}`,
+        };
       }
-
-      // ブラウザ環境でのみモックデータを返却
-      if (path.startsWith('mock/')) {
-        if (baseName.includes('魔女_ルナ') || baseName.includes('キャラクター')) {
-          return {
-            path,
-            baseName,
-            fileTitle: "魔女_ルナ",
-            extension: "md",
-            documentType: "markdown",
-            metadata: { role: "ヒロイン", age: 17 },
-            mtimeMs: Date.now(),
-            content: `# キャラクター設定：|魔女《まじょ》ルナ・アルテミス...`,
-          };
-        }
-        if (baseName.endsWith('.png') || baseName.endsWith('.jpg')) {
-          return {
-            path,
-            baseName,
-            fileTitle,
-            extension,
-            documentType: "image",
-            metadata: {},
-            mtimeMs: Date.now(),
-            content: "",
-          };
-        }
-      }
-
-      // 拡張子から簡易判定
-      let documentType: FileDocument['documentType'] = "unknown";
-      if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'bmp', 'ico'].includes(extension)) {
-        documentType = "image";
-      } else if (extension === 'txt') {
-        documentType = "novel";
-      } else if (extension === 'md' || extension === 'markdown') {
-        documentType = "markdown";
-      } else if (['gitignore', 'gitattributes', 'novelaidattributes', 'editorconfig', 'prettierrc', 'json', 'yaml', 'yml', 'toml', 'css', 'scss', 'less', 'js', 'ts', 'sh', 'bat', 'ini'].includes(extension)) {
-        documentType = "code";
-      } else if (extension === 'chat' || extension === 'ch') {
-        documentType = "chat";
-      }
-
-      return {
-        path,
-        baseName,
-        fileTitle,
-        extension,
-        mtimeMs: Date.now(),
-        content: "",
-        metadata: {},
-        documentType,
-      };
     }
+
+    return await novelaidFs.readDocument(path);
   },
 
   // ファイルバイナリ読み込み
@@ -234,30 +263,23 @@ export const fileService = {
   },
 
   // ファイル保存
-  async writeFile(path: string, content: string, metadata: any = {}): Promise<number> {
-    try {
-      const baseName = path.split(/[/\\]/).pop() || "";
-      const dotIndex = baseName.lastIndexOf('.');
-      let extension = dotIndex > 0 ? baseName.substring(dotIndex + 1).toLowerCase() : "";
-      if (!extension && baseName.startsWith('.') && !baseName.slice(1).includes('.')) {
-        extension = baseName.slice(1).toLowerCase();
-      }
-
-      const doc: FileDocument = {
-        path,
-        baseName,
-        fileTitle: dotIndex > 0 ? baseName.substring(0, dotIndex) : baseName,
-        extension,
-        content,
-        metadata,
-        documentType: "novel",
-        mtimeMs: Date.now(),
-      };
-      return await novelaidFs.writeDocument(path, doc);
-    } catch (err) {
-      console.warn("writeDocument fallback:", err);
-      return Date.now();
-    }
+  async writeFile(path: string, content: string, metadata: any = {}, docInfo?: Partial<FileDocument>): Promise<number> {
+    const doc: FileDocument = {
+      path,
+      relativePath: docInfo?.relativePath || basename(path),
+      absolutePath: docInfo?.absolutePath || path,
+      projectPath: docInfo?.projectPath || '',
+      relativeParentDir: docInfo?.relativeParentDir || '',
+      parentDir: docInfo?.parentDir || dirname(path),
+      baseName: docInfo?.baseName || basename(path),
+      fileTitle: docInfo?.fileTitle || stem(path),
+      extension: docInfo?.extension || extname(path),
+      content,
+      metadata,
+      documentType: docInfo?.documentType || "novel",
+      mtimeMs: Date.now(),
+    };
+    return await novelaidFs.writeDocument(doc.absolutePath || path, doc);
   },
 
   // 新規ファイル作成
@@ -276,11 +298,15 @@ export const fileService = {
     } catch (err) {
       console.warn("createNextFile fallback:", err);
       const fileName = "0130_第13話.txt";
-      const sep = dirPath.includes("\\") ? "\\" : "/";
-      const targetPath = `${dirPath}${sep}${fileName}`;
+      const targetPath = joinPath(dirPath, fileName);
       return {
         name: fileName,
-        path: targetPath,
+        path: fileName,
+        relativePath: fileName,
+        absolutePath: targetPath,
+        projectPath: dirPath,
+        relativeParentDir: "",
+        parentDir: dirPath,
         baseName: fileName,
         fileTitle: "0130_第13話",
         extension: "txt",

@@ -149,8 +149,8 @@ export const BaseMetadataListPanel: React.FC<BaseMetadataListPanelProps> = ({
   // 全アイテムのパースと正規化（novelaid-editor互換）
   const allItems: NormalizedMetadataItem[] = useMemo(() => {
     return Object.entries(cache).map(([filePath, meta]) => {
-      const fileName = filePath.split(/[/\\]/).pop() || '';
-      const baseNameWithoutExt = fileName.replace(/\.[^/.]+$/, '');
+      const fileName = fileService.basename(filePath);
+      const baseNameWithoutExt = fileService.stem(filePath);
 
       // tags と tag を両方抽出
       const rawTags = [

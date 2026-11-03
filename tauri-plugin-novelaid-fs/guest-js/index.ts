@@ -128,3 +128,62 @@ export async function scanDocuments(projectPath: string): Promise<NovelaidDocume
     projectPath,
   });
 }
+
+// -------------------------------------------------------------
+// パス操作標準ユーティリティ関数（ライブラリ提供）
+// -------------------------------------------------------------
+
+export function normalizePath(p: string): string {
+  if (!p) return '';
+  return p.replace(/\\/g, '/').replace(/\/+/g, '/').replace(/\/+$/, '') || '/';
+}
+
+export function basename(p: string): string {
+  const norm = normalizePath(p);
+  const idx = norm.lastIndexOf('/');
+  return idx >= 0 ? norm.slice(idx + 1) : norm;
+}
+
+export function dirname(p: string): string {
+  const norm = normalizePath(p);
+  const idx = norm.lastIndexOf('/');
+  if (idx <= 0) return idx === 0 ? '/' : '';
+  return norm.slice(0, idx);
+}
+
+export function extname(p: string): string {
+  const name = basename(p);
+  const dotIdx = name.lastIndexOf('.');
+  if (dotIdx > 0) {
+    return name.slice(dotIdx + 1).toLowerCase();
+  }
+  // ドットファイル (.gitignore など)
+  if (name.startsWith('.') && !name.slice(1).includes('.')) {
+    return name.slice(1).toLowerCase();
+  }
+  return '';
+}
+
+export function stem(p: string): string {
+  const name = basename(p);
+  const dotIdx = name.lastIndexOf('.');
+  if (dotIdx > 0) {
+    return name.slice(0, dotIdx);
+  }
+  return name;
+}
+
+export function joinPath(...parts: string[]): string {
+  const filtered = parts.filter(Boolean).map(p => p.replace(/\\/g, '/'));
+  if (filtered.length === 0) return '';
+  const joined = filtered.join('/').replace(/\/+/g, '/');
+  return joined.replace(/\/+$/, '') || '/';
+}
+
+export function isSubPath(child: string, parent: string): boolean {
+  const nChild = normalizePath(child).toLowerCase();
+  const nParent = normalizePath(parent).toLowerCase();
+  if (nChild === nParent) return true;
+  const pWithSlash = nParent.endsWith('/') ? nParent : `${nParent}/`;
+  return nChild.startsWith(pWithSlash);
+}

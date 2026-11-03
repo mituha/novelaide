@@ -232,7 +232,12 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       });
 
       try {
-        const mtime = await fileService.writeFile(docToSave.path, docToSave.content, docToSave.metadata);
+        const mtime = await fileService.writeFile(
+          docToSave.absolutePath || docToSave.path,
+          docToSave.content,
+          docToSave.metadata,
+          docToSave
+        );
 
         // openDocumentsRef.current を同期的に即座に更新
         openDocumentsRef.current = openDocumentsRef.current.map((doc) => {
@@ -317,6 +322,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
           const newDoc: DocumentState = {
             path: fileData.path,
+            relativePath: fileData.relativePath || fileData.path,
+            absolutePath: fileData.absolutePath || fileData.path,
+            projectPath: fileData.projectPath || '',
+            relativeParentDir: fileData.relativeParentDir || '',
+            parentDir: fileData.parentDir || '',
             baseName: fileData.baseName,
             fileTitle: fileData.fileTitle,
             extension: fileData.extension || '',

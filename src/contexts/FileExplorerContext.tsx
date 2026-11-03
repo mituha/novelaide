@@ -9,33 +9,10 @@ import { useDocument } from './DocumentContext';
 import { useNotification } from './NotificationContext';
 import { bootLog, bootTimeStart } from '../utils/bootLogger';
 
-function normalizePath(p: string): string {
-  return p.replace(/\\/g, '/');
-}
-
-function getParentDir(p: string): string {
-  const norm = normalizePath(p);
-  const lastSlash = norm.lastIndexOf('/');
-  if (lastSlash === -1) return p;
-  return p.substring(0, lastSlash);
-}
-
-function joinPath(dir: string, name: string): string {
-  const isBackslash = dir.includes('\\');
-  const sep = isBackslash ? '\\' : '/';
-  return dir.endsWith(sep) ? `${dir}${name}` : `${dir}${sep}${name}`;
-}
-
-function isSubPathOrEqual(sub: string, parent: string): boolean {
-  const nSub = normalizePath(sub).toLowerCase();
-  const nParent = normalizePath(parent).toLowerCase();
-  return nSub === nParent || nSub.startsWith(nParent.endsWith('/') ? nParent : `${nParent}/`);
-}
-
 function findEntryByPath(items: DirEntry[], targetPath: string): DirEntry | null {
-  const normTarget = normalizePath(targetPath);
+  const normTarget = fileService.normalizePath(targetPath);
   for (const item of items) {
-    if (normalizePath(item.path) === normTarget) return item;
+    if (fileService.normalizePath(item.path) === normTarget) return item;
     if (item.children) {
       const found = findEntryByPath(item.children, targetPath);
       if (found) return found;
@@ -63,26 +40,21 @@ function countEntries(items: DirEntry[]): { files: number; folders: number } {
 }
 
 function getUniqueCopyPath(items: DirEntry[], targetDir: string, originalName: string, isDir: boolean): string {
-  const isBackslash = targetDir.includes('\\');
-  const sep = isBackslash ? '\\' : '/';
-
   let baseName = originalName;
   let ext = '';
   if (!isDir) {
-    const dotIdx = originalName.lastIndexOf('.');
-    if (dotIdx > 0) {
-      baseName = originalName.substring(0, dotIdx);
-      ext = originalName.substring(dotIdx);
-    }
+    baseName = fileService.stem(originalName);
+    const rawExt = fileService.extname(originalName);
+    ext = rawExt ? `.${rawExt}` : '';
   }
 
   let candidateName = `${baseName} - コピー${ext}`;
-  let candidatePath = targetDir.endsWith(sep) ? `${targetDir}${candidateName}` : `${targetDir}${sep}${candidateName}`;
+  let candidatePath = fileService.joinPath(targetDir, candidateName);
   let counter = 2;
 
   while (findEntryByPath(items, candidatePath)) {
     candidateName = `${baseName} - コピー (${counter})${ext}`;
-    candidatePath = targetDir.endsWith(sep) ? `${targetDir}${candidateName}` : `${targetDir}${sep}${candidateName}`;
+    candidatePath = fileService.joinPath(targetDir, candidateName);
     counter++;
   }
 
@@ -219,14 +191,14 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       // 2. 削除時のタブクローズ & 選択解除
       if (action === 'delete') {
         setSelectedPath((current) => {
-          if (current && isSubPathOrEqual(current, path)) {
+          if (current && fileService.isSubPath(current, path)) {
             return null;
           }
           return current;
         });
 
         for (const doc of openDocuments) {
-          if (isSubPathOrEqual(doc.path, path)) {
+          if (fileService.isSubPath(doc.path, path)) {
             await closeTab(doc.path);
           }
         }
@@ -238,7 +210,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
           if (doc.path === path) {
             await closeTab(doc.path);
             await openDocument(newPath);
-          } else if (isSubPathOrEqual(doc.path, path)) {
+          } else if (fileService.isSubPath(doc.path, path)) {
             const sub = doc.path.substring(path.length);
             const isBackslash = newPath.includes('\\');
             const updated = `${newPath}${sub.replace(/\//g, isBackslash ? '\\' : '/')}`;
@@ -291,8 +263,8 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (selectedIsDir) {
         return selectedPath;
       }
-      const parent = getParentDir(selectedPath);
-      if (parent && isSubPathOrEqual(parent, projectPath)) {
+      const parent = fileService.dirname(selectedPath);
+      if (parent && fileService.isSubPath(parent, projectPath)) {
         return parent;
       }
     }
@@ -302,9 +274,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   // プロジェクト名（末尾フォルダ名）の解決
   const projectName = useMemo(() => {
     if (!projectPath) return '作品フォルダー';
-    const norm = normalizePath(projectPath);
-    const parts = norm.split('/');
-    return parts[parts.length - 1] || '作品フォルダー';
+    return fileService.basename(projectPath) || '作品フォルダー';
   }, [projectPath]);
 
   // ターゲットヒント
@@ -312,11 +282,11 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     if (!projectPath) return '';
     if (selectedPath) {
       if (selectedIsDir) {
-        const folderName = selectedPath.split(/[/\\]/).pop() || selectedPath;
+        const folderName = fileService.basename(selectedPath) || selectedPath;
         return `選択フォルダー「${folderName}」内`;
       }
-      const parent = getParentDir(selectedPath);
-      const parentName = parent.split(/[/\\]/).pop() || 'ルート';
+      const parent = fileService.dirname(selectedPath);
+      const parentName = fileService.basename(parent) || 'ルート';
       return `「${parentName}」階層内`;
     }
     return 'プロジェクトルート直下';
@@ -367,7 +337,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const submitCreate = useCallback(async () => {
     if (!newItemName.trim() || !creatingDir) return;
 
-    const targetPath = joinPath(creatingDir, newItemName.trim());
+    const targetPath = fileService.joinPath(creatingDir, newItemName.trim());
     const type = creatingType;
 
     try {
@@ -463,8 +433,8 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       return;
     }
 
-    const parent = getParentDir(renamingPath);
-    const newPath = joinPath(parent, renamingName.trim());
+    const parent = fileService.dirname(renamingPath);
+    const newPath = fileService.joinPath(parent, renamingName.trim());
     const oldPath = renamingPath;
 
     try {
@@ -512,11 +482,15 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
   const copyPath = useCallback(async (entry: DirEntry, relative = false) => {
     let textToCopy = entry.path;
-    if (relative && projectPath) {
-      const normPath = normalizePath(entry.path);
-      const normProj = normalizePath(projectPath);
-      if (normPath.startsWith(normProj)) {
-        textToCopy = normPath.substring(normProj.length).replace(/^\//, '');
+    if (relative) {
+      if (entry.relativePath) {
+        textToCopy = entry.relativePath;
+      } else if (projectPath) {
+        const normPath = fileService.normalizePath(entry.path);
+        const normProj = fileService.normalizePath(projectPath);
+        if (normPath.startsWith(normProj)) {
+          textToCopy = normPath.substring(normProj.length).replace(/^\//, '');
+        }
       }
     }
     try {
@@ -531,8 +505,8 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     async (sourcePath: string, targetDir: string, isCopy: boolean) => {
       if (!projectPath || !sourcePath || !targetDir) return;
 
-      const normSource = normalizePath(sourcePath);
-      const normTarget = normalizePath(targetDir);
+      const normSource = fileService.normalizePath(sourcePath);
+      const normTarget = fileService.normalizePath(targetDir);
 
       const sourceEntry = findEntryByPath(entries, sourcePath);
       const isDir = sourceEntry ? sourceEntry.isDirectory : false;
@@ -543,28 +517,25 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       }
 
       // ガード2: フォルダ自身、または自身の子孫フォルダへの移動・コピーは禁止
-      if (isDir && isSubPathOrEqual(targetDir, sourcePath)) {
+      if (isDir && fileService.isSubPath(targetDir, sourcePath)) {
         await alertDialog('自身またはその配下のフォルダーには移動・コピーできません。');
         return;
       }
 
       // ガード3: 移動で、移動先がすでに現在の親フォルダである場合は何もしない
-      const currentParent = normalizePath(getParentDir(sourcePath));
+      const currentParent = fileService.normalizePath(fileService.dirname(sourcePath));
       if (!isCopy && currentParent === normTarget) {
         return;
       }
 
-      const originalName = sourcePath.split(/[/\\]/).pop() || '';
+      const originalName = fileService.basename(sourcePath);
       if (!originalName) return;
-
-      const isBackslash = targetDir.includes('\\');
-      const sep = isBackslash ? '\\' : '/';
 
       let destPath: string;
       if (isCopy) {
         destPath = getUniqueCopyPath(entries, targetDir, originalName, isDir);
       } else {
-        destPath = targetDir.endsWith(sep) ? `${targetDir}${originalName}` : `${targetDir}${sep}${originalName}`;
+        destPath = fileService.joinPath(targetDir, originalName);
         if (findEntryByPath(entries, destPath)) {
           await alertDialog(`移動先に同名のアイテム「${originalName}」が既に存在します。`);
           return;
@@ -579,11 +550,11 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
 
           // 開いているエディタタブの追従
           for (const doc of openDocuments) {
-            const normDoc = normalizePath(doc.path);
+            const normDoc = fileService.normalizePath(doc.path);
             if (isDir) {
-              if (isSubPathOrEqual(doc.path, sourcePath)) {
+              if (fileService.isSubPath(doc.path, sourcePath)) {
                 const sub = normDoc.substring(normSource.length);
-                const updatedDocPath = `${destPath}${sub.replace(/\//g, isBackslash ? '\\' : '/')}`;
+                const updatedDocPath = fileService.joinPath(destPath, sub.replace(/^\/+/, ''));
                 await closeTab(doc.path);
                 await openDocument(updatedDocPath);
               }
@@ -613,8 +584,8 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const revealActiveFile = useCallback(() => {
     if (!activePath || !projectPath) return;
 
-    const normActive = normalizePath(activePath);
-    const normProj = normalizePath(projectPath);
+    const normActive = fileService.normalizePath(activePath);
+    const normProj = fileService.normalizePath(projectPath);
 
     if (normActive.startsWith(normProj)) {
       const relative = normActive.substring(normProj.length).replace(/^\//, '');

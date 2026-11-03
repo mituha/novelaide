@@ -10,24 +10,15 @@ interface EpisodeNavigatorProps {
   documentType: NovelaidDocumentType;
   paneId: PaneId;
   viewMode: DocumentViewMode;
+  parentDir?: string;
 }
-
-const normalizePath = (p: string): string => p.replace(/\\/g, '/').replace(/\/+$/, '');
-
-const getParentDirectory = (filePath: string): string => {
-  const normalized = normalizePath(filePath);
-  const lastIndex = normalized.lastIndexOf('/');
-  if (lastIndex === -1) {
-    return '';
-  }
-  return normalized.substring(0, lastIndex);
-};
 
 export const EpisodeNavigator: React.FC<EpisodeNavigatorProps> = ({
   activePath,
   documentType,
   paneId,
   viewMode,
+  parentDir,
 }) => {
   const { openDocument, closeTab } = useDocument();
   const [prevEpisode, setPrevEpisode] = useState<DirEntry | null>(null);
@@ -43,8 +34,8 @@ export const EpisodeNavigator: React.FC<EpisodeNavigatorProps> = ({
     }
 
     const loadEpisodes = async () => {
-      const parentDir = getParentDirectory(activePath);
-      if (!parentDir) {
+      const targetParentDir = parentDir || (activePath ? fileService.dirname(activePath) : '');
+      if (!targetParentDir) {
         if (isMounted) {
           setPrevEpisode(null);
           setNextEpisode(null);
@@ -53,7 +44,7 @@ export const EpisodeNavigator: React.FC<EpisodeNavigatorProps> = ({
       }
 
       try {
-        const entries = await fileService.readDirectory(parentDir, false);
+        const entries = await fileService.readDirectory(targetParentDir, false);
         if (!isMounted) return;
 
         // novel 形式のファイルのみを抽出し、自然順序（数値昇順）でソート
@@ -63,9 +54,9 @@ export const EpisodeNavigator: React.FC<EpisodeNavigatorProps> = ({
             a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' })
           );
 
-        const currentNorm = normalizePath(activePath);
+        const currentNorm = fileService.normalizePath(activePath);
         const currentIndex = novelEntries.findIndex(
-          (entry) => normalizePath(entry.path) === currentNorm
+          (entry) => fileService.normalizePath(entry.path) === currentNorm
         );
 
         if (currentIndex === -1) {
@@ -94,11 +85,11 @@ export const EpisodeNavigator: React.FC<EpisodeNavigatorProps> = ({
     return () => {
       isMounted = false;
     };
-  }, [activePath, documentType]);
+  }, [activePath, documentType, parentDir]);
 
   const handleNavigate = useCallback(
     async (targetPath: string) => {
-      if (normalizePath(targetPath) === normalizePath(activePath)) {
+      if (fileService.normalizePath(targetPath) === fileService.normalizePath(activePath)) {
         return;
       }
 

@@ -4,9 +4,9 @@ export type DocumentStat = { path: string, exists: boolean, mtimeMs: number, siz
 
 export type FsChangeEvent = { action: string, path: string, newPath: string | null, };
 
-export type NovelaidDirEntry = { name: string, path: string, baseName: string, fileTitle: string, extension: string, isDirectory: boolean, documentType: NovelaidDocumentType, children: Array<NovelaidDirEntry> | null, };
+export type NovelaidDirEntry = { name: string, path: string, relativePath: string, absolutePath: string, projectPath: string, relativeParentDir: string, parentDir: string, baseName: string, fileTitle: string, extension: string, isDirectory: boolean, documentType: NovelaidDocumentType, children: Array<NovelaidDirEntry> | null, };
 
-export type NovelaidDocument = { path: string, baseName: string, fileTitle: string, extension: string, content: string, metadata: any, documentType: NovelaidDocumentType, mtimeMs: number, };
+export type NovelaidDocument = { path: string, relativePath: string, absolutePath: string, projectPath: string, relativeParentDir: string, parentDir: string, baseName: string, fileTitle: string, extension: string, content: string, metadata: any, documentType: NovelaidDocumentType, mtimeMs: number, };
 
 export type NovelaidDocumentType = "novel" | "markdown" | "image" | "chat" | "gitDiff" | "browser" | "css" | "code" | "unknown" | "external";
 
