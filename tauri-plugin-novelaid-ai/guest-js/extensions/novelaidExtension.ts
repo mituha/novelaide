@@ -15,7 +15,7 @@ export interface ExtensionToolDefinition {
     properties: Record<string, unknown>;
     required?: string[];
   };
-  execute: (args: any) => Promise<any>;
+  execute: (toolCallIdOrArgs?: any, maybeArgs?: any, signal?: AbortSignal, onUpdate?: Function) => Promise<any>;
 }
 
 /**
@@ -202,6 +202,17 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
         }
       };
 
+      // 引数の正規化（Pi SDK標準の execute(toolCallId, args, signal, onUpdate) および 単一引数 execute(args) の両対応）
+      const resolveToolArgs = (first: any, second: any): Record<string, any> => {
+        if (typeof first === 'string' && second !== undefined) {
+          return typeof second === 'object' && second !== null ? second : {};
+        }
+        if (typeof first === 'object' && first !== null) {
+          return first;
+        }
+        return {};
+      };
+
       // 2. ツールの登録（permission に基づくフィルタリング）
       if (permission !== 'none') {
         // --- 読み取り系ツール (Read-only / Edit 共通) ---
@@ -212,7 +223,8 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
           name: readDef.name,
           description: readDef.description,
           parameters: readDef.parameters,
-          execute: async (args: any) => await runTool('read', args || {}),
+          execute: async (callIdOrArgs: any, maybeArgs: any) =>
+            await runTool('read', resolveToolArgs(callIdOrArgs, maybeArgs)),
         });
 
         // get_open_documents
@@ -252,9 +264,10 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             },
             required: [],
           },
-          execute: async (args: any) => {
+          execute: async (callIdOrArgs: any, maybeArgs: any) => {
+            const resolvedArgs = resolveToolArgs(callIdOrArgs, maybeArgs);
             if (options.uiDocumentContext) {
-              const doc = options.uiDocumentContext.getActiveDocument(args?.side);
+              const doc = options.uiDocumentContext.getActiveDocument(resolvedArgs?.side);
               if (doc) {
                 return {
                   status: 'success',
@@ -283,7 +296,8 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             },
             required: [],
           },
-          execute: async (args: any) => await runTool('scan_proofread', args || {}),
+          execute: async (callIdOrArgs: any, maybeArgs: any) =>
+            await runTool('scan_proofread', resolveToolArgs(callIdOrArgs, maybeArgs)),
         });
 
         // extract_ruby
@@ -300,7 +314,8 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             },
             required: [],
           },
-          execute: async (args: any) => await runTool('extract_ruby', args || {}),
+          execute: async (callIdOrArgs: any, maybeArgs: any) =>
+            await runTool('extract_ruby', resolveToolArgs(callIdOrArgs, maybeArgs)),
         });
 
         // search_metadata
@@ -317,7 +332,8 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             },
             required: ['query'],
           },
-          execute: async (args: any) => await runTool('search_metadata', args || {}),
+          execute: async (callIdOrArgs: any, maybeArgs: any) =>
+            await runTool('search_metadata', resolveToolArgs(callIdOrArgs, maybeArgs)),
         });
 
         // --- 書き込み系ツール (Edit 権限時のみ登録) ---
@@ -328,7 +344,8 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             name: writeDef.name,
             description: writeDef.description,
             parameters: writeDef.parameters,
-            execute: async (args: any) => await runTool('write', args || {}),
+            execute: async (callIdOrArgs: any, maybeArgs: any) =>
+              await runTool('write', resolveToolArgs(callIdOrArgs, maybeArgs)),
           });
 
           // Pi SDK 標準互換: edit
@@ -337,7 +354,8 @@ export function createNovelaidExtension(options: NovelaidExtensionOptions = {}) 
             name: editDef.name,
             description: editDef.description,
             parameters: editDef.parameters,
-            execute: async (args: any) => await runTool('edit', args || {}),
+            execute: async (callIdOrArgs: any, maybeArgs: any) =>
+              await runTool('edit', resolveToolArgs(callIdOrArgs, maybeArgs)),
           });
         }
       }

@@ -485,12 +485,27 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   // ツール実行ハンドラー（DocumentState / DocumentContext を唯一の信頼源とする安全パイプライン）
   const toolExecutor = useCallback(
-    async (toolName: string, args: Record<string, any>) => {
+    async (toolName: string, args: Record<string, any> = {}) => {
       console.group(`%c[ChatView:ToolExecutor] ツール呼び出し受信 🛠️: ${toolName}`, 'color: #3b82f6; font-weight: bold;');
       console.log('▶ 呼び出しツール:', toolName);
       console.log('▶ 渡された引数 (args):', args);
       console.log('▶ 編集権限 (allowWrite):', allowWrite);
       console.groupEnd();
+
+      // 開いているドキュメントをパス・ファイル名・拡張子なしタイトルから柔軟に検索
+      const findDoc = (target: string) => {
+        if (!target) return undefined;
+        const targetNorm = target.trim();
+        const targetBase = fileService.basename(targetNorm);
+        const targetStem = fileService.stem(targetNorm);
+        return openDocuments.find((d) => {
+          if (d.path === targetNorm) return true;
+          if (fileService.basename(d.path) === targetBase) return true;
+          if (fileService.stem(d.path) === targetStem) return true;
+          if (d.fileTitle === targetNorm || d.baseName === targetNorm) return true;
+          return false;
+        });
+      };
 
       // --- スコープ境界ガード ---
       const validateScope = (targetPath: string): { allowed: boolean; reason?: string } => {
@@ -533,16 +548,12 @@ export const ChatView: React.FC<ChatViewProps> = ({
           return { status: 'error', message: scopeCheck.reason };
         }
 
-        let doc = openDocuments.find(
-          (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
-        );
+        let doc = findDoc(targetPath);
 
         if (!doc) {
           try {
             await openDocument(targetPath);
-            doc = openDocuments.find(
-              (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
-            );
+            doc = findDoc(targetPath);
           } catch (e: any) {
             return { status: 'error', message: `ドキュメントのオープンに失敗しました: ${e.message}` };
           }
@@ -554,13 +565,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
         const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : lines.length;
         const sliced = lines.slice(offset, offset + limit).join('\n');
 
-        return {
+        const readResult = {
           status: 'success',
-          path: targetPath,
+          path: doc?.path || targetPath,
           totalLines: lines.length,
           returnedLines: Math.min(limit, lines.length - offset),
           content: sliced,
         };
+        console.log(`%c[ChatView:ToolExecutor] read 完了 (${readResult.returnedLines}行返却)`, 'color: #10b981;', readResult);
+        return readResult;
       }
 
       // 2. write ツール
@@ -574,15 +587,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
           return { status: 'error', message: scopeCheck.reason };
         }
 
-        let doc = openDocuments.find(
-          (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
-        );
+        let doc = findDoc(targetPath);
         if (!doc) {
           try {
             await openDocument(targetPath);
-            doc = openDocuments.find(
-              (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
-            );
+            doc = findDoc(targetPath);
           } catch {
             // 新規作成などの場合
           }
@@ -591,11 +600,13 @@ export const ChatView: React.FC<ChatViewProps> = ({
         const resolvedPath = doc?.path || targetPath;
         updateContent(resolvedPath, args.content || '');
 
-        return {
+        const writeResult = {
           status: 'success',
           path: resolvedPath,
           message: `ドキュメント [${resolvedPath}] の内容を更新しました（未保存状態・エディター即座同期）。`,
         };
+        console.log(`%c[ChatView:ToolExecutor] write 完了`, 'color: #10b981;', writeResult);
+        return writeResult;
       }
 
       // 3. edit ツール
@@ -609,15 +620,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
           return { status: 'error', message: scopeCheck.reason };
         }
 
-        let doc = openDocuments.find(
-          (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
-        );
+        let doc = findDoc(targetPath);
         if (!doc) {
           try {
             await openDocument(targetPath);
-            doc = openDocuments.find(
-              (d) => d.path === targetPath || fileService.basename(d.path) === fileService.basename(targetPath)
-            );
+            doc = findDoc(targetPath);
           } catch (e: any) {
             return { status: 'error', message: `ドキュメント [${targetPath}] が見つかりませんでした。` };
           }
@@ -646,12 +653,14 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         updateContent(doc.path, currentText);
 
-        return {
+        const editResult = {
           status: 'success',
           path: doc.path,
           appliedEdits: appliedCount,
           message: `${appliedCount} 件の差分編集を適用しました（未保存状態・エディター即座同期）。`,
         };
+        console.log(`%c[ChatView:ToolExecutor] edit 完了 (${appliedCount}件適用)`, 'color: #10b981;', editResult);
+        return editResult;
       }
 
       // 4. search_metadata ツール
