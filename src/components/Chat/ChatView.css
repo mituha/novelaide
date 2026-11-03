@@ -1,0 +1,10 @@
+.chat-view-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-primary, #18181b);
+  color: var(--text-primary, #e4e4e7);
+  overflow: hidden;
+  position: relative;
+}

@@ -1,0 +1,63 @@
+.message-markdown-wrapper {
+  font-size: 14px;
+  line-height: 1.6;
+  color: inherit;
+  word-break: break-word;
+}
+
+.message-markdown-wrapper p {
+  margin: 0 0 8px 0;
+}
+
+.message-markdown-wrapper p:last-child {
+  margin-bottom: 0;
+}
+
+.message-markdown-wrapper ruby {
+  ruby-position: over;
+}
+
+.message-markdown-wrapper rt {
+  font-size: 0.65em;
+  opacity: 0.85;
+}
+
+.message-markdown-wrapper pre {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 8px 12px;
+  border-radius: 6px;
+  overflow-x: auto;
+  margin: 8px 0;
+  font-family: var(--font-mono, monospace);
+  font-size: 13px;
+}
+
+.message-markdown-wrapper code {
+  font-family: var(--font-mono, monospace);
+  background: rgba(0, 0, 0, 0.15);
+  padding: 2px 4px;
+  border-radius: 4px;
+  font-size: 0.9em;
+}
+
+.message-markdown-wrapper pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.message-markdown-wrapper ul,
+.message-markdown-wrapper ol {
+  margin: 4px 0 8px 20px;
+  padding: 0;
+}
+
+.message-markdown-wrapper li {
+  margin-bottom: 4px;
+}
+
+.message-markdown-wrapper blockquote {
+  border-left: 3px solid var(--accent-color, #3b82f6);
+  margin: 8px 0;
+  padding: 4px 0 4px 12px;
+  opacity: 0.85;
+}

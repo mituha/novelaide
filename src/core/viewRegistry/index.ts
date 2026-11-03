@@ -7,6 +7,7 @@ import {
   MarkdownReaderPlugin,
 } from '../../plugins/views/MarkdownPreviewPlugin';
 import { ImagePreviewPlugin } from '../../plugins/views/ImagePreviewPlugin';
+import { ChatViewPlugin } from '../../plugins/views/ChatViewPlugin';
 
 // シングルトンインスタンスの作成
 export const viewRegistry = new ViewRegistry();
@@ -18,5 +19,6 @@ viewRegistry.register(NovelReaderPlugin);
 viewRegistry.register(MarkdownPreviewPlugin);
 viewRegistry.register(MarkdownReaderPlugin);
 viewRegistry.register(ImagePreviewPlugin);
+viewRegistry.register(ChatViewPlugin);
 
 export { ViewRegistry };
