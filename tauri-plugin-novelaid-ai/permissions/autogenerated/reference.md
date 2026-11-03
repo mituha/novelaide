@@ -8,6 +8,7 @@ Default permissions for the novelaid-ai plugin
 - `allow-ai-get-models`
 - `allow-ai-send-message`
 - `allow-ai-run-tool`
+- `allow-ai-get-env-api-key`
 
 ## Permission Table
 
@@ -17,6 +18,32 @@ Default permissions for the novelaid-ai plugin
 <th>Description</th>
 </tr>
 
+
+<tr>
+<td>
+
+`novelaid-ai:allow-ai-get-env-api-key`
+
+</td>
+<td>
+
+Enables the ai_get_env_api_key command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-ai:deny-ai-get-env-api-key`
+
+</td>
+<td>
+
+Denies the ai_get_env_api_key command without any pre-configured scope.
+
+</td>
+</tr>
 
 <tr>
 <td>

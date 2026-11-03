@@ -16,6 +16,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::ai_get_models,
             commands::ai_send_message,
             commands::ai_run_tool,
+            commands::ai_get_env_api_key,
         ])
         .build()
 }

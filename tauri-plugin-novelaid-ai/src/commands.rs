@@ -125,3 +125,44 @@ pub(crate) async fn ai_run_tool(
         _ => Err(format!("Unknown tool: {}", tool_name)),
     }
 }
+
+/// OS の環境変数から AI プロバイダー専用の API キーを安全に取得（ホワイトリスト制限）
+#[command]
+pub(crate) async fn ai_get_env_api_key(provider: String) -> Result<Option<String>, String> {
+    match provider.to_lowercase().as_str() {
+        "gemini" | "google" => {
+            if let Ok(key) = std::env::var("GEMINI_API_KEY") {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(trimmed.to_string()));
+                }
+            }
+            if let Ok(key) = std::env::var("GOOGLE_API_KEY") {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(trimmed.to_string()));
+                }
+            }
+            Ok(None)
+        }
+        "openai" => {
+            if let Ok(key) = std::env::var("OPENAI_API_KEY") {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(trimmed.to_string()));
+                }
+            }
+            Ok(None)
+        }
+        "anthropic" => {
+            if let Ok(key) = std::env::var("ANTHROPIC_API_KEY") {
+                let trimmed = key.trim();
+                if !trimmed.is_empty() {
+                    return Ok(Some(trimmed.to_string()));
+                }
+            }
+            Ok(None)
+        }
+        _ => Ok(None),
+    }
+}

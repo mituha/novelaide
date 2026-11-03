@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import type { SettingTabPlugin, SettingTabProps } from 'restar-app-settings';
 import {
   fetchAllAvailableModels,
+  getEnvApiKey,
   AiModelInfo,
   DEFAULT_LM_STUDIO_URL,
 } from 'tauri-plugin-novelaid-ai-api';
@@ -24,7 +25,15 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
   const [availableModels, setAvailableModels] = useState<AiModelInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
+  const [detectedEnvKey, setDetectedEnvKey] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // OS 環境変数からのキー検出
+  useEffect(() => {
+    getEnvApiKey('gemini').then((key) => {
+      setDetectedEnvKey(!!key);
+    });
+  }, []);
 
   // 最新モデル一覧の動的フェッチ
   const refreshModels = useCallback(async () => {
@@ -76,16 +85,16 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
         <div className="setting-info">
           <label className="setting-label">Google Gemini API キー</label>
           <div className="setting-desc">
-            Gemini 2.5 Flash / Pro などのクラウドモデルを利用するための API キーです（Google AI Studio で取得可能）。
+            Gemini 2.5 Flash / Pro などのクラウドモデルを利用するための API キーです（OS環境変数 GEMINI_API_KEY が設定されている場合は自動認識されます）。
           </div>
         </div>
-        <div className="setting-control" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+        <div className="setting-control" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' }}>
           <div style={{ position: 'relative', width: '260px' }}>
             <input
               type={showApiKey ? 'text' : 'password'}
               className="setting-text-input"
               style={{ width: '100%', paddingRight: '32px' }}
-              placeholder="AIzaSy..."
+              placeholder={detectedEnvKey ? 'OS環境変数 GEMINI_API_KEY を検出済' : 'AIzaSy...'}
               value={geminiApiKey}
               onChange={(e) => updateSetting('aiGeminiApiKey', e.target.value.trim())}
             />
@@ -107,6 +116,12 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
               {showApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
             </button>
           </div>
+          {!geminiApiKey && detectedEnvKey && (
+            <div style={{ fontSize: '11px', color: '#10b981', display: 'flex', alignItems: 'center', gap: '4px' }}>
+              <CheckCircle2 size={12} />
+              <span>OS環境変数（GEMINI_API_KEY）を認識中（入力不要で利用可能）</span>
+            </div>
+          )}
         </div>
       </div>
 

@@ -1,6 +1,6 @@
 import { Agent, type AgentEvent, type StreamFn } from '@earendil-works/pi-agent-core';
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';
-import { DEFAULT_LM_STUDIO_URL, GEMINI_OPENAI_BASE_URL } from './modelManager';
+import { DEFAULT_LM_STUDIO_URL, GEMINI_OPENAI_BASE_URL, getEnvApiKey } from './modelManager';
 import { Persona, AiPersonaType, AgentSessionEvent, AiProviderType } from '../types';
 import { getPersonaPrompt } from '../domain/guidelines';
 import { ToolPermissionLevel } from '../domain/tools';
@@ -255,10 +255,16 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
       const partial: any = { role: 'assistant', content: [] };
       stream.push({ type: 'start', partial });
 
-      // Gemini 選択時で API キーが未入力の場合は即座に案内して終了
-      if (provider === 'gemini' && (!options.apiKey || options.apiKey.trim().length === 0)) {
+      // APIキーの解決（設定値 -> OS環境変数のフォールバック）
+      let resolvedApiKey = options.apiKey && options.apiKey.trim().length > 0 ? options.apiKey.trim() : undefined;
+      if (!resolvedApiKey && provider === 'gemini') {
+        resolvedApiKey = await getEnvApiKey('gemini');
+      }
+
+      // Gemini 選択時で API キーが未入力（設定にも環境変数にもなし）の場合は即座に案内して終了
+      if (provider === 'gemini' && !resolvedApiKey) {
         console.warn('%c[Novelaid AI] Google Gemini API キーが未設定です ⚠️', 'color: #ef4444; font-weight: bold;');
-        const errMsg = '【Google Gemini API キー未設定】\n設定画面（AI設定）で Google Gemini API キーを入力してください。';
+        const errMsg = '【Google Gemini API キー未設定】\n設定画面（AI設定）で API キーを入力するか、OS の環境変数 GEMINI_API_KEY を設定してください。';
         partial.content = [{ type: 'text', text: errMsg }];
         stream.push({ type: 'text_start', contentIndex: 0, partial: { ...partial } } as any);
         stream.push({ type: 'text_delta', contentIndex: 0, delta: errMsg, partial: { ...partial } } as any);
@@ -278,8 +284,8 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
         'Content-Type': 'application/json',
       };
 
-      if (options.apiKey && options.apiKey.trim().length > 0) {
-        headers['Authorization'] = `Bearer ${options.apiKey.trim()}`;
+      if (resolvedApiKey) {
+        headers['Authorization'] = `Bearer ${resolvedApiKey}`;
       }
 
       try {
@@ -774,6 +780,12 @@ export class PiWritingAgentSession {
         thinkingLevel: this.options.useReasoning === false ? 'off' : 'medium',
       },
       streamFn,
+      getApiKey: async (p: string) => {
+        if (this.options.apiKey && this.options.apiKey.trim().length > 0) {
+          return this.options.apiKey.trim();
+        }
+        return getEnvApiKey(p);
+      },
       beforeToolCall: async (context: any) => {
         const toolName = context.toolCall?.name || context.toolName || 'tool';
         const callId = context.toolCall?.id || context.callId || `call_${Date.now()}`;

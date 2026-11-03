@@ -5,4 +5,5 @@ permissions = [
     "allow-ai-get-models",
     "allow-ai-send-message",
     "allow-ai-run-tool",
+    "allow-ai-get-env-api-key",
 ]

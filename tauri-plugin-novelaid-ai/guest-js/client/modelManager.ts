@@ -1,8 +1,22 @@
 import { AiModelInfo } from '../types';
 import { GOOGLE_MODELS } from '@earendil-works/pi-ai/providers/google.models';
+import { invoke } from '@tauri-apps/api/core';
 
 export const DEFAULT_LM_STUDIO_URL = 'http://localhost:1234/v1';
 export const GEMINI_OPENAI_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
+
+/**
+ * OS の環境変数から AI プロバイダー専用の API キーを取得（Tauri Rust バックエンド経由・ホワイトリスト制限）
+ */
+export async function getEnvApiKey(provider: string = 'gemini'): Promise<string | undefined> {
+  try {
+    const key = await invoke<string | null>('plugin:novelaid-ai|ai_get_env_api_key', { provider });
+    return key && key.trim().length > 0 ? key.trim() : undefined;
+  } catch (e) {
+    console.warn('[modelManager] getEnvApiKey failed or unsupported in browser mode:', e);
+    return undefined;
+  }
+}
 
 export interface ModelFetchOptions {
   lmStudioUrl?: string;
@@ -40,10 +54,15 @@ export async function fetchLmStudioModels(baseUrl: string = DEFAULT_LM_STUDIO_UR
  * Google Gemini のモデル一覧を pi SDK カタログおよび Google REST API から動的取得
  */
 export async function fetchGeminiModels(apiKey?: string): Promise<AiModelInfo[]> {
+  let resolvedKey = apiKey && apiKey.trim().length > 0 ? apiKey.trim() : undefined;
+  if (!resolvedKey) {
+    resolvedKey = await getEnvApiKey('gemini');
+  }
+
   // 1. API キーが提供されている場合、Google API からリアルタイムに最新モデルを取得
-  if (apiKey && apiKey.trim().length > 0) {
+  if (resolvedKey) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey.trim()}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models?key=${resolvedKey}`;
       const res = await fetch(url, { signal: AbortSignal.timeout(3000) });
       if (res.ok) {
         const data = (await res.json()) as {

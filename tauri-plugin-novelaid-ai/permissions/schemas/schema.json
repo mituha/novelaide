@@ -295,6 +295,18 @@
       "type": "string",
       "oneOf": [
         {
+          "description": "Enables the ai_get_env_api_key command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-ai-get-env-api-key",
+          "markdownDescription": "Enables the ai_get_env_api_key command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the ai_get_env_api_key command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-ai-get-env-api-key",
+          "markdownDescription": "Denies the ai_get_env_api_key command without any pre-configured scope."
+        },
+        {
           "description": "Enables the ai_get_models command without any pre-configured scope.",
           "type": "string",
           "const": "allow-ai-get-models",
@@ -343,10 +355,10 @@
           "markdownDescription": "Denies the ai_send_message command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for the novelaid-ai plugin\n#### This default permission set includes:\n\n- `allow-ai-is-available`\n- `allow-ai-get-models`\n- `allow-ai-send-message`\n- `allow-ai-run-tool`",
+          "description": "Default permissions for the novelaid-ai plugin\n#### This default permission set includes:\n\n- `allow-ai-is-available`\n- `allow-ai-get-models`\n- `allow-ai-send-message`\n- `allow-ai-run-tool`\n- `allow-ai-get-env-api-key`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for the novelaid-ai plugin\n#### This default permission set includes:\n\n- `allow-ai-is-available`\n- `allow-ai-get-models`\n- `allow-ai-send-message`\n- `allow-ai-run-tool`"
+          "markdownDescription": "Default permissions for the novelaid-ai plugin\n#### This default permission set includes:\n\n- `allow-ai-is-available`\n- `allow-ai-get-models`\n- `allow-ai-send-message`\n- `allow-ai-run-tool`\n- `allow-ai-get-env-api-key`"
         }
       ]
     }
