@@ -75,17 +75,79 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
     }
 
     const endpoint = `${baseUrl}/chat/completions`;
-    const apiMessages = messagesList.map((m: any) => ({
-      role: m.role || 'user',
-      content:
-        typeof m.content === 'string'
-          ? m.content
-          : Array.isArray(m.content)
-          ? m.content.map((c: any) => c.text || '').join('')
-          : '',
-      tool_calls: m.tool_calls || m.toolCalls,
-      tool_call_id: m.tool_call_id || m.toolCallId,
-    }));
+    const apiMessages = messagesList.map((m: any) => {
+      // 1. toolResult メッセージ -> OpenAI規格 role: "tool" に変換
+      if (m.role === 'toolResult') {
+        let textContent = '';
+        if (typeof m.content === 'string') {
+          textContent = m.content;
+        } else if (Array.isArray(m.content)) {
+          textContent = m.content
+            .map((c: any) => (typeof c === 'string' ? c : c.text || JSON.stringify(c)))
+            .join('\n');
+        } else if (m.content) {
+          textContent = JSON.stringify(m.content);
+        }
+
+        return {
+          role: 'tool',
+          tool_call_id: m.toolCallId || m.tool_call_id || '',
+          content: textContent,
+        };
+      }
+
+      // 2. assistant メッセージ -> content と tool_calls の分離 (OpenAI規格)
+      if (m.role === 'assistant') {
+        let textContent = '';
+        const toolCalls: any[] = [];
+
+        if (typeof m.content === 'string') {
+          textContent = m.content;
+        } else if (Array.isArray(m.content)) {
+          for (const item of m.content) {
+            if (item.type === 'text') {
+              textContent += item.text || '';
+            } else if (item.type === 'toolCall' || item.type === 'tool_call') {
+              toolCalls.push({
+                id: item.id,
+                type: 'function',
+                function: {
+                  name: item.name,
+                  arguments:
+                    typeof item.arguments === 'string'
+                      ? item.arguments
+                      : JSON.stringify(item.arguments || {}),
+                },
+              });
+            }
+          }
+        }
+
+        const msgObj: Record<string, any> = {
+          role: 'assistant',
+          content: textContent || '',
+        };
+        if (toolCalls.length > 0) {
+          msgObj.tool_calls = toolCalls;
+        }
+        return msgObj;
+      }
+
+      // 3. user / system メッセージ
+      let contentStr = '';
+      if (typeof m.content === 'string') {
+        contentStr = m.content;
+      } else if (Array.isArray(m.content)) {
+        contentStr = m.content
+          .map((c: any) => (typeof c === 'string' ? c : c.text || ''))
+          .join('\n');
+      }
+
+      return {
+        role: m.role || 'user',
+        content: contentStr,
+      };
+    });
 
     let toolsList: any[] = [];
     if (maybeOptions && Array.isArray(maybeOptions.tools)) {
@@ -539,6 +601,7 @@ export class PiWritingAgentSession {
             name: t.name,
             description: t.description,
             parameters: t.parameters,
+            execute: t.execute,
           }));
 
     const streamFn = createBrowserStreamFn({
@@ -595,32 +658,40 @@ export class PiWritingAgentSession {
       },
       streamFn,
       beforeToolCall: async (context: any) => {
+        const toolName = context.toolCall?.name || context.toolName || 'tool';
+        const callId = context.toolCall?.id || context.callId || `call_${Date.now()}`;
+        const args = context.args || context.toolCall?.arguments || context.params || {};
+
         console.group('%c[Novelaid AI] 🔧 ツール実行開始 (beforeToolCall)', 'color: #8b5cf6; font-weight: bold;');
-        console.log(`▶ ツール名: %c${context.toolName}`, 'color: #3b82f6; font-weight: bold;');
-        console.log(`▶ コールID: ${context.callId}`);
-        console.log(`▶ 引数 (params):`, context.params);
+        console.log(`▶ ツール名: %c${toolName}`, 'color: #3b82f6; font-weight: bold;');
+        console.log(`▶ コールID: ${callId}`);
+        console.log(`▶ 引数 (args):`, args);
         console.groupEnd();
 
         this.onEvent?.({
           type: 'tool_call_start',
-          toolName: context.toolName || 'tool',
-          callId: context.callId || `call_${Date.now()}`,
-          args: context.params || {},
+          toolName,
+          callId,
+          args,
         });
         return undefined;
       },
       afterToolCall: async (context: any) => {
+        const toolName = context.toolCall?.name || context.toolName || 'tool';
+        const callId = context.toolCall?.id || context.callId || `call_${Date.now()}`;
+        const result = context.result;
+
         console.group('%c[Novelaid AI] 🔧 ツール実行完了 (afterToolCall)', 'color: #10b981; font-weight: bold;');
-        console.log(`▶ ツール名: %c${context.toolName}`, 'color: #3b82f6; font-weight: bold;');
-        console.log(`▶ コールID: ${context.callId}`);
-        console.log(`▶ 実行結果:`, context.result);
+        console.log(`▶ ツール名: %c${toolName}`, 'color: #3b82f6; font-weight: bold;');
+        console.log(`▶ コールID: ${callId}`);
+        console.log(`▶ 実行結果:`, result);
         console.groupEnd();
 
         this.onEvent?.({
           type: 'tool_call_end',
-          toolName: context.toolName || 'tool',
-          callId: context.callId || `call_${Date.now()}`,
-          result: context.result,
+          toolName,
+          callId,
+          result,
         });
         return undefined;
       },
