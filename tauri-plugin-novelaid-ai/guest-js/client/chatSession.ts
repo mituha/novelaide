@@ -1,7 +1,7 @@
 import { Agent, type AgentEvent, type StreamFn } from '@earendil-works/pi-agent-core';
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai';
 import { DEFAULT_LM_STUDIO_URL } from './modelManager';
-import { Persona, AgentSessionEvent } from '../types';
+import { Persona, AiPersonaType, AgentSessionEvent } from '../types';
 import { getPersonaPrompt } from '../domain/guidelines';
 import {
   createNovelaidExtension,
@@ -18,7 +18,7 @@ export type ToolExecutor = (toolName: string, args: Record<string, any>) => Prom
 export interface PiAgentSessionOptions {
   model?: string;
   baseUrl?: string;
-  persona?: Persona;
+  persona?: Persona | AiPersonaType | string;
   contextContent?: string;
   uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;
@@ -145,12 +145,12 @@ function createBrowserStreamFn(
           fullResponseText.slice(0, 100) + (fullResponseText.length > 100 ? '...' : '')
         );
 
-        stream.push({ type: 'text_end', contentIndex: 0, partial });
+        stream.push({ type: 'text_end', contentIndex: 0, content: fullResponseText, partial } as any);
         stream.end({
           role: 'assistant',
           content: [{ type: 'text', text: fullResponseText }],
           stopReason: 'stop',
-        });
+        } as any);
       } catch (err: any) {
         console.warn(
           `%c[Novelaid AI] LM Studio 通信エラー / オフラインフォールバック ⚠️: ${err.message}`,
@@ -168,12 +168,12 @@ function createBrowserStreamFn(
           partial: { ...partial, content: [{ type: 'text', text: fallbackText }] },
         });
 
-        stream.push({ type: 'text_end', contentIndex: 0, partial });
+        stream.push({ type: 'text_end', contentIndex: 0, content: fullResponseText, partial } as any);
         stream.end({
           role: 'assistant',
           content: [{ type: 'text', text: fullResponseText }],
           stopReason: 'stop',
-        });
+        } as any);
       }
     })();
 

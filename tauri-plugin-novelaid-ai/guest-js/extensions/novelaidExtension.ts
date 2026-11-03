@@ -60,7 +60,7 @@ export interface NovelaidToolProxy {
 
 export interface NovelaidExtensionOptions {
   lmStudioUrl?: string;
-  persona?: Persona;
+  persona?: Persona | string;
   contextContent?: string;
   uiDocumentContext?: UIDocumentContext;
   toolProxy?: NovelaidToolProxy;

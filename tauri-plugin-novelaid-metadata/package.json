@@ -17,7 +17,7 @@
     "README.md"
   ],
   "scripts": {
-    "build": "rollup -c",
+    "build": "tsc --noEmit && rollup -c",
     "test": "vitest run",
     "prepublishOnly": "npm run build"
   },

@@ -1,10 +1,13 @@
 import { useCallback } from 'react';
 import { useAIContext } from '../contexts/AIContextContext';
+import { basename } from 'tauri-plugin-novelaid-fs-api';
 
 export interface ContextDocumentItem {
   path: string;
   baseName?: string;
+  title?: string;
   content: string;
+  isDirty?: boolean;
 }
 
 export function useAIContextContent() {
@@ -48,7 +51,7 @@ export function useAIContextContent() {
           }
         }
 
-        const fileName = path.split(/[/\\]/).pop() || path;
+        const fileName = doc?.baseName || doc?.title || basename(path);
         if (content) {
           result += `[File: ${fileName}]\n\`\`\`\n${content}\n\`\`\`\n\n`;
         }

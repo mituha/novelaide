@@ -16,6 +16,8 @@ export interface AiPersona {
   systemPrompt?: string;
 }
 
+export type Persona = AiPersona;
+
 export interface ChatMessage {
   id: string;
   role: 'user' | 'assistant' | 'system' | 'tool';
@@ -66,5 +68,5 @@ export type AgentSessionEvent =
   | { type: 'message_update'; delta: string }
   | { type: 'tool_call_start'; toolName: string; callId: string; args: Record<string, any> }
   | { type: 'tool_call_end'; toolName: string; callId: string; result: any }
-  | { type: 'turn_end'; fullContent: string }
+  | { type: 'turn_end'; fullContent?: string; status?: 'success' | 'error' }
   | { type: 'error'; error: string };

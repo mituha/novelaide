@@ -3,6 +3,8 @@
  * novelaid-cli および novelaid-editor と完全共通化されたドメインルール
  */
 
+import type { AiPersona } from '../types';
+
 export type NovelaidDocumentType = "novel" | "markdown" | "plot" | "chat" | "general";
 
 /**
@@ -48,7 +50,13 @@ export function getPersonaGuideline(docType: NovelaidDocumentType = "novel"): st
 /**
  * ペルソナIDに応じたプロンプトを取得
  */
-export function getPersonaPrompt(persona: string = "partner"): string {
+export function getPersonaPrompt(persona: string | AiPersona = "partner"): string {
+  if (typeof persona === "object" && persona !== null) {
+    if (persona.systemPrompt) {
+      return persona.systemPrompt;
+    }
+    persona = persona.id;
+  }
   switch (persona) {
     case "partner":
       return `あなたは小説作家の執筆パートナーです。作品の世界観を尊重し、魅力的なプロットや情景描写、キャラクター造形のアイデアを一緒に広げてください。\n\n${getPersonaGuideline("novel")}`;

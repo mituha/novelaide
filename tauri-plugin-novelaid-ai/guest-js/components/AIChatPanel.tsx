@@ -18,6 +18,7 @@ import { fetchLmStudioModels, getFallbackModels } from '../client/modelManager';
 import { PiWritingAgentSession, ToolExecutor, UIDocumentContext } from '../client/chatSession';
 import { getPersonaGuideline } from '../domain/guidelines';
 import { useAIContextContent, ContextDocumentItem } from '../hooks/useAIContextContent';
+import { basename } from 'tauri-plugin-novelaid-fs-api';
 import { AIChatInput } from './AIChatInput';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -163,11 +164,15 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
   };
 
   // UI ドキュメントコンテキスト（未保存バッファおよび開いているタブ一覧へのリアルタイムアクセス）
+  const getDocTitle = (doc: ContextDocumentItem): string => {
+    return doc.title || doc.baseName || basename(doc.path) || '無題';
+  };
+
   const uiDocumentContext: UIDocumentContext = {
     getOpenDocuments: () =>
       openDocuments.map((doc) => ({
         path: doc.path,
-        title: doc.name || doc.path.split(/[/\\]/).pop() || '無題',
+        title: getDocTitle(doc),
         isDirty: doc.isDirty ?? false,
       })),
     getActiveDocument: (side?: 'left' | 'right') => {
@@ -175,7 +180,7 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
       if (!doc) return null;
       return {
         path: doc.path,
-        title: doc.name || doc.path.split(/[/\\]/).pop() || '無題',
+        title: getDocTitle(doc),
         content: doc.content || '',
         isDirty: doc.isDirty ?? false,
       };

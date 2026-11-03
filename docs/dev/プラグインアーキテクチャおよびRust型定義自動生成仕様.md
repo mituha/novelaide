@@ -151,10 +151,19 @@ npm run typegen
 
 1. **`cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml`**
    - プラグインクレートのテストを実行し、`ts-rs` により `guest-js/models.ts` を出力。
-2. **`npm run build:plugin` (`rollup -c`)**
-   - `guest-js/` を Rollup でコンパイルし、`dist-js/` 配下に ESM / CJS / `.d.ts` 定義ファイルを生成。
+2. **`npm run build:plugin` (`tsc --noEmit && rollup -c`)**
+   - `tsc --noEmit` による厳格なTypeScript型検査を先行実行し、型エラー検知時は即座にビルドを中断。
+   - 型検査通過後、Rollup でコンパイルし、`dist-js/` 配下に ESM / CJS / `.d.ts` 定義ファイルを生成。
 3. **フロントエンド側の型同期**
    - `fileService.ts` やコンポーネントが即座に最新の型定義を参照可能。
+
+### 5.1 プラグインビルド時の型検査義務化方針（ビルド見逃し防止）
+各プラグインの `package.json` における `"build"` スクリプトは、必ず `"tsc --noEmit && rollup -c"` と定義します。
+- **理由**: `@rollup/plugin-typescript` のみでは設定によって型エラーが存在してもトランスパイルが継続・完了し、ホスト側の `skipLibCheck` と重なることで不整合が見逃されるリスクがあるため。
+- **対象プラグイン**: `novelaid-fs`, `novelaid-ai`, `restar-git`, `restar-settings`, `novelaid-calibration`, `novelaid-ruby`, `novelaid-metadata` 全プラグイン。
+
+### 5.2 パス操作の `tauri-plugin-novelaid-fs-api` への一元化
+全プラグインおよびホストアプリにおけるパス操作（ファイル名取得、拡張子取得、正規化等）は、各コンポーネントやプラグイン内での独自 `split(/[/\\]/)` を禁止し、必ず `tauri-plugin-novelaid-fs-api` の `basename` / `normalizePath` / `joinPath` 等の標準APIを使用します。
 
 ---
 
