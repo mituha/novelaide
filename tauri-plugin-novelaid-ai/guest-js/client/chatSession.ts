@@ -250,7 +250,7 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
                 } as any);
               }
 
-              // 3. ツール呼び出し（Tool Calls）の検出と組み立て
+              // 3. ツール呼び出し（Tool Calls）の検出と組み立て (pi-ai 準拠)
               if (Array.isArray(delta?.tool_calls)) {
                 if (isThinkingActive) {
                   isThinkingActive = false;
@@ -270,14 +270,14 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
                       arguments: tc.function?.arguments || '',
                     };
                     partial.content.push({
-                      type: 'tool_call',
+                      type: 'toolCall',
                       id: toolCallsMap[idx].id,
                       name: toolCallsMap[idx].name,
-                      arguments: toolCallsMap[idx].arguments,
+                      arguments: {},
                     });
                     const cIdx = partial.content.length - 1;
                     stream.push({
-                      type: 'tool_call_start',
+                      type: 'toolcall_start',
                       contentIndex: cIdx,
                       partial: { ...partial },
                     } as any);
@@ -289,11 +289,15 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
                       toolCallsMap[idx].arguments += tc.function.arguments;
                       const callItem = partial.content.find((c: any) => c.id === toolCallsMap[idx].id);
                       if (callItem) {
-                        callItem.arguments = toolCallsMap[idx].arguments;
+                        try {
+                          callItem.arguments = JSON.parse(toolCallsMap[idx].arguments);
+                        } catch {
+                          callItem.arguments = { raw: toolCallsMap[idx].arguments };
+                        }
                       }
                       const cIdx = partial.content.findIndex((c: any) => c.id === toolCallsMap[idx].id);
                       stream.push({
-                        type: 'tool_call_delta',
+                        type: 'toolcall_delta',
                         contentIndex: cIdx !== -1 ? cIdx : 0,
                         delta: tc.function.arguments,
                         partial: { ...partial },
@@ -331,14 +335,22 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
         const hasToolCalls = Object.keys(toolCallsMap).length > 0;
         if (hasToolCalls) {
           for (const tc of Object.values(toolCallsMap)) {
+            let parsedArgs: Record<string, any> = {};
+            try {
+              parsedArgs = tc.arguments ? JSON.parse(tc.arguments) : {};
+            } catch {
+              parsedArgs = { raw: tc.arguments };
+            }
+
             const cIdx = partial.content.findIndex((c: any) => c.id === tc.id);
             stream.push({
-              type: 'tool_call_end',
+              type: 'toolcall_end',
               contentIndex: cIdx !== -1 ? cIdx : 0,
               toolCall: {
+                type: 'toolCall',
                 id: tc.id,
                 name: tc.name,
-                arguments: tc.arguments,
+                arguments: parsedArgs,
               },
               partial: { ...partial },
             } as any);
@@ -360,20 +372,33 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
           finalContent.push({ type: 'text', text: fullResponseText });
         }
         if (hasToolCalls) {
+          console.group('%c[Novelaid AI] 🛠️ ツール呼び出し検出・解析', 'color: #ec4899; font-weight: bold;');
           for (const tc of Object.values(toolCallsMap)) {
+            let parsedArgs: Record<string, any> = {};
+            try {
+              parsedArgs = tc.arguments ? JSON.parse(tc.arguments) : {};
+            } catch {
+              parsedArgs = { raw: tc.arguments };
+            }
+            console.log(`▶ ツール名: %c${tc.name}`, 'color: #3b82f6; font-weight: bold;');
+            console.log(`  コールID: ${tc.id}`);
+            console.log(`  引数 (Object):`, parsedArgs);
+            console.log(`  引数 (Raw JSON):`, tc.arguments);
+
             finalContent.push({
-              type: 'tool_call',
+              type: 'toolCall',
               id: tc.id,
               name: tc.name,
-              arguments: tc.arguments,
+              arguments: parsedArgs,
             });
           }
+          console.groupEnd();
         }
 
         stream.end({
           role: 'assistant',
           content: finalContent,
-          stopReason: hasToolCalls ? 'tool_use' : 'stop',
+          stopReason: hasToolCalls ? 'toolUse' : 'stop',
         } as any);
       } catch (err: any) {
         console.warn(
@@ -570,7 +595,12 @@ export class PiWritingAgentSession {
       },
       streamFn,
       beforeToolCall: async (context: any) => {
-        console.log('%c[Novelaid AI] ツール実行開始 🔧:', 'color: #8b5cf6;', context.toolName, context.params);
+        console.group('%c[Novelaid AI] 🔧 ツール実行開始 (beforeToolCall)', 'color: #8b5cf6; font-weight: bold;');
+        console.log(`▶ ツール名: %c${context.toolName}`, 'color: #3b82f6; font-weight: bold;');
+        console.log(`▶ コールID: ${context.callId}`);
+        console.log(`▶ 引数 (params):`, context.params);
+        console.groupEnd();
+
         this.onEvent?.({
           type: 'tool_call_start',
           toolName: context.toolName || 'tool',
@@ -580,7 +610,12 @@ export class PiWritingAgentSession {
         return undefined;
       },
       afterToolCall: async (context: any) => {
-        console.log('%c[Novelaid AI] ツール実行完了 🔧:', 'color: #8b5cf6;', context.toolName, context.result);
+        console.group('%c[Novelaid AI] 🔧 ツール実行完了 (afterToolCall)', 'color: #10b981; font-weight: bold;');
+        console.log(`▶ ツール名: %c${context.toolName}`, 'color: #3b82f6; font-weight: bold;');
+        console.log(`▶ コールID: ${context.callId}`);
+        console.log(`▶ 実行結果:`, context.result);
+        console.groupEnd();
+
         this.onEvent?.({
           type: 'tool_call_end',
           toolName: context.toolName || 'tool',

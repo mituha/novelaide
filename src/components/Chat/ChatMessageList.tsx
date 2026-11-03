@@ -62,6 +62,27 @@ const getLatestThoughtSnippet = (text?: string): string => {
   return cleaned;
 };
 
+/**
+ * ツール呼び出しバッジのヘッダー文字列を生成（ツール名＋主要引数のサマリー）
+ */
+const formatToolCallHeader = (name?: string, args?: any, isCompleted?: boolean): string => {
+  if (!name) return isCompleted ? 'ツール完了' : 'ツール実行中...';
+  let argSummary = '';
+  if (args && typeof args === 'object') {
+    if (args.path) {
+      argSummary = `("${args.path}")`;
+    } else if (args.query) {
+      argSummary = `("${args.query}")`;
+    } else if (args.fileName) {
+      argSummary = `("${args.fileName}")`;
+    } else if (args.text) {
+      argSummary = `("${args.text.slice(0, 20)}...")`;
+    }
+  }
+  const statusPrefix = isCompleted ? 'ツール完了' : 'ツール実行中';
+  return `${statusPrefix}: ${name}${argSummary ? ` ${argSummary}` : ''}`;
+};
+
 export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   messages,
   personas,
@@ -264,11 +285,11 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
                                 <summary className="chat-tool-badge">
                                   <Wrench size={12} className="tool-icon" />
                                   <span className="tool-name">
-                                    {part.metadata?.tool_call?.name
-                                      ? part.metadata?.tool_call?.result
-                                        ? `ツール完了: ${part.metadata.tool_call.name}`
-                                        : `ツール実行中: ${part.metadata.tool_call.name}`
-                                      : 'ツール実行中...'}
+                                    {formatToolCallHeader(
+                                      part.metadata?.tool_call?.name,
+                                      part.metadata?.tool_call?.arguments,
+                                      !!part.metadata?.tool_call?.result
+                                    )}
                                   </span>
                                 </summary>
                                 <div className="chat-tool-payload">

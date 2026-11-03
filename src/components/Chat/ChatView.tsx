@@ -344,7 +344,11 @@ export const ChatView: React.FC<ChatViewProps> = ({
   // ツール実行ハンドラー（DocumentState / DocumentContext を唯一の信頼源とする安全パイプライン）
   const toolExecutor = useCallback(
     async (toolName: string, args: Record<string, any>) => {
-      console.log(`%c[ChatView:ToolExecutor] ツール実行 🔧: ${toolName}`, 'color: #8b5cf6; font-weight: bold;', args);
+      console.group(`%c[ChatView:ToolExecutor] ツール呼び出し受信 🛠️: ${toolName}`, 'color: #3b82f6; font-weight: bold;');
+      console.log('▶ 呼び出しツール:', toolName);
+      console.log('▶ 渡された引数 (args):', args);
+      console.log('▶ 編集権限 (allowWrite):', allowWrite);
+      console.groupEnd();
 
       // --- スコープ境界ガード ---
       const validateScope = (targetPath: string): { allowed: boolean; reason?: string } => {
