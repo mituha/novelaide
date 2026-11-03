@@ -42,6 +42,7 @@ interface StreamFnOptions {
   defaultModel?: string;
   useReasoning?: boolean;
   toolsPermission?: ToolPermissionLevel;
+  tools?: any[];
 }
 
 /**
@@ -87,15 +88,20 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
     }));
 
     let toolsList: any[] = [];
-    if (contextOrOptions && Array.isArray(contextOrOptions.tools)) {
+    if (maybeOptions && Array.isArray(maybeOptions.tools)) {
+      toolsList = maybeOptions.tools;
+    } else if (contextOrOptions && Array.isArray(contextOrOptions.tools)) {
       toolsList = contextOrOptions.tools;
+    } else if (Array.isArray(options.tools)) {
+      toolsList = options.tools;
     }
 
     (async () => {
       console.groupCollapsed(`%c[Novelaid AI] リクエスト送信 🚀 (${provider} / ${modelName})`, 'color: #3b82f6; font-weight: bold;');
       console.log('エンドポイント:', endpoint);
       console.log('メッセージ履歴:', apiMessages);
-      console.log('ツール定義:', toolsList);
+      console.log('ツール定義候補数:', toolsList.length);
+      console.log('ツール権限レベル:', options.toolsPermission);
       console.groupEnd();
 
       const partial: any = { role: 'assistant', content: [] };
@@ -500,15 +506,6 @@ export class PiWritingAgentSession {
       systemPrompt += `\n\n【出力指示】思考プロセス（推論ログや手順）は出力せず、直接結論・回答本文のみを出力してください。`;
     }
 
-    const streamFn = createBrowserStreamFn({
-      baseUrl,
-      provider: this.options.provider,
-      apiKey: this.options.apiKey,
-      defaultModel: modelId,
-      useReasoning: this.options.useReasoning,
-      toolsPermission: permission,
-    });
-
     // 3. Extension から登録されたツール配列（registerTool）を取得
     const toolsForAgent =
       permission === 'none'
@@ -518,6 +515,16 @@ export class PiWritingAgentSession {
             description: t.description,
             parameters: t.parameters,
           }));
+
+    const streamFn = createBrowserStreamFn({
+      baseUrl,
+      provider: this.options.provider,
+      apiKey: this.options.apiKey,
+      defaultModel: modelId,
+      useReasoning: this.options.useReasoning,
+      toolsPermission: permission,
+      tools: toolsForAgent,
+    });
 
     // pi 標準互換の /model コマンドを登録
     if (!this.registeredCommands.has('model')) {
@@ -751,12 +758,17 @@ export class PiWritingAgentSession {
     // agent が既に初期化されている場合、streamFn を再生成して反映
     if (this.agent) {
       const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+      const permission: ToolPermissionLevel =
+        this.options.toolsPermission ?? (this.options.useTools === false ? 'none' : 'read');
+      const tools = (this.agent as any).state?.tools || [];
       const streamFn = createBrowserStreamFn({
         baseUrl,
         provider: this.options.provider,
         apiKey: this.options.apiKey,
         defaultModel: modelId,
         useReasoning: this.options.useReasoning,
+        toolsPermission: permission,
+        tools,
       });
       (this.agent as any).streamFn = streamFn;
       (this.agent as any).state.model = {
@@ -773,12 +785,17 @@ export class PiWritingAgentSession {
     if (this.agent) {
       (this.agent as any).state.thinkingLevel = val ? 'medium' : 'off';
       const baseUrl = this.options.baseUrl || (this.options.provider === 'gemini' ? GEMINI_OPENAI_BASE_URL : DEFAULT_LM_STUDIO_URL);
+      const permission: ToolPermissionLevel =
+        this.options.toolsPermission ?? (this.options.useTools === false ? 'none' : 'read');
+      const tools = (this.agent as any).state?.tools || [];
       const streamFn = createBrowserStreamFn({
         baseUrl,
         provider: this.options.provider,
         apiKey: this.options.apiKey,
         defaultModel: this.options.model,
         useReasoning: val,
+        toolsPermission: permission,
+        tools,
       });
       (this.agent as any).streamFn = streamFn;
     }
