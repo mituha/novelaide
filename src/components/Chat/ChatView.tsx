@@ -157,6 +157,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
   const sessionRef = useRef<PiWritingAgentSession | null>(null);
   const currentSessionPathRef = useRef<string | undefined>(path);
+  const projectFilesRef = useRef<Array<{ path: string; relativePath: string; name: string; stem: string }>>([]);
 
   // ドキュメント切り替え時にセッションをリセット
   useEffect(() => {
@@ -260,6 +261,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
       try {
         const entries = await fileService.readDirectory(projectPath, true);
         const fileList: string[] = [];
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
 
         const collectFiles = (items: DirEntry[]) => {
           for (const item of items) {
@@ -271,12 +273,19 @@ export const ChatView: React.FC<ChatViewProps> = ({
               if (['txt', 'md', 'json', 'ch', 'yaml', 'yml'].includes(ext)) {
                 const titlePart = item.fileTitle && item.fileTitle !== item.baseName ? ` [${item.fileTitle}]` : '';
                 fileList.push(`- ${item.relativePath || item.name}${titlePart}`);
+                allFiles.push({
+                  path: item.path,
+                  relativePath: item.relativePath || item.name,
+                  name: item.name,
+                  stem: item.fileTitle || fileService.stem(item.name),
+                });
               }
             }
           }
         };
 
         collectFiles(entries);
+        projectFilesRef.current = allFiles;
         if (isMounted) {
           const summary = [
             '【プロジェクト構造・参照可能ファイル一覧】',
@@ -509,19 +518,121 @@ export const ChatView: React.FC<ChatViewProps> = ({
       console.log('▶ 編集権限 (allowWrite):', allowWrite);
       console.groupEnd();
 
-      // 開いているドキュメントをパス・ファイル名・拡張子なしタイトルから柔軟に検索
-      const findDoc = (target: string) => {
-        if (!target) return undefined;
-        const targetNorm = target.trim();
-        const targetBase = fileService.basename(targetNorm);
-        const targetStem = fileService.stem(targetNorm);
-        return openDocuments.find((d) => {
-          if (d.path === targetNorm) return true;
-          if (fileService.basename(d.path) === targetBase) return true;
-          if (fileService.stem(d.path) === targetStem) return true;
-          if (d.fileTitle === targetNorm || d.baseName === targetNorm) return true;
-          return false;
+      // 空白・アンダースコア・ハイフン・中黒記号等を除去して小文字化した正規化キー生成
+      const normalize = (s: string) => s.toLowerCase().replace(/[\s_\-・　]/g, '');
+
+      // 実在ファイルまたは開いているドキュメントの安全な解決ヘルパー（表記揺れ・空白混入に対応）
+      const resolveFile = (rawPath: string) => {
+        if (!rawPath || !rawPath.trim()) {
+          return { found: false, candidates: [] as string[] };
+        }
+        const target = rawPath.trim();
+        const targetBase = fileService.basename(target);
+        const targetStem = fileService.stem(target);
+        const targetNorm = normalize(target);
+        const targetBaseNorm = normalize(targetBase);
+        const targetStemNorm = normalize(targetStem);
+
+        // 1. openDocuments（現在開いているファイル・未保存バッファ）から探索
+        // 1-1. パス、ベース名、タイトル完全一致
+        let doc = openDocuments.find(
+          (d) =>
+            d.path === target ||
+            d.relativePath === target ||
+            fileService.basename(d.path) === targetBase ||
+            fileService.stem(d.path) === targetStem ||
+            d.fileTitle === target
+        );
+        if (doc) {
+          return { found: true, doc, resolvedPath: doc.path, candidates: [] as string[] };
+        }
+
+        // 1-2. openDocuments 内の正規化キー一致（空白「第 166 話」等）
+        doc = openDocuments.find((d) => {
+          const normTitle = normalize(d.fileTitle);
+          const normBase = normalize(d.baseName);
+          const normStem = normalize(fileService.stem(d.path));
+          return (
+            normTitle === targetNorm ||
+            normTitle === targetStemNorm ||
+            normBase === targetBaseNorm ||
+            normStem === targetStemNorm ||
+            (targetNorm.length >= 3 && normTitle.includes(targetNorm)) ||
+            (targetNorm.length >= 3 && targetNorm.includes(normTitle))
+          );
         });
+        if (doc) {
+          return { found: true, doc, resolvedPath: doc.path, isNormalized: true, candidates: [] as string[] };
+        }
+
+        // 2. プロジェクト内の実在ファイル群から探索
+        const files = projectFilesRef.current;
+        // 2-1. 完全一致
+        const exactMatch = files.find(
+          (f) =>
+            f.path === target ||
+            f.relativePath === target ||
+            f.name.toLowerCase() === targetBase.toLowerCase() ||
+            f.stem.toLowerCase() === targetStem.toLowerCase()
+        );
+        if (exactMatch) {
+          return { found: true, resolvedPath: exactMatch.path, candidates: [] as string[] };
+        }
+
+        // 2-2. 拡張子補完（.txt, .md）
+        const extMatch = files.find(
+          (f) =>
+            f.relativePath === `${target}.txt` ||
+            f.relativePath === `${target}.md` ||
+            f.name === `${targetBase}.txt` ||
+            f.name === `${targetBase}.md`
+        );
+        if (extMatch) {
+          return { found: true, resolvedPath: extMatch.path, isNormalized: true, candidates: [] as string[] };
+        }
+
+        // 2-3. 正規化キー完全一致（「第 166 話」と「第166話」の空白・記号差異を吸収）
+        const normMatches = files.filter((f) => {
+          const fnNorm = normalize(f.name);
+          const fsNorm = normalize(f.stem);
+          return (
+            fnNorm === targetNorm ||
+            fsNorm === targetNorm ||
+            fnNorm === targetBaseNorm ||
+            fsNorm === targetStemNorm
+          );
+        });
+        if (normMatches.length === 1) {
+          return { found: true, resolvedPath: normMatches[0].path, isNormalized: true, candidates: [] as string[] };
+        }
+
+        // 2-4. 正規化キーによる包含マッチング
+        const partialMatches = files.filter((f) => {
+          const fnNorm = normalize(f.name);
+          const fsNorm = normalize(f.stem);
+          return (
+            (targetNorm.length >= 3 && fnNorm.includes(targetNorm)) ||
+            (targetNorm.length >= 3 && fsNorm.includes(targetNorm)) ||
+            (targetStemNorm.length >= 3 && fnNorm.includes(targetStemNorm)) ||
+            (targetStemNorm.length >= 3 && fsNorm.includes(targetStemNorm)) ||
+            (fsNorm.length >= 3 && targetNorm.includes(fsNorm))
+          );
+        });
+
+        if (partialMatches.length === 1) {
+          return { found: true, resolvedPath: partialMatches[0].path, isNormalized: true, candidates: [] as string[] };
+        }
+
+        // 候補一覧の生成（最大5件）
+        const candidates = (partialMatches.length > 0 ? partialMatches : files)
+          .filter((f) => {
+            const fnNorm = normalize(f.name);
+            return targetNorm.length >= 2 && fnNorm.includes(targetNorm.slice(0, 3));
+          })
+          .slice(0, 5)
+          .map((f) => f.relativePath || f.name);
+
+        return { found: false, candidates };
       };
 
       // --- スコープ境界ガード ---
@@ -565,12 +676,29 @@ export const ChatView: React.FC<ChatViewProps> = ({
           return { status: 'error', message: scopeCheck.reason };
         }
 
-        let doc = findDoc(targetPath);
+        const resolved = resolveFile(targetPath);
+        if (!resolved.found || !resolved.resolvedPath) {
+          // ★実在しない場合は openDocument を絶対に呼ばず、即座にエラーと候補を返却！
+          const candidatesMsg =
+            resolved.candidates.length > 0
+              ? `\n【もしかして以下のファイルですか？】\n${resolved.candidates.map((c) => `- ${c}`).join('\n')}`
+              : '';
+          return {
+            status: 'error',
+            message: `指定されたファイル [${targetPath}] が見つかりませんでした。${candidatesMsg}`,
+            candidates: resolved.candidates.length > 0 ? resolved.candidates : undefined,
+            hint:
+              resolved.candidates.length > 0
+                ? '上記の候補一覧から正確なファイル名（拡張子含む）を指定して再試行してください。'
+                : 'プロジェクト構造内に該当ファイルが見つかりません。ファイル名と拡張子（.txt や .md）を確認してください。',
+          };
+        }
 
+        let doc = resolved.doc;
         if (!doc) {
           try {
-            await openDocument(targetPath);
-            doc = findDoc(targetPath);
+            await openDocument(resolved.resolvedPath);
+            doc = openDocuments.find((d) => d.path === resolved.resolvedPath);
           } catch (e: any) {
             return { status: 'error', message: `ドキュメントのオープンに失敗しました: ${e.message}` };
           }
@@ -582,13 +710,16 @@ export const ChatView: React.FC<ChatViewProps> = ({
         const limit = typeof args.limit === 'number' && args.limit > 0 ? args.limit : lines.length;
         const sliced = lines.slice(offset, offset + limit).join('\n');
 
-        const readResult = {
+        const readResult: Record<string, any> = {
           status: 'success',
-          path: doc?.path || targetPath,
+          path: resolved.resolvedPath,
           totalLines: lines.length,
           returnedLines: Math.min(limit, lines.length - offset),
           content: sliced,
         };
+        if (resolved.isNormalized) {
+          readResult.note = `ファイル名表記の揺れ（空白や記号の差）を補正して [${resolved.resolvedPath}] を読み込みました。`;
+        }
         console.log(`%c[ChatView:ToolExecutor] read 完了 (${readResult.returnedLines}行返却)`, 'color: #10b981;', readResult);
         return readResult;
       }
@@ -604,24 +735,30 @@ export const ChatView: React.FC<ChatViewProps> = ({
           return { status: 'error', message: scopeCheck.reason };
         }
 
-        let doc = findDoc(targetPath);
+        const resolved = resolveFile(targetPath);
+        const resolvedPath = resolved.found && resolved.resolvedPath ? resolved.resolvedPath : targetPath;
+
+        let doc = resolved.doc;
         if (!doc) {
           try {
-            await openDocument(targetPath);
-            doc = findDoc(targetPath);
+            await openDocument(resolvedPath);
+            doc = openDocuments.find((d) => d.path === resolvedPath);
           } catch {
             // 新規作成などの場合
           }
         }
 
-        const resolvedPath = doc?.path || targetPath;
-        updateContent(resolvedPath, args.content || '');
+        const finalPath = doc?.path || resolvedPath;
+        updateContent(finalPath, args.content || '');
 
-        const writeResult = {
+        const writeResult: Record<string, any> = {
           status: 'success',
-          path: resolvedPath,
-          message: `ドキュメント [${resolvedPath}] の内容を更新しました（未保存状態・エディター即座同期）。`,
+          path: finalPath,
+          message: `ドキュメント [${finalPath}] の内容を更新しました（未保存状態・エディター即座同期）。`,
         };
+        if (resolved.isNormalized) {
+          writeResult.note = `ファイル名表記の揺れ（空白や記号の差）を補正して [${finalPath}] に書き込みました。`;
+        }
         console.log(`%c[ChatView:ToolExecutor] write 完了`, 'color: #10b981;', writeResult);
         return writeResult;
       }
@@ -637,11 +774,24 @@ export const ChatView: React.FC<ChatViewProps> = ({
           return { status: 'error', message: scopeCheck.reason };
         }
 
-        let doc = findDoc(targetPath);
+        const resolved = resolveFile(targetPath);
+        if (!resolved.found || !resolved.resolvedPath) {
+          const candidatesMsg =
+            resolved.candidates.length > 0
+              ? `\n【もしかして以下のファイルですか？】\n${resolved.candidates.map((c) => `- ${c}`).join('\n')}`
+              : '';
+          return {
+            status: 'error',
+            message: `編集対象のファイル [${targetPath}] が見つかりませんでした。${candidatesMsg}`,
+            candidates: resolved.candidates.length > 0 ? resolved.candidates : undefined,
+          };
+        }
+
+        let doc = resolved.doc;
         if (!doc) {
           try {
-            await openDocument(targetPath);
-            doc = findDoc(targetPath);
+            await openDocument(resolved.resolvedPath);
+            doc = openDocuments.find((d) => d.path === resolved.resolvedPath);
           } catch (e: any) {
             return { status: 'error', message: `ドキュメント [${targetPath}] が見つかりませんでした。` };
           }
@@ -670,12 +820,15 @@ export const ChatView: React.FC<ChatViewProps> = ({
 
         updateContent(doc.path, currentText);
 
-        const editResult = {
+        const editResult: Record<string, any> = {
           status: 'success',
           path: doc.path,
           appliedEdits: appliedCount,
           message: `${appliedCount} 件の差分編集を適用しました（未保存状態・エディター即座同期）。`,
         };
+        if (resolved.isNormalized) {
+          editResult.note = `ファイル名表記の揺れ（空白や記号の差）を補正して [${doc.path}] を編集しました。`;
+        }
         console.log(`%c[ChatView:ToolExecutor] edit 完了 (${appliedCount}件適用)`, 'color: #10b981;', editResult);
         return editResult;
       }

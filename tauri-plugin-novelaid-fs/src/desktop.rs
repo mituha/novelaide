@@ -244,6 +244,13 @@ impl<R: Runtime> NovelaidFs<R> {
 
   pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
     let resolved_path = self.resolve_target_path(path);
+    if !resolved_path.exists() {
+      return Err(crate::Error::Io(std::io::Error::new(
+        std::io::ErrorKind::NotFound,
+        format!("File not found: {}", resolved_path.display())
+      )));
+    }
+
     let document_type = self.get_document_type_internal(&resolved_path);
     let (
         relative_path,
