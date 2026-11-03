@@ -27,6 +27,7 @@ export interface PiAgentSessionOptions {
   toolExecutor?: ToolExecutor;
   onEvent?: (event: AgentSessionEvent) => void;
   onToken?: (delta: string) => void;
+  onThoughtToken?: (delta: string) => void;
 }
 
 interface StreamFnOptions {
@@ -57,7 +58,9 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
     if (contextOrOptions && Array.isArray(contextOrOptions.messages)) {
       messagesList = contextOrOptions.messages;
       signal = maybeOptions?.signal;
-      if (modelOrMessages?.id) modelName = modelOrMessages.id;
+      if (modelOrMessages?.id && modelOrMessages.id !== 'unknown') {
+        modelName = modelOrMessages.id;
+      }
     } else if (Array.isArray(modelOrMessages)) {
       messagesList = modelOrMessages;
       signal = contextOrOptions?.signal;
@@ -82,12 +85,14 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
       console.log('メッセージ履歴:', apiMessages);
       console.groupEnd();
 
-      const partial: any = { role: 'assistant', content: [{ type: 'text', text: '' }] };
+      const partial: any = { role: 'assistant', content: [] };
       stream.push({ type: 'start', partial });
-      stream.push({ type: 'text_start', contentIndex: 0, partial });
 
       let receivedTokenCount = 0;
+      let fullThoughtText = '';
       let fullResponseText = '';
+      let isThinkingActive = false;
+      let isTextActive = false;
 
       const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -138,19 +143,72 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
               const choice = parsed.choices?.[0];
               const delta = choice?.delta;
 
+              // 1. 思考トークン（Reasoning / Thinking）の検出と送出
+              const reasoningToken = delta?.reasoning_content || delta?.reasoning || delta?.thought;
+              if (reasoningToken) {
+                if (!isThinkingActive) {
+                  isThinkingActive = true;
+                  partial.content.push({ type: 'thinking', thinking: '' });
+                  stream.push({
+                    type: 'thinking_start',
+                    contentIndex: partial.content.length - 1,
+                    partial: { ...partial },
+                  } as any);
+                }
+
+                fullThoughtText += reasoningToken;
+                const thoughtBlock = partial.content.find((c: any) => c.type === 'thinking');
+                if (thoughtBlock) {
+                  thoughtBlock.thinking = fullThoughtText;
+                }
+
+                stream.push({
+                  type: 'thinking_delta',
+                  contentIndex: 0,
+                  delta: reasoningToken,
+                  partial: { ...partial },
+                } as any);
+              }
+
+              // 2. 本文トークン（Text Content）の検出と送出
               if (delta?.content) {
+                if (isThinkingActive) {
+                  isThinkingActive = false;
+                  stream.push({
+                    type: 'thinking_end',
+                    contentIndex: 0,
+                    content: fullThoughtText,
+                    partial: { ...partial },
+                  } as any);
+                }
+
+                if (!isTextActive) {
+                  isTextActive = true;
+                  partial.content.push({ type: 'text', text: '' });
+                  const textIndex = partial.content.length - 1;
+                  stream.push({
+                    type: 'text_start',
+                    contentIndex: textIndex,
+                    partial: { ...partial },
+                  } as any);
+                }
+
                 const token = delta.content;
                 receivedTokenCount++;
                 fullResponseText += token;
-                partial.content[0].text = fullResponseText;
+                const textBlock = partial.content.find((c: any) => c.type === 'text');
+                if (textBlock) {
+                  textBlock.text = fullResponseText;
+                }
+                const textIndex = partial.content.findIndex((c: any) => c.type === 'text');
 
                 // pi-agent-core 規格: partial を付与して text_delta を送出
                 stream.push({
                   type: 'text_delta',
-                  contentIndex: 0,
+                  contentIndex: textIndex !== -1 ? textIndex : 0,
                   delta: token,
-                  partial: { ...partial, content: [{ type: 'text', text: fullResponseText }] },
-                });
+                  partial: { ...partial },
+                } as any);
               }
             } catch {
               // JSON パースエラーはスキップ
@@ -158,17 +216,42 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
           }
         }
 
+        if (isThinkingActive) {
+          isThinkingActive = false;
+          stream.push({
+            type: 'thinking_end',
+            contentIndex: 0,
+            content: fullThoughtText,
+            partial: { ...partial },
+          } as any);
+        }
+
+        const textIndex = partial.content.findIndex((c: any) => c.type === 'text');
+        if (isTextActive) {
+          stream.push({
+            type: 'text_end',
+            contentIndex: textIndex !== -1 ? textIndex : 0,
+            content: fullResponseText,
+            partial: { ...partial },
+          } as any);
+        }
+
         console.log(
-          `%c[Novelaid AI] 受信完了 ✅ (トークン数: ${receivedTokenCount}, 文字数: ${fullResponseText.length})`,
+          `%c[Novelaid AI] 受信完了 ✅ (思考文字数: ${fullThoughtText.length}, 本文トークン数: ${receivedTokenCount}, 本文文字数: ${fullResponseText.length})`,
           'color: #10b981; font-weight: bold;',
           '\n応答本文プレビュー:',
           fullResponseText.slice(0, 100) + (fullResponseText.length > 100 ? '...' : '')
         );
 
-        stream.push({ type: 'text_end', contentIndex: 0, content: fullResponseText, partial } as any);
+        const finalContent: any[] = [];
+        if (fullThoughtText) {
+          finalContent.push({ type: 'thinking', thinking: fullThoughtText });
+        }
+        finalContent.push({ type: 'text', text: fullResponseText });
+
         stream.end({
           role: 'assistant',
-          content: [{ type: 'text', text: fullResponseText }],
+          content: finalContent,
           stopReason: 'stop',
         } as any);
       } catch (err: any) {
@@ -179,14 +262,20 @@ function createBrowserStreamFn(options: StreamFnOptions): StreamFn {
 
         const fallbackText = `\n（※LM Studio への接続が検出されなかったため、ローカル補助モードで動作しています）\n\nご質問を受け付けました。執筆パートナーとして原稿を分析します。`;
         fullResponseText = fallbackText;
-        partial.content[0].text = fullResponseText;
+        partial.content = [{ type: 'text', text: fullResponseText }];
+
+        stream.push({
+          type: 'text_start',
+          contentIndex: 0,
+          partial: { ...partial },
+        } as any);
 
         stream.push({
           type: 'text_delta',
           contentIndex: 0,
           delta: fallbackText,
-          partial: { ...partial, content: [{ type: 'text', text: fallbackText }] },
-        });
+          partial: { ...partial },
+        } as any);
 
         stream.push({ type: 'text_end', contentIndex: 0, content: fullResponseText, partial } as any);
         stream.end({
@@ -209,6 +298,7 @@ export class PiWritingAgentSession {
   private options: PiAgentSessionOptions;
   private onEvent?: (event: AgentSessionEvent) => void;
   private onToken?: (delta: string) => void;
+  private onThoughtToken?: (delta: string) => void;
   private unsubscribe?: () => void;
 
   // Extension レジストリ
@@ -220,6 +310,7 @@ export class PiWritingAgentSession {
     this.options = options;
     this.onEvent = options.onEvent;
     this.onToken = options.onToken;
+    this.onThoughtToken = options.onThoughtToken;
   }
 
   /**
@@ -316,11 +407,25 @@ export class PiWritingAgentSession {
       `ツール数: ${toolsForAgent.length}, コマンド数: ${this.registeredCommands.size}`
     );
 
+    const modelObj = {
+      id: modelId,
+      name: modelId,
+      api: 'openai-completions',
+      provider: this.options.provider || 'lm-studio',
+      baseUrl,
+      reasoning: true,
+      input: ['text'],
+      cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+      contextWindow: 128000,
+      maxTokens: 16384,
+    };
+
     // 4. pi-agent-core Agent インスタンスの生成
     this.agent = new Agent({
       initialState: {
         systemPrompt,
         tools: toolsForAgent as any,
+        model: modelObj as any,
       },
       streamFn,
       beforeToolCall: async (context: any) => {
@@ -369,13 +474,34 @@ export class PiWritingAgentSession {
         break;
 
       case 'message_update':
-        const delta = event.assistantMessageEvent?.delta || event.delta || '';
-        if (delta) {
-          this.onToken?.(delta);
-          this.onEvent?.({
-            type: 'message_update',
-            delta,
-          });
+        const asstEvent = event.assistantMessageEvent;
+        if (asstEvent?.type === 'thinking_delta') {
+          const delta = asstEvent.delta || '';
+          if (delta) {
+            this.onThoughtToken?.(delta);
+            this.onEvent?.({
+              type: 'thought_update',
+              delta,
+            });
+          }
+        } else if (asstEvent?.type === 'text_delta') {
+          const delta = asstEvent.delta || '';
+          if (delta) {
+            this.onToken?.(delta);
+            this.onEvent?.({
+              type: 'message_update',
+              delta,
+            });
+          }
+        } else {
+          const delta = event.assistantMessageEvent?.delta || event.delta || '';
+          if (delta) {
+            this.onToken?.(delta);
+            this.onEvent?.({
+              type: 'message_update',
+              delta,
+            });
+          }
         }
         break;
 
@@ -498,6 +624,12 @@ export class PiWritingAgentSession {
         defaultModel: modelId,
       });
       (this.agent as any).streamFn = streamFn;
+      (this.agent as any).state.model = {
+        ...(this.agent as any).state.model,
+        id: modelId,
+        name: modelId,
+        provider: this.options.provider || 'lm-studio',
+      };
     }
   }
 

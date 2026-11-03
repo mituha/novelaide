@@ -350,6 +350,36 @@ export const ChatView: React.FC<ChatViewProps> = ({
         apiKey: targetProvider === 'gemini' ? geminiApiKey : undefined,
         contextContent,
         uiDocumentContext,
+        onThoughtToken: (thoughtDelta) => {
+          setFileData((prev) => {
+            const updatedMessages = prev.messages.map((m) => {
+              if (m.id !== assistantMsgId) return m;
+
+              const parts = [...(m.parts || [])];
+              let thoughtPartIdx = parts.findIndex((p) => p.type === 'thought');
+
+              if (thoughtPartIdx === -1) {
+                // 先頭に thought パートを挿入
+                parts.unshift({ type: 'thought', content: thoughtDelta });
+              } else {
+                parts[thoughtPartIdx] = {
+                  ...parts[thoughtPartIdx],
+                  content: parts[thoughtPartIdx].content + thoughtDelta,
+                };
+              }
+
+              return {
+                ...m,
+                parts,
+              };
+            });
+
+            return {
+              ...prev,
+              messages: updatedMessages,
+            };
+          });
+        },
         onToken: (delta) => {
           setFileData((prev) => {
             const updatedMessages = prev.messages.map((m) => {
@@ -424,10 +454,18 @@ export const ChatView: React.FC<ChatViewProps> = ({
       });
     } finally {
       setIsStreaming(false);
-      // 完了した最新状態をファイルへ最終確定保存
+      // 完了した最新状態をファイルへ最終確定保存（空の thought パートは除去）
       setFileData((current) => {
-        saveFile(current);
-        return current;
+        const cleanedMessages = current.messages.map((m) => {
+          if (!m.parts) return m;
+          const filteredParts = m.parts.filter(
+            (p) => p.type !== 'thought' || (p.content && p.content.trim().length > 0)
+          );
+          return { ...m, parts: filteredParts };
+        });
+        const finalStruct = { ...current, messages: cleanedMessages };
+        saveFile(finalStruct);
+        return finalStruct;
       });
     }
   };

@@ -300,6 +300,15 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
         contextContent,
         uiDocumentContext,
         toolExecutor: useTools ? toolExecutor : undefined,
+        onThoughtToken: (thoughtDelta) => {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === assistantMsgId
+                ? { ...msg, thoughts: (msg.thoughts || '') + thoughtDelta }
+                : msg
+            )
+          );
+        },
         onToken: (delta) => {
           console.log('[AIChatPanel] トークン描画更新:', delta);
           setMessages((prev) =>
@@ -533,6 +542,12 @@ export const AIChatPanel: React.FC<AIChatPanelProps> = ({
                 )}
               </button>
             </div>
+            {msg.thoughts && (
+              <details className="ai-thoughts-block" style={{ fontSize: '11px', opacity: 0.8, marginBottom: '6px', padding: '4px 8px', background: 'rgba(0,0,0,0.1)', borderRadius: '4px' }}>
+                <summary style={{ cursor: 'pointer', userSelect: 'none' }}>💭 思考プロセス</summary>
+                <div style={{ marginTop: '4px', whiteSpace: 'pre-wrap' }}>{msg.thoughts}</div>
+              </details>
+            )}
             <div className="ai-message-bubble">{msg.content}</div>
           </div>
         ))}

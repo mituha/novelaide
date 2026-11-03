@@ -70,6 +70,7 @@ export interface AiToolResult {
 export type AgentSessionEvent =
   | { type: 'message_start'; role: 'assistant' | 'tool'; messageId: string }
   | { type: 'message_update'; delta: string }
+  | { type: 'thought_update'; delta: string }
   | { type: 'tool_call_start'; toolName: string; callId: string; args: Record<string, any> }
   | { type: 'tool_call_end'; toolName: string; callId: string; result: any }
   | { type: 'turn_end'; fullContent?: string; status?: 'success' | 'error' }

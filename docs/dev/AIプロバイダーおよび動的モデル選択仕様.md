@@ -54,3 +54,17 @@
 }
 ```
 ファイルを再オープンした際、保存されたプロバイダーとモデルが自動復元されます。
+
+---
+
+## 5. モデル名解決と思考トークン（Reasoning）のストリーミング仕様
+
+### 5.1 モデル名解決と `unknown` 送信の防止
+- `pi-agent-core` の `Agent` インスタンス初期化時（`initialState.model`）および動的切り替え時（`setModel`）に、指定されたモデルIDをモデルオブジェクトの `id` / `name` として登録します。
+- `createBrowserStreamFn` は `modelOrMessages.id` が `'unknown'` の場合は初期化時に渡された `defaultModel` を採用し、LM Studio や Gemini に絶対に `"model": "unknown"` を送信しないよう防御します。これにより LM Studio 側のモデル解決探索オーバーヘッドを完全に根絶します。
+
+### 5.2 思考トークン（`reasoning_content` / `thinking`）のリアルタイム処理
+- Qwen 3.5 や DeepSeek 等の推論モデルが出力する思考トークン（`delta.reasoning_content`、`delta.reasoning`、`delta.thought`）を SSE ストリーム内で即座に検出します。
+- `pi-ai` 規格に準拠し、思考開始時に `thinking_start`、思考増分に `thinking_delta`、本文遷移時に `thinking_end` イベントを送出します。
+- UI側（`ChatView.tsx`）の思考ブロック（`parts[type: 'thought']`）へリアルタイムにトークンをアペンドすることで、AIの思考開始の瞬間から即座に画面が動き出し、回答前の無反応・フリーズ時間を解消します。
+
