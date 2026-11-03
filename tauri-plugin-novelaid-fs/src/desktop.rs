@@ -144,9 +144,21 @@ impl<R: Runtime> NovelaidFs<R> {
     dir.clone()
   }
 
+  /// 相対パスが渡された場合に、設定されている project_directory と結合して絶対パスへ解決する
+  pub fn resolve_target_path(&self, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+      path.to_path_buf()
+    } else if let Some(project_dir) = self.get_project_directory() {
+      project_dir.join(path)
+    } else {
+      path.to_path_buf()
+    }
+  }
+
   pub fn get_document_stat(&self, path: &Path) -> crate::Result<DocumentStat> {
-    let path_str = path.to_string_lossy().to_string();
-    match std::fs::metadata(path) {
+    let resolved = self.resolve_target_path(path);
+    let path_str = resolved.to_string_lossy().replace('\\', "/");
+    match std::fs::metadata(&resolved) {
       Ok(meta) => {
         let mtime = meta.modified().unwrap_or_else(|_| SystemTime::now());
         Ok(DocumentStat {
@@ -166,29 +178,31 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn read_file_binary(&self, path: &Path) -> crate::Result<Vec<u8>> {
-    std::fs::read(path).map_err(crate::Error::Io)
+    let resolved = self.resolve_target_path(path);
+    std::fs::read(&resolved).map_err(crate::Error::Io)
   }
 
   pub fn parse_path_info(&self, target_path: &Path) -> (String, String, String, String, String, String, String, String) {
     let project_dir = self.get_project_directory();
-    let absolute_path = target_path.to_string_lossy().replace('\\', "/");
+    let resolved_abs = self.resolve_target_path(target_path);
+    let absolute_path = resolved_abs.to_string_lossy().replace('\\', "/");
     let project_path_str = project_dir
         .as_ref()
         .map(|p| p.to_string_lossy().replace('\\', "/"))
         .unwrap_or_default();
 
-    let parent_dir = target_path
+    let parent_dir = resolved_abs
         .parent()
         .map(|p| p.to_string_lossy().replace('\\', "/"))
         .unwrap_or_default();
 
     let (relative_path, relative_parent_dir) = if let Some(ref proj) = project_dir {
-        let rel = target_path
+        let rel = resolved_abs
             .strip_prefix(proj)
             .map(|p| p.to_string_lossy().replace('\\', "/"))
-            .unwrap_or_else(|_| target_path.file_name().unwrap_or_default().to_string_lossy().to_string());
+            .unwrap_or_else(|_| target_path.to_string_lossy().replace('\\', "/"));
 
-        let rel_parent = target_path
+        let rel_parent = resolved_abs
             .parent()
             .and_then(|p| p.strip_prefix(proj).ok())
             .map(|p| p.to_string_lossy().replace('\\', "/"))
@@ -197,14 +211,14 @@ impl<R: Runtime> NovelaidFs<R> {
         (rel, rel_parent)
     } else {
         (
-            target_path.file_name().unwrap_or_default().to_string_lossy().to_string(),
+            target_path.to_string_lossy().replace('\\', "/"),
             String::new(),
         )
     };
 
-    let base_name = target_path.file_name().unwrap_or_default().to_string_lossy().to_string();
-    let file_title = target_path.file_stem().unwrap_or_default().to_string_lossy().to_string();
-    let extension = target_path
+    let base_name = resolved_abs.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let file_title = resolved_abs.file_stem().unwrap_or_default().to_string_lossy().to_string();
+    let extension = resolved_abs
         .extension()
         .and_then(|s| s.to_str())
         .map(|s| s.to_lowercase())
@@ -229,7 +243,8 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn read_document(&self, path: &Path) -> crate::Result<NovelaidDocument> {
-    let document_type = self.get_document_type_internal(path);
+    let resolved_path = self.resolve_target_path(path);
+    let document_type = self.get_document_type_internal(&resolved_path);
     let (
         relative_path,
         absolute_path,
@@ -241,7 +256,7 @@ impl<R: Runtime> NovelaidFs<R> {
         extension,
     ) = self.parse_path_info(path);
 
-    let mtime = std::fs::metadata(path)
+    let mtime = std::fs::metadata(&resolved_path)
         .and_then(|m| m.modified())
         .unwrap_or_else(|_| SystemTime::now());
     let mtime_ms = system_time_to_ms(mtime);
@@ -266,7 +281,7 @@ impl<R: Runtime> NovelaidFs<R> {
     }
 
     // テキストファイル読み込み試行 (バイナリや未知の形式でUTF-8デコード失敗時はUnknownとして安全返却)
-    match std::fs::read_to_string(path) {
+    match std::fs::read_to_string(&resolved_path) {
       Ok(content) => {
         // Code形式の場合はFrontmatter解析を行わず、純粋な生テキストとして扱う
         let (metadata, body) = if document_type == NovelaidDocumentType::Code {
@@ -322,6 +337,7 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn write_document(&self, path: &Path, document: NovelaidDocument) -> crate::Result<u64> {
+    let resolved = self.resolve_target_path(path);
     // Code形式の場合はFrontmatterを付与せず、純粋な生テキストとして保存
     let full_content = if document.document_type == NovelaidDocumentType::Code {
       document.content
@@ -333,20 +349,20 @@ impl<R: Runtime> NovelaidFs<R> {
     let time_before_write = SystemTime::now();
 
     // 2. ファイルの保存
-    std::fs::write(path, full_content).map_err(crate::Error::Io)?;
+    std::fs::write(&resolved, full_content).map_err(crate::Error::Io)?;
     
     // Invalidate attributes cache if modifying .novelaidattributes
-    self.attributes_manager.invalidate_if_attributes_file(path);
+    self.attributes_manager.invalidate_if_attributes_file(&resolved);
 
     // 3. ファイルの更新日時の取得 (B) とリトライ検証 (B >= A)
-    let mut mtime = std::fs::metadata(path)
+    let mut mtime = std::fs::metadata(&resolved)
         .and_then(|m| m.modified())
         .unwrap_or(time_before_write);
 
     let mut retries = 0;
     while mtime < time_before_write && retries < 10 {
       std::thread::sleep(std::time::Duration::from_millis(10));
-      if let Ok(meta) = std::fs::metadata(path) {
+      if let Ok(meta) = std::fs::metadata(&resolved) {
         if let Ok(modified) = meta.modified() {
           mtime = modified;
         }
@@ -357,9 +373,10 @@ impl<R: Runtime> NovelaidFs<R> {
     let mtime_ms = system_time_to_ms(mtime);
 
     // Update cache
+    let absolute_path = resolved.to_string_lossy().replace('\\', "/");
     {
       let mut cache = self.metadata_cache.lock().unwrap();
-      cache.insert(path.to_string_lossy().to_string(), CacheEntry {
+      cache.insert(absolute_path, CacheEntry {
           metadata: document.metadata,
           mtime,
       });
@@ -369,24 +386,27 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn create_directory(&self, path: &Path) -> crate::Result<()> {
-    std::fs::create_dir_all(path).map_err(crate::Error::Io)?;
+    let resolved = self.resolve_target_path(path);
+    std::fs::create_dir_all(&resolved).map_err(crate::Error::Io)?;
     Ok(())
   }
 
   pub fn create_file(&self, path: &Path, content: Option<&str>) -> crate::Result<()> {
-    if let Some(parent) = path.parent() {
+    let resolved = self.resolve_target_path(path);
+    if let Some(parent) = resolved.parent() {
       std::fs::create_dir_all(parent).map_err(crate::Error::Io)?;
     }
-    std::fs::write(path, content.unwrap_or("")).map_err(crate::Error::Io)?;
-    self.attributes_manager.invalidate_if_attributes_file(path);
+    std::fs::write(&resolved, content.unwrap_or("")).map_err(crate::Error::Io)?;
+    self.attributes_manager.invalidate_if_attributes_file(&resolved);
     Ok(())
   }
 
   pub fn create_next_file(&self, dir_path: &Path) -> crate::Result<NovelaidDirEntry> {
-    std::fs::create_dir_all(dir_path).map_err(crate::Error::Io)?;
+    let resolved_dir = self.resolve_target_path(dir_path);
+    std::fs::create_dir_all(&resolved_dir).map_err(crate::Error::Io)?;
 
     let mut existing_files = Vec::new();
-    if let Ok(entries) = std::fs::read_dir(dir_path) {
+    if let Ok(entries) = std::fs::read_dir(&resolved_dir) {
       for entry in entries.flatten() {
         if let Ok(file_type) = entry.file_type() {
           if file_type.is_file() {
@@ -399,10 +419,10 @@ impl<R: Runtime> NovelaidFs<R> {
       }
     }
 
-    let folder_name = dir_path.file_name().unwrap_or_default().to_string_lossy().to_string();
-    let doc_type = self.attributes_manager.get_directory_type(dir_path, None);
+    let folder_name = resolved_dir.file_name().unwrap_or_default().to_string_lossy().to_string();
+    let doc_type = self.attributes_manager.get_directory_type(&resolved_dir, None);
     let next_file_name = crate::predictor::predict_next_file_name(&existing_files, &folder_name, doc_type);
-    let target_path = dir_path.join(&next_file_name);
+    let target_path = resolved_dir.join(&next_file_name);
 
     std::fs::write(&target_path, "").map_err(crate::Error::Io)?;
     self.attributes_manager.invalidate_if_attributes_file(&target_path);
@@ -437,33 +457,38 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   pub fn remove(&self, path: &Path) -> crate::Result<()> {
-    if path.is_dir() {
-      std::fs::remove_dir_all(path).map_err(crate::Error::Io)?;
-      self.attributes_manager.invalidate_dir(path);
-    } else if path.is_file() {
-      std::fs::remove_file(path).map_err(crate::Error::Io)?;
-      self.attributes_manager.invalidate_if_attributes_file(path);
+    let resolved = self.resolve_target_path(path);
+    if resolved.is_dir() {
+      std::fs::remove_dir_all(&resolved).map_err(crate::Error::Io)?;
+      self.attributes_manager.invalidate_dir(&resolved);
+    } else if resolved.is_file() {
+      std::fs::remove_file(&resolved).map_err(crate::Error::Io)?;
+      self.attributes_manager.invalidate_if_attributes_file(&resolved);
     }
     Ok(())
   }
 
   pub fn rename(&self, old_path: &Path, new_path: &Path) -> crate::Result<()> {
-    std::fs::rename(old_path, new_path).map_err(crate::Error::Io)?;
-    self.attributes_manager.invalidate_if_attributes_file(old_path);
-    self.attributes_manager.invalidate_if_attributes_file(new_path);
+    let resolved_old = self.resolve_target_path(old_path);
+    let resolved_new = self.resolve_target_path(new_path);
+    std::fs::rename(&resolved_old, &resolved_new).map_err(crate::Error::Io)?;
+    self.attributes_manager.invalidate_if_attributes_file(&resolved_old);
+    self.attributes_manager.invalidate_if_attributes_file(&resolved_new);
     Ok(())
   }
 
   pub fn copy(&self, source_path: &Path, target_path: &Path) -> crate::Result<()> {
-    if source_path.is_dir() {
-      copy_dir_recursive(source_path, target_path).map_err(crate::Error::Io)?;
+    let resolved_source = self.resolve_target_path(source_path);
+    let resolved_target = self.resolve_target_path(target_path);
+    if resolved_source.is_dir() {
+      copy_dir_recursive(&resolved_source, &resolved_target).map_err(crate::Error::Io)?;
     } else {
-      if let Some(parent) = target_path.parent() {
+      if let Some(parent) = resolved_target.parent() {
         std::fs::create_dir_all(parent).map_err(crate::Error::Io)?;
       }
-      std::fs::copy(source_path, target_path).map_err(crate::Error::Io)?;
+      std::fs::copy(&resolved_source, &resolved_target).map_err(crate::Error::Io)?;
     }
-    self.attributes_manager.invalidate_if_attributes_file(target_path);
+    self.attributes_manager.invalidate_if_attributes_file(&resolved_target);
     Ok(())
   }
 
@@ -492,7 +517,8 @@ impl<R: Runtime> NovelaidFs<R> {
   }
 
   fn get_document_type_internal(&self, path: &Path) -> NovelaidDocumentType {
-    self.attributes_manager.get_document_type(path)
+    let resolved = self.resolve_target_path(path);
+    self.attributes_manager.get_document_type(&resolved)
   }
 
   /// プロジェクト内の Markdown/Novel ドキュメントを走査して NovelaidDocument 一覧を返却
@@ -562,4 +588,25 @@ fn copy_dir_recursive(src: &Path, dest: &Path) -> std::io::Result<()> {
     }
   }
   Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+  use super::*;
+
+  #[test]
+  fn test_extract_frontmatter_static() {
+    let content = "---\ntitle: テスト小説\n---\n本文です";
+    let (meta, body) = extract_frontmatter_static(content);
+    assert_eq!(meta["title"], "テスト小説");
+    assert_eq!(body, "本文です");
+  }
+
+  #[test]
+  fn test_extract_frontmatter_none() {
+    let content = "普通のテキスト本文";
+    let (meta, body) = extract_frontmatter_static(content);
+    assert!(meta.as_object().unwrap().is_empty());
+    assert_eq!(body, content);
+  }
 }

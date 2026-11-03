@@ -119,7 +119,10 @@ pub(crate) async fn read_directory<R: Runtime>(
     parent_type: Option<NovelaidDocumentType>,
 ) -> Result<Vec<NovelaidDirEntry>> {
     tauri::async_runtime::spawn_blocking(move || {
-        read_dir_recursive(&app, std::path::Path::new(&path), recursive, parent_type)
+        let novelaid_fs = app.novelaid_fs();
+        let target_path = std::path::Path::new(&path);
+        let resolved_path = novelaid_fs.resolve_target_path(target_path);
+        read_dir_recursive(&app, &resolved_path, recursive, parent_type)
     })
     .await
     .unwrap_or_else(|e| Err(std::io::Error::new(std::io::ErrorKind::Other, e.to_string())))
@@ -131,7 +134,10 @@ pub(crate) fn get_document_type<R: Runtime>(
     app: AppHandle<R>,
     path: String,
 ) -> NovelaidDocumentType {
-    app.novelaid_fs().attributes_manager.get_document_type(std::path::Path::new(&path))
+    let novelaid_fs = app.novelaid_fs();
+    let target = std::path::Path::new(&path);
+    let resolved = novelaid_fs.resolve_target_path(target);
+    novelaid_fs.attributes_manager.get_document_type(&resolved)
 }
 
 #[command]
@@ -140,7 +146,10 @@ pub(crate) fn get_directory_type<R: Runtime>(
     path: String,
     parent_type: Option<NovelaidDocumentType>,
 ) -> NovelaidDocumentType {
-    app.novelaid_fs().attributes_manager.get_directory_type(std::path::Path::new(&path), parent_type)
+    let novelaid_fs = app.novelaid_fs();
+    let target = std::path::Path::new(&path);
+    let resolved = novelaid_fs.resolve_target_path(target);
+    novelaid_fs.attributes_manager.get_directory_type(&resolved, parent_type)
 }
 
 #[command]
@@ -248,7 +257,9 @@ pub(crate) async fn remove<R: Runtime>(
     path: String,
     force: Option<bool>,
 ) -> Result<RemoveResult> {
-    let target = std::path::Path::new(&path);
+    let novelaid_fs = app.novelaid_fs();
+    let raw_target = std::path::Path::new(&path);
+    let target = novelaid_fs.resolve_target_path(raw_target);
     if !target.exists() {
         return Ok(RemoveResult::NotFound);
     }
@@ -267,7 +278,7 @@ pub(crate) async fn remove<R: Runtime>(
         });
     }
 
-    app.novelaid_fs().remove(target)?;
+    novelaid_fs.remove(&target)?;
 
     use tauri::Emitter;
     let _ = app.emit(
