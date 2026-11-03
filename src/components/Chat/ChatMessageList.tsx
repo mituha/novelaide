@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   MoreHorizontal,
   Trash2,
@@ -17,6 +17,7 @@ interface ChatMessageListProps {
   messages: ChatMessage[];
   personas: PersonaDefinition[];
   onMessagesChange?: (newMessages: ChatMessage[]) => void;
+  isStreaming?: boolean;
 }
 
 const displayTimestamp = (ts?: string | number): string => {
@@ -46,8 +47,46 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   messages,
   personas,
   onMessagesChange,
+  isStreaming = false,
 }) => {
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const isAutoScrollEnabledRef = useRef<boolean>(true);
+
+  // ユーザーの手動スクロールを検知（上部にスクロール中は自動追従を一時停止、一番下に戻ったら再開）
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    isAutoScrollEnabledRef.current = isAtBottom;
+  };
+
+  const scrollToBottom = useCallback((smooth = false) => {
+    if (containerRef.current) {
+      containerRef.current.scrollTo({
+        top: containerRef.current.scrollHeight,
+        behavior: smooth ? 'smooth' : 'auto',
+      });
+    }
+  }, []);
+
+  // 新規メッセージ追加時（ユーザー送信や新規アシスタント枠生成時）は強制スクロール
+  useEffect(() => {
+    isAutoScrollEnabledRef.current = true;
+    scrollToBottom(true);
+  }, [messages.length, scrollToBottom]);
+
+  // ストリーミング中・トークン受信時の末尾更新監視
+  const lastMessage = messages[messages.length - 1];
+  const lastPartsText = (lastMessage?.parts || []).map((p) => p.content).join('');
+  const lastContentWatch = `${lastMessage?.content || ''}:${lastPartsText}`;
+
+  useEffect(() => {
+    if (isAutoScrollEnabledRef.current) {
+      scrollToBottom(false);
+    }
+  }, [lastContentWatch, isStreaming, scrollToBottom]);
 
   const handleDeleteMessage = (id: string) => {
     if (!onMessagesChange) return;
@@ -80,7 +119,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
   };
 
   return (
-    <div className="chat-message-list">
+    <div ref={containerRef} className="chat-message-list" onScroll={handleScroll}>
       {messages.map((msg) => {
         const isUser = msg.role === 'user';
         const isSystem = msg.role === 'system';
@@ -200,6 +239,7 @@ export const ChatMessageList: React.FC<ChatMessageListProps> = ({
           </div>
         );
       })}
+      <div ref={messagesEndRef} />
     </div>
   );
 };

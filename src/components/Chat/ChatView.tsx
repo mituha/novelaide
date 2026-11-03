@@ -549,6 +549,7 @@ export const ChatView: React.FC<ChatViewProps> = ({
         messages={fileData?.messages || []}
         personas={DEFAULT_STATIC_PERSONAS}
         onMessagesChange={!isReadOnly ? handleMessagesChange : undefined}
+        isStreaming={isStreaming}
       />
 
       {!isReadOnly && (
