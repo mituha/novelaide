@@ -1,0 +1,234 @@
+.update-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(2px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10000;
+}
+
+.update-modal-container {
+  background-color: var(--bg-primary, #1e1e1e);
+  color: var(--text-primary, #cccccc);
+  border: 1px solid var(--border-color, #3c3c3c);
+  border-radius: 8px;
+  width: 90%;
+  max-width: 480px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: updateModalFadeIn 0.2s ease-out;
+}
+
+@keyframes updateModalFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.update-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border-color, #333333);
+}
+
+.update-modal-header h3 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  color: var(--text-primary, #ffffff);
+}
+
+.update-modal-close-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #888888);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.update-modal-close-btn:hover {
+  background-color: var(--bg-hover, #2a2d2e);
+  color: var(--text-primary, #ffffff);
+}
+
+.update-modal-body {
+  padding: 20px 16px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.update-status-idle {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.update-version-badge {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  gap: 8px;
+  background-color: var(--bg-secondary, #252526);
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-family: monospace;
+  font-size: 13px;
+}
+
+.current-version {
+  color: var(--text-secondary, #888888);
+}
+
+.version-arrow {
+  color: var(--accent-color, #0e639c);
+}
+
+.new-version {
+  color: var(--color-success, #4caf50);
+  font-weight: bold;
+}
+
+.update-prompt-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.update-release-notes {
+  background-color: var(--bg-tertiary, #181818);
+  border: 1px solid var(--border-color, #2d2d2d);
+  border-radius: 6px;
+  padding: 10px 12px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.update-release-notes h4 {
+  margin: 0 0 6px 0;
+  font-size: 12px;
+  color: var(--text-secondary, #aaaaaa);
+}
+
+.release-notes-content {
+  font-size: 12px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.update-status-downloading,
+.update-status-ready,
+.update-status-error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+}
+
+.spin-icon {
+  animation: spin 1s linear infinite;
+  color: var(--accent-color, #007acc);
+}
+
+@keyframes spin {
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.downloading-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.update-progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: var(--bg-tertiary, #2a2a2a);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 4px;
+}
+
+.update-progress-bar {
+  height: 100%;
+  background-color: var(--accent-color, #007acc);
+  transition: width 0.2s ease-out;
+}
+
+.update-progress-info {
+  font-size: 12px;
+  color: var(--text-secondary, #888888);
+}
+
+.update-hint {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted, #777777);
+}
+
+.update-modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 16px;
+  border-top: 1px solid var(--border-color, #333333);
+  background-color: var(--bg-secondary, #252526);
+}
+
+.update-btn {
+  padding: 6px 14px;
+  font-size: 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: background-color 0.15s;
+}
+
+.update-btn.cancel {
+  background-color: transparent;
+  border-color: var(--border-color, #444444);
+  color: var(--text-primary, #cccccc);
+}
+
+.update-btn.cancel:hover {
+  background-color: var(--bg-hover, #333333);
+}
+
+.update-btn.primary {
+  background-color: var(--accent-color, #007acc);
+  color: #ffffff;
+}
+
+.update-btn.primary:hover {
+  background-color: var(--accent-hover, #0062a3);
+}
+
+.update-btn.success {
+  background-color: #2e7d32;
+  color: #ffffff;
+}
+
+.update-btn.success:hover {
+  background-color: #1b5e20;
+}

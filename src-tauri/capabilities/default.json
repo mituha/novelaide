@@ -14,6 +14,8 @@
     "novelaid-ai:default",
     "novelaid-calibration:default",
     "novelaid-ruby:default",
-    "novelaid-metadata:default"
+    "novelaid-metadata:default",
+    "updater:default",
+    "process:default"
   ]
 }

@@ -5,6 +5,8 @@ import "restar-app-settings/styles.css";
 import "./core/settingsRegistry";
 import { NotificationProvider } from "./contexts/NotificationContext";
 import { ToastContainer } from "./components/Notification/ToastContainer";
+import { useAutoUpdate } from "./hooks/useAutoUpdate";
+import { UpdateModal } from "./components/Update/UpdateModal";
 import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
@@ -36,6 +38,18 @@ function AppContent() {
   );
 }
 
+function AutoUpdateHandler() {
+  const { activeUpdate, isModalOpen, closeModal } = useAutoUpdate();
+  if (!activeUpdate) return null;
+  return (
+    <UpdateModal
+      updateInfo={activeUpdate}
+      isOpen={isModalOpen}
+      onClose={closeModal}
+    />
+  );
+}
+
 function SettingsBoundApp() {
   const { setTheme } = useTheme();
 
@@ -59,6 +73,7 @@ function SettingsBoundApp() {
               <AppContent />
               <SettingsModal />
               <ToastContainer />
+              <AutoUpdateHandler />
             </DocumentProvider>
           </GitProvider>
         </ProjectProvider>

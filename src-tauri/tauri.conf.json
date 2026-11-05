@@ -47,6 +47,15 @@
       "wix": {
         "language": "ja-JP"
       }
+    },
+    "createUpdaterArtifacts": true
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "",
+      "endpoints": [
+        "https://github.com/mituha/novelaide/releases/latest/download/latest.json"
+      ]
     }
   }
 }
