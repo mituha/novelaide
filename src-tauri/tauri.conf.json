@@ -24,7 +24,9 @@
       "csp": null,
       "assetProtocol": {
         "enable": true,
-        "scope": ["**"]
+        "scope": [
+          "**"
+        ]
       }
     }
   },
@@ -40,7 +42,10 @@
     ],
     "windows": {
       "nsis": {
-        "languages": ["Japanese", "English"],
+        "languages": [
+          "Japanese",
+          "English"
+        ],
         "displayLanguageSelector": false,
         "installerIcon": "icons/icon.ico"
       },
@@ -52,7 +57,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDBBODg0NUQwRUJFODU5NEMKUldSTVdlanIwRVdJQ29QZmp5VnVzdlA3YUR4WjNkMHlHWkVReFlkMDJGRHlqTlJwRUd5SXc2WE8K",
       "endpoints": [
         "https://github.com/mituha/novelaide/releases/latest/download/latest.json"
       ]
