@@ -9,7 +9,7 @@ import {
   Edit3,
   ChevronDown,
   Split,
-  PanelRightClose,
+  ArrowRightLeft,
 } from 'lucide-react';
 import './EditorTabs.css';
 
@@ -32,11 +32,12 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
     closeTab,
     closeOtherTabs,
     closeRightTabs,
+    closeLeftTabs,
     closeAllTabs,
     changeViewMode,
     openPreviewInOtherPane,
     splitToOtherPane,
-    closePane,
+    moveToOtherPane,
     isSplit,
   } = useDocument();
 
@@ -273,135 +274,178 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({ paneId = 'editor.left' }
           </button>
         )}
 
-        {/* 2. 左ペイン時のみ: 単にドキュメントを分割表示する機能 */}
-        {paneId === 'editor.left' && activePath && (
+        {/* 2. 反対側ペインにドキュメントを分割表示する機能 */}
+        {activePath && (
           <button
             type="button"
             className="editor-tab-action-btn"
             onClick={() => splitToOtherPane(activePath, paneId)}
-            title="反対側のペインに分割表示（同じ状態で開く/既存ならアクティブ化）"
+            title={
+              paneId === 'editor.left'
+                ? '反対側のペインに分割表示（同じ状態で開く/既存ならアクティブ化）'
+                : '左側のペインに分割表示（同じ状態で開く/既存ならアクティブ化）'
+            }
           >
             <Columns2 size={13} />
             {!isSplit && <span>横に分割</span>}
           </button>
         )}
 
-        {/* 3. 左ペイン時のみ: 別サイドのビューにプレビュー状態で開く機能 */}
-        {paneId === 'editor.left' && activePath && canPreview && (
+        {/* 3. 反対側ペインにプレビュー状態で開く機能 */}
+        {activePath && canPreview && (
           <button
             type="button"
             className="editor-tab-action-btn"
             onClick={() => openPreviewInOtherPane(activePath, paneId)}
-            title="反対側のペインにプレビューとして開く（既存ならアクティブ化）"
+            title={
+              paneId === 'editor.left'
+                ? '反対側のペインにプレビューとして開く（既存ならアクティブ化）'
+                : '左側のペインにプレビューとして開く（既存ならアクティブ化）'
+            }
           >
             <BookOpen size={13} />
             {!isSplit && <span>分割プレビュー</span>}
           </button>
         )}
-
-        {/* 4. 右ペイン時: ペインを閉じるボタン */}
-        {paneId === 'editor.right' && (
-          <button
-            type="button"
-            className="editor-tab-action-btn pane-close-action-btn"
-            onClick={() => closePane('editor.right')}
-            title="右ペインを閉じる"
-          >
-            <X size={13} />
-            {!isSplit && <span>ペインを閉じる</span>}
-          </button>
-        )}
       </div>
 
       {/* タブ右クリックコンテキストメニュー */}
-      {contextMenu && (
-        <div
-          ref={contextMenuRef}
-          className="tab-context-menu"
-          style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
-        >
-          <div
-            className="tab-context-menu-item"
-            onClick={() => {
-              closeTab(contextMenu.tab.path, paneId);
-              setContextMenu(null);
-            }}
-          >
-            <X size={13} />
-            <span>閉じる</span>
-          </div>
-          <div
-            className="tab-context-menu-item"
-            onClick={() => {
-              closeOtherTabs(contextMenu.tab.path, paneId);
-              setContextMenu(null);
-            }}
-          >
-            <span>他のタブを閉じる</span>
-          </div>
-          <div
-            className="tab-context-menu-item"
-            onClick={() => {
-              closeRightTabs(contextMenu.tab.path, paneId);
-              setContextMenu(null);
-            }}
-          >
-            <span>右側のタブを閉じる</span>
-          </div>
-          <div
-            className="tab-context-menu-item"
-            onClick={() => {
-              closeAllTabs(paneId);
-              setContextMenu(null);
-            }}
-          >
-            <span>すべてのタブを閉じる</span>
-          </div>
+      {contextMenu && (() => {
+        const targetTabIndex = tabs.findIndex((t) => t.path === contextMenu.tab.path);
+        const isFirstTab = targetTabIndex === 0;
+        const isLastTab = targetTabIndex === tabs.length - 1;
+        const isOnlyTab = tabs.length <= 1;
+        const isTabSupportPreview =
+          contextMenu.tab.documentType === 'novel' || contextMenu.tab.documentType === 'markdown';
+        const isTabCurrentlyPreview =
+          contextMenu.tab.viewMode === 'preview' || contextMenu.tab.viewMode === 'reader';
 
-          <div className="tab-context-menu-separator" />
-
+        return (
           <div
-            className="tab-context-menu-item"
-            onClick={() => {
-              splitToOtherPane(contextMenu.tab.path, paneId);
-              setContextMenu(null);
-            }}
+            ref={contextMenuRef}
+            className="tab-context-menu"
+            style={{ top: `${contextMenu.y}px`, left: `${contextMenu.x}px` }}
           >
-            <Split size={13} />
-            <span>横に分割して開く</span>
-          </div>
-
-          {(contextMenu.tab.documentType === 'novel' ||
-            contextMenu.tab.documentType === 'markdown') && (
+            {/* --- 閉じる系グループ --- */}
             <div
               className="tab-context-menu-item"
               onClick={() => {
-                openPreviewInOtherPane(contextMenu.tab.path, paneId);
+                closeTab(contextMenu.tab.path, paneId);
                 setContextMenu(null);
               }}
             >
-              <BookOpen size={13} />
-              <span>分割プレビューで開く</span>
+              <X size={13} />
+              <span>閉じる</span>
             </div>
-          )}
+            <div
+              className={`tab-context-menu-item ${isOnlyTab ? 'disabled' : ''}`}
+              onClick={() => {
+                if (isOnlyTab) return;
+                closeOtherTabs(contextMenu.tab.path, paneId);
+                setContextMenu(null);
+              }}
+            >
+              <span>他のタブを閉じる</span>
+            </div>
+            <div
+              className={`tab-context-menu-item ${isLastTab ? 'disabled' : ''}`}
+              onClick={() => {
+                if (isLastTab) return;
+                closeRightTabs(contextMenu.tab.path, paneId);
+                setContextMenu(null);
+              }}
+            >
+              <span>右側のタブを閉じる</span>
+            </div>
+            <div
+              className={`tab-context-menu-item ${isFirstTab ? 'disabled' : ''}`}
+              onClick={() => {
+                if (isFirstTab) return;
+                closeLeftTabs(contextMenu.tab.path, paneId);
+                setContextMenu(null);
+              }}
+            >
+              <span>左側のタブを閉じる</span>
+            </div>
+            <div
+              className="tab-context-menu-item"
+              onClick={() => {
+                closeAllTabs(paneId);
+                setContextMenu(null);
+              }}
+            >
+              <span>すべてのタブを閉じる</span>
+            </div>
 
-          {isSplit && paneId === 'editor.right' && (
-            <>
-              <div className="tab-context-menu-separator" />
+            {/* --- モード切替グループ --- */}
+            {isTabSupportPreview && (
+              <>
+                <div className="tab-context-menu-separator" />
+                {isTabCurrentlyPreview ? (
+                  <div
+                    className="tab-context-menu-item"
+                    onClick={() => {
+                      changeViewMode(contextMenu.tab.path, 'editor', paneId);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <Edit3 size={13} />
+                    <span>エディター（編集）で開く</span>
+                  </div>
+                ) : (
+                  <div
+                    className="tab-context-menu-item"
+                    onClick={() => {
+                      const targetMode =
+                        contextMenu.tab.documentType === 'novel' ? 'reader' : 'preview';
+                      changeViewMode(contextMenu.tab.path, targetMode, paneId);
+                      setContextMenu(null);
+                    }}
+                  >
+                    <Eye size={13} />
+                    <span>プレビューで開く</span>
+                  </div>
+                )}
+              </>
+            )}
+
+            {/* --- ペイン分割・移動グループ --- */}
+            <div className="tab-context-menu-separator" />
+            <div
+              className="tab-context-menu-item"
+              onClick={() => {
+                splitToOtherPane(contextMenu.tab.path, paneId);
+                setContextMenu(null);
+              }}
+            >
+              <Split size={13} />
+              <span>横に分割して開く</span>
+            </div>
+            <div
+              className="tab-context-menu-item"
+              onClick={() => {
+                moveToOtherPane(contextMenu.tab.path, paneId);
+                setContextMenu(null);
+              }}
+            >
+              <ArrowRightLeft size={13} />
+              <span>{paneId === 'editor.left' ? '右ペインへ移動' : '左ペインへ移動'}</span>
+            </div>
+            {isTabSupportPreview && (
               <div
-                className="tab-context-menu-item danger"
+                className="tab-context-menu-item"
                 onClick={() => {
-                  closePane('editor.right');
+                  openPreviewInOtherPane(contextMenu.tab.path, paneId);
                   setContextMenu(null);
                 }}
               >
-                <PanelRightClose size={13} />
-                <span>右ペインを閉じる</span>
+                <BookOpen size={13} />
+                <span>分割プレビューで開く</span>
               </div>
-            </>
-          )}
-        </div>
-      )}
+            )}
+          </div>
+        );
+      })()}
     </div>
   );
 };

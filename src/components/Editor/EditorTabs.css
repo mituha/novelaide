@@ -273,12 +273,6 @@
   border-color: var(--accent-color);
 }
 
-.editor-tab-action-btn.pane-close-action-btn:hover {
-  background-color: #ef4444;
-  color: #ffffff;
-  border-color: #ef4444;
-}
-
 .pane-bar-editor-right {
   border-left: 1px solid var(--border-color);
 }
@@ -293,7 +287,7 @@
 .tab-context-menu {
   position: fixed;
   z-index: 1000;
-  min-width: 175px;
+  min-width: 185px;
   background-color: var(--bg-primary);
   border: 1px solid var(--border-color);
   border-radius: 6px;
@@ -315,6 +309,12 @@
 
 .tab-context-menu-item:hover {
   background-color: var(--hover-color);
+}
+
+.tab-context-menu-item.disabled {
+  opacity: 0.38;
+  cursor: default;
+  pointer-events: none;
 }
 
 .tab-context-menu-item.danger:hover {

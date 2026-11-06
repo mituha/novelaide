@@ -43,6 +43,7 @@ interface DocumentContextType {
   closeDocument: (path: string) => Promise<void>;
   closeOtherTabs: (path: string, paneId?: PaneId) => Promise<void>;
   closeRightTabs: (path: string, paneId?: PaneId) => Promise<void>;
+  closeLeftTabs: (path: string, paneId?: PaneId) => Promise<void>;
   closeAllTabs: (paneId?: PaneId) => Promise<void>;
   switchTab: (path: string, paneId?: PaneId) => void;
   setActivePane: (paneId: PaneId) => void;
@@ -53,6 +54,7 @@ interface DocumentContextType {
   openPreview: (path: string, mode?: 'preview' | 'reader', targetPane?: PaneId) => void;
   openPreviewInOtherPane: (path?: string, fromPane?: PaneId) => void;
   splitToOtherPane: (path?: string, fromPane?: PaneId) => void;
+  moveToOtherPane: (path: string, fromPane?: PaneId) => Promise<void>;
   openPreviewInSplit: (path?: string) => void;
   toggleSplitPreview: (path?: string) => void;
   toggleSplit: () => void;
@@ -513,6 +515,22 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [activePane, openDocuments, closeTab]
   );
 
+  // 指定したタブより左側のタブを閉じる
+  const closeLeftTabs = useCallback(
+    async (path: string, paneId?: PaneId) => {
+      const targetPane = paneId || activePane;
+      const paneTabs = openDocuments.filter((d) => d.views.some((v) => v.viewId === targetPane));
+      const targetIndex = paneTabs.findIndex((d) => d.path === path);
+      if (targetIndex > 0) {
+        const tabsToClose = paneTabs.slice(0, targetIndex);
+        for (const t of tabsToClose) {
+          await closeTab(t.path, targetPane);
+        }
+      }
+    },
+    [activePane, openDocuments, closeTab]
+  );
+
   // ペインの全タブを閉じる
   const closeAllTabs = useCallback(
     async (paneId?: PaneId) => {
@@ -742,6 +760,31 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     },
     [activePane, activePathByPane, getOppositePane, openDocuments, openDocument]
+  );
+
+  // 指定したタブを反対側のペインへ移動する（元のペインからは閉じる）
+  const moveToOtherPane = useCallback(
+    async (path: string, fromPane?: PaneId) => {
+      const sourcePane = fromPane || activePane;
+      const targetPane = getOppositePane(sourcePane);
+      if (!path) return;
+
+      const doc = openDocuments.find((d) => d.path === path);
+      const sourceView = doc?.views.find((v) => v.viewId === sourcePane);
+      const targetMode = sourceView?.viewMode || 'editor';
+
+      setIsSplit(true);
+
+      // 反対ペインに開く（既存ならアクティブ化）
+      await openDocument(path, { paneId: targetPane, viewMode: targetMode });
+
+      // 元のペインからタブを閉じる
+      await closeTab(path, sourcePane);
+
+      // 移動先のペインをアクティブにする
+      setActivePane(targetPane);
+    },
+    [activePane, getOppositePane, openDocuments, openDocument, closeTab]
   );
 
   // 後方互換用：ペイン閉鎖は行わず、安全に別サイドプレビューを実行
@@ -1123,6 +1166,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         closeDocument,
         closeOtherTabs,
         closeRightTabs,
+        closeLeftTabs,
         closeAllTabs,
         switchTab,
         setActivePane: handleSetActivePane,
@@ -1131,6 +1175,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         openPreview,
         openPreviewInOtherPane,
         splitToOtherPane,
+        moveToOtherPane,
         openPreviewInSplit,
         toggleSplitPreview,
         toggleSplit,
