@@ -108,13 +108,31 @@ export class EditorSupport {
     ['novel', 'markdown'].forEach((lang) => {
       monaco.languages.registerCompletionItemProvider(lang, {
         provideCompletionItems: (model: any, position: any) => {
-          // カーソル位置への新規挿入（直前文字列を置換しないため幅0のカーソル位置を指定）
-          const insertRange = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: position.column,
-            endColumn: position.column,
-          };
+          // アクティブなエディターから選択範囲および選択テキストを取得
+          const activeEditor = monaco.editor
+            .getEditors()
+            .find((ed: any) => ed.getModel() === model);
+          const selection = activeEditor?.getSelection();
+          const hasSelection = !!(selection && !selection.isEmpty());
+          const selectedText = hasSelection ? model.getValueInRange(selection) : '';
+
+          // スニペット構文用エスケープ
+          const escapedSelectedText = selectedText.replace(/([\\$}`])/g, '\\$1');
+
+          // 適用対象の範囲（選択範囲があれば選択領域を置換、なければ幅0のカーソル位置へ新規挿入）
+          const targetRange = hasSelection
+            ? {
+                startLineNumber: selection.startLineNumber,
+                startColumn: selection.startColumn,
+                endLineNumber: selection.endLineNumber,
+                endColumn: selection.endColumn,
+              }
+            : {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              };
 
           const suggestions: any[] = [
             {
@@ -123,7 +141,7 @@ export class EditorSupport {
               insertText: '……',
               detail: '三点リーダー（2倍角）',
               documentation: '小説用三点リーダー（……）を挿入します。',
-              range: insertRange,
+              range: targetRange,
             },
             {
               label: '――',
@@ -131,25 +149,37 @@ export class EditorSupport {
               insertText: '――',
               detail: 'ダッシュ（2倍角）',
               documentation: '小説用ダッシュ（――）を挿入します。',
-              range: insertRange,
+              range: targetRange,
             },
             {
               label: '｜漢字《かんじ》',
               kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: '｜${1:漢字}《${2:よみ}》',
+              insertText: hasSelection
+                ? `｜${escapedSelectedText}《\${1:よみ}》`
+                : '｜${1:漢字}《${2:よみ}》',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              detail: 'ルビ記法（novelaid標準）',
-              documentation: '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
-              range: insertRange,
+              detail: hasSelection
+                ? `ルビ記法: ｜${selectedText}《…》`
+                : 'ルビ記法（novelaid標準）',
+              documentation: hasSelection
+                ? `選択中の「${selectedText}」にルビ記法を適用します。`
+                : '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
+              range: targetRange,
             },
             {
               label: '《《傍点》》',
               kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: '《《${1:テキスト}》》',
+              insertText: hasSelection
+                ? `《《${escapedSelectedText}》》`
+                : '《《${1:テキスト}》》',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              detail: '傍点記法（強調）',
-              documentation: '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
-              range: insertRange,
+              detail: hasSelection
+                ? `傍点記法: 《《${selectedText}》》`
+                : '傍点記法（強調）',
+              documentation: hasSelection
+                ? `選択中の「${selectedText}」を傍点（《《…》》）で囲みます。`
+                : '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
+              range: targetRange,
             },
           ];
 
@@ -186,7 +216,7 @@ export class EditorSupport {
                   kind: monaco.languages.CompletionItemKind.Text,
                   insertText: pair.close,
                   detail: pair.label,
-                  range: insertRange,
+                  range: targetRange,
                 });
               }
             }
