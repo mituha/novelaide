@@ -561,20 +561,54 @@ impl<R: Runtime> NovelaidFs<R> {
 
 // バックグラウンドワーカーから self なしで呼び出せる静的フロントマター抽出ヘルパー
 fn extract_frontmatter_static(content: &str) -> (serde_json::Value, &str) {
-  if !content.starts_with("---\n") && !content.starts_with("---\r\n") {
+  // UTF-8 BOM (\u{FEFF}) を透過的に除去
+  let effective_content = content.strip_prefix('\u{FEFF}').unwrap_or(content);
+
+  // 開始フェンス（---\r\n または ---\n）のチェック
+  let rest = if let Some(after) = effective_content.strip_prefix("---\r\n") {
+    after
+  } else if let Some(after) = effective_content.strip_prefix("---\n") {
+    after
+  } else {
     return (serde_json::json!({}), content);
+  };
+
+  // 終了フェンス（各行先頭の "---" + 改行またはEOF）を行頭探索
+  let mut offset = 0;
+  let mut found_fence = None;
+  let len = rest.len();
+
+  while offset < len {
+    let slice = &rest[offset..];
+    if slice.starts_with("---") {
+      let after_fence = &slice[3..];
+      if after_fence.is_empty() {
+        found_fence = Some((offset, offset + 3));
+        break;
+      } else if after_fence.starts_with("\r\n") {
+        found_fence = Some((offset, offset + 5));
+        break;
+      } else if after_fence.starts_with('\n') {
+        found_fence = Some((offset, offset + 4));
+        break;
+      }
+    }
+
+    // 次の行頭 (\n の直後) へ進める
+    if let Some(pos) = slice.find('\n') {
+      offset += pos + 1;
+    } else {
+      break;
+    }
   }
 
-  let splitter = if content.contains("\r\n") { "\r\n" } else { "\n" };
-  let fence = format!("---{}", splitter);
-  
-  let parts: Vec<&str> = content.splitn(3, &fence).collect();
-  if parts.len() < 3 {
-    return (serde_json::json!({}), content);
-  }
+  let (yaml_end, body_start) = match found_fence {
+    Some(indices) => indices,
+    None => return (serde_json::json!({}), content),
+  };
 
-  let yaml_str = parts[1];
-  let body = parts[2];
+  let yaml_str = &rest[..yaml_end];
+  let body = &rest[body_start..];
 
   match serde_yaml::from_str::<serde_json::Value>(yaml_str) {
     Ok(metadata) => (metadata, body),
@@ -615,5 +649,43 @@ mod tests {
     let (meta, body) = extract_frontmatter_static(content);
     assert!(meta.as_object().unwrap().is_empty());
     assert_eq!(body, content);
+  }
+
+  #[test]
+  fn test_extract_frontmatter_mixed_line_endings() {
+    // 先頭フェンスは LF、本文には CRLF が混在
+    let content = "---\ntags:\n  - plot\n---\nプロット本文\r\n=======\r\n詳細";
+    let (meta, body) = extract_frontmatter_static(content);
+    assert_eq!(meta["tags"][0], "plot");
+    assert_eq!(body, "プロット本文\r\n=======\r\n詳細");
+  }
+
+  #[test]
+  fn test_extract_frontmatter_bom() {
+    // UTF-8 BOM (\u{FEFF}) 付き
+    let content = "\u{FEFF}---\ntitle: BOM付き小説\n---\n本文";
+    let (meta, body) = extract_frontmatter_static(content);
+    assert_eq!(meta["title"], "BOM付き小説");
+    assert_eq!(body, "本文");
+  }
+
+  #[test]
+  fn test_extract_frontmatter_crlf_fence_and_lf_fence() {
+    // 開始フェンスが CRLF、終了フェンスが LF
+    let content = "---\r\ntype: character\r\n---\n登場人物設定";
+    let (meta, body) = extract_frontmatter_static(content);
+    assert_eq!(meta["type"], "character");
+    assert_eq!(body, "登場人物設定");
+  }
+
+  #[test]
+  fn test_extract_frontmatter_actual_target_file() {
+    let target = Path::new("D:/home/mituha/novels/UnmemoryWorldOnline/10_novels/わんメモ/030_第三章_ペンギン大戦！/030_プロット/031_プロット_第三章_ペンギン大戦！_後編.md");
+    if target.exists() {
+      let content = std::fs::read_to_string(target).expect("実ファイルの読み込みに成功すること");
+      let (meta, body) = extract_frontmatter_static(&content);
+      assert_eq!(meta["tags"][0], "plot", "tags に plot が含まれていること");
+      assert!(body.starts_with("第三章"), "本文が正しく抽出されていること");
+    }
   }
 }
