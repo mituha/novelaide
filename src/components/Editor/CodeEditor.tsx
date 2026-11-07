@@ -505,7 +505,7 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
           acceptSuggestionOnEnter: 'on',
           tabCompletion: 'on',
           suggest: {
-            showWords: !isWritingMode,
+            showWords: true, // CompletionItemKind.Text (三点リーダー、ダッシュ等) を表示可能にする
             showSnippets: true,
           },
         }}

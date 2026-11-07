@@ -108,60 +108,52 @@ export class EditorSupport {
     ['novel', 'markdown'].forEach((lang) => {
       monaco.languages.registerCompletionItemProvider(lang, {
         provideCompletionItems: (model: any, position: any) => {
+          const word = model.getWordUntilPosition(position);
+          const range = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: word.startColumn,
+            endColumn: word.endColumn,
+          };
+
           const suggestions: any[] = [
             {
               label: '……',
               kind: monaco.languages.CompletionItemKind.Text,
               insertText: '……',
+              filterText: '……...さんてんリーダー',
               detail: '三点リーダー（2倍角）',
               documentation: '小説用三点リーダー（……）を挿入します。',
-              range: {
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endColumn: position.column,
-              },
+              range,
             },
             {
               label: '――',
               kind: monaco.languages.CompletionItemKind.Text,
               insertText: '――',
+              filterText: '――--ダッシュだっしゅ',
               detail: 'ダッシュ（2倍角）',
               documentation: '小説用ダッシュ（――）を挿入します。',
-              range: {
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endColumn: position.column,
-              },
+              range,
             },
             {
               label: '｜漢字《かんじ》',
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: '｜${1:漢字}《${2:よみ}》',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              filterText: '｜漢字《かんじ》るびルビruby',
               detail: 'ルビ記法（novelaid標準）',
               documentation: '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
-              range: {
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endColumn: position.column,
-              },
+              range,
             },
             {
               label: '《《傍点》》',
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: '《《${1:テキスト}》》',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              filterText: '《《傍点》》ぼうてんきょうちょう',
               detail: '傍点記法（強調）',
               documentation: '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
-              range: {
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endColumn: position.column,
-              },
+              range,
             },
           ];
 
@@ -198,12 +190,7 @@ export class EditorSupport {
                   kind: monaco.languages.CompletionItemKind.Text,
                   insertText: pair.close,
                   detail: pair.label,
-                  range: {
-                    startLineNumber: position.lineNumber,
-                    endLineNumber: position.lineNumber,
-                    startColumn: position.column,
-                    endColumn: position.column,
-                  },
+                  range,
                 });
               }
             }

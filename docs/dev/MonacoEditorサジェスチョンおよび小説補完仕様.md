@@ -50,7 +50,7 @@ Enter キー ──▶ 通常の段落改行（誤爆なし）
 | **`wordBasedSuggestions`** | **`"off"`** | ファイル内の英単語等を勝手に拾って候補に出すノイズを排除 |
 | **`acceptSuggestionOnEnter`** | **`"on"`** | ユーザーが `Ctrl + Space` で意図して呼び出した候補を Enter キーで素早く確定 |
 | **`tabCompletion`** | **`"on"`** | Tab キーでも補完確定を可能に |
-| **`suggest.showWords`** | **`false`** | 単語辞書候補を非表示 |
+| **`suggest.showWords`** | **`true`** | `CompletionItemKind.Text`（三点リーダー・ダッシュ等）を表示可能に（`wordBasedSuggestions: "off"` で自動単語収集ノイズは停止済み） |
 | **`suggest.showSnippets`** | **`true`** | ルビ・傍点等のスニペット候補を有効化 |
 
 ---
