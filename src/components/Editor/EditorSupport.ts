@@ -119,31 +119,48 @@ export class EditorSupport {
           // スニペット構文用エスケープ
           const escapedSelectedText = selectedText.replace(/([\\$}`])/g, '\\$1');
 
-          // カーソル位置（幅0）：プレフィックス照合用。選択テキストのファジー照合による誤除外を完全防止
-          const insertRange = {
-            startLineNumber: position.lineNumber,
-            endLineNumber: position.lineNumber,
-            startColumn: position.column,
-            endColumn: position.column,
-          };
-
-          // 置換範囲：確定時に置き換える範囲（選択範囲全体、またはカーソル現在位置）
-          const replaceRange = hasSelection
+          // 適用対象の範囲（単一 IRange）
+          // ※ Monaco は CompletionItemRanges.insert.startColumn !== replace.startColumn の場合
+          // isInvalid = true として全破棄するため、必ず単一の IRange を使用する
+          const targetRange = hasSelection
             ? {
                 startLineNumber: selection.startLineNumber,
                 startColumn: selection.startColumn,
                 endLineNumber: selection.endLineNumber,
                 endColumn: selection.endColumn,
               }
-            : insertRange;
-
-          // Monaco CompletionItemRanges (insertとreplaceの分離定義)
-          const itemRanges = {
-            insert: insertRange,
-            replace: replaceRange,
-          };
+            : {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              };
 
           const suggestions: any[] = [
+            {
+              label: '……',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: '……',
+              filterText: hasSelection
+                ? `${selectedText} …… ... さんてん リーダー`
+                : '…… ... さんてん リーダー',
+              detail: '三点リーダー（2倍角）',
+              documentation: '小説用三点リーダー（……）を挿入します。',
+              range: targetRange,
+              sortText: '01_ellipsis',
+            },
+            {
+              label: '――',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: '――',
+              filterText: hasSelection
+                ? `${selectedText} ―― -- ダッシュ だっしゅ`
+                : '―― -- ダッシュ だっしゅ',
+              detail: 'ダッシュ（2倍角）',
+              documentation: '小説用ダッシュ（――）を挿入します。',
+              range: targetRange,
+              sortText: '02_dash',
+            },
             {
               label: 'ルビ: ｜漢字《かんじ》',
               kind: monaco.languages.CompletionItemKind.Snippet,
@@ -160,8 +177,8 @@ export class EditorSupport {
               documentation: hasSelection
                 ? `選択中の「${selectedText}」にルビ記法を適用します。Tabキーで読みの入力へジャンプできます。`
                 : '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
-              range: itemRanges,
-              sortText: '01_ruby',
+              range: targetRange,
+              sortText: '03_ruby',
             },
             {
               label: '傍点: 《《強調》》',
@@ -179,28 +196,8 @@ export class EditorSupport {
               documentation: hasSelection
                 ? `選択中の「${selectedText}」を傍点（《《…》》）で囲みます。`
                 : '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
-              range: itemRanges,
-              sortText: '02_bouten',
-            },
-            {
-              label: '……',
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: '……',
-              filterText: '……...さんてんリーダー',
-              detail: '三点リーダー（2倍角）',
-              documentation: '小説用三点リーダー（……）を挿入します。',
-              range: itemRanges,
-              sortText: '10_ellipsis',
-            },
-            {
-              label: '――',
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: '――',
-              filterText: '――--ダッシュだっしゅ',
-              detail: 'ダッシュ（2倍角）',
-              documentation: '小説用ダッシュ（――）を挿入します。',
-              range: itemRanges,
-              sortText: '11_dash',
+              range: targetRange,
+              sortText: '04_bouten',
             },
           ];
 
@@ -237,8 +234,8 @@ export class EditorSupport {
                   kind: monaco.languages.CompletionItemKind.Text,
                   insertText: pair.close,
                   detail: pair.label,
-                  range: itemRanges,
-                  sortText: '20_close_bracket',
+                  range: targetRange,
+                  sortText: '05_close_bracket',
                 });
               }
             }
