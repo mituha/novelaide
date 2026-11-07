@@ -119,67 +119,88 @@ export class EditorSupport {
           // スニペット構文用エスケープ
           const escapedSelectedText = selectedText.replace(/([\\$}`])/g, '\\$1');
 
-          // 適用対象の範囲（選択範囲があれば選択領域を置換、なければ幅0のカーソル位置へ新規挿入）
-          const targetRange = hasSelection
+          // カーソル位置（幅0）：プレフィックス照合用。選択テキストのファジー照合による誤除外を完全防止
+          const insertRange = {
+            startLineNumber: position.lineNumber,
+            endLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endColumn: position.column,
+          };
+
+          // 置換範囲：確定時に置き換える範囲（選択範囲全体、またはカーソル現在位置）
+          const replaceRange = hasSelection
             ? {
                 startLineNumber: selection.startLineNumber,
                 startColumn: selection.startColumn,
                 endLineNumber: selection.endLineNumber,
                 endColumn: selection.endColumn,
               }
-            : {
-                startLineNumber: position.lineNumber,
-                endLineNumber: position.lineNumber,
-                startColumn: position.column,
-                endColumn: position.column,
-              };
+            : insertRange;
+
+          // Monaco CompletionItemRanges (insertとreplaceの分離定義)
+          const itemRanges = {
+            insert: insertRange,
+            replace: replaceRange,
+          };
 
           const suggestions: any[] = [
             {
-              label: '……',
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: '……',
-              detail: '三点リーダー（2倍角）',
-              documentation: '小説用三点リーダー（……）を挿入します。',
-              range: targetRange,
-            },
-            {
-              label: '――',
-              kind: monaco.languages.CompletionItemKind.Text,
-              insertText: '――',
-              detail: 'ダッシュ（2倍角）',
-              documentation: '小説用ダッシュ（――）を挿入します。',
-              range: targetRange,
-            },
-            {
-              label: '｜漢字《かんじ》',
+              label: 'ルビ: ｜漢字《かんじ》',
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: hasSelection
                 ? `｜${escapedSelectedText}《\${1:よみ}》`
                 : '｜${1:漢字}《${2:よみ}》',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              filterText: hasSelection
+                ? `${selectedText} ルビ るび ruby 漢字 かんじ ｜|`
+                : 'ルビ るび ruby 漢字 かんじ ｜|',
               detail: hasSelection
                 ? `ルビ記法: ｜${selectedText}《…》`
                 : 'ルビ記法（novelaid標準）',
               documentation: hasSelection
-                ? `選択中の「${selectedText}」にルビ記法を適用します。`
+                ? `選択中の「${selectedText}」にルビ記法を適用します。Tabキーで読みの入力へジャンプできます。`
                 : '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
-              range: targetRange,
+              range: itemRanges,
+              sortText: '01_ruby',
             },
             {
-              label: '《《傍点》》',
+              label: '傍点: 《《強調》》',
               kind: monaco.languages.CompletionItemKind.Snippet,
               insertText: hasSelection
                 ? `《《${escapedSelectedText}》》`
                 : '《《${1:テキスト}》》',
               insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              filterText: hasSelection
+                ? `${selectedText} 傍点 ぼうてん 強調 きょうちょう 《《`
+                : '傍点 ぼうてん 強調 きょうちょう 《《',
               detail: hasSelection
                 ? `傍点記法: 《《${selectedText}》》`
                 : '傍点記法（強調）',
               documentation: hasSelection
                 ? `選択中の「${selectedText}」を傍点（《《…》》）で囲みます。`
                 : '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
-              range: targetRange,
+              range: itemRanges,
+              sortText: '02_bouten',
+            },
+            {
+              label: '……',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: '……',
+              filterText: '……...さんてんリーダー',
+              detail: '三点リーダー（2倍角）',
+              documentation: '小説用三点リーダー（……）を挿入します。',
+              range: itemRanges,
+              sortText: '10_ellipsis',
+            },
+            {
+              label: '――',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: '――',
+              filterText: '――--ダッシュだっしゅ',
+              detail: 'ダッシュ（2倍角）',
+              documentation: '小説用ダッシュ（――）を挿入します。',
+              range: itemRanges,
+              sortText: '11_dash',
             },
           ];
 
@@ -216,7 +237,8 @@ export class EditorSupport {
                   kind: monaco.languages.CompletionItemKind.Text,
                   insertText: pair.close,
                   detail: pair.label,
-                  range: targetRange,
+                  range: itemRanges,
+                  sortText: '20_close_bracket',
                 });
               }
             }
