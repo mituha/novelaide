@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronRight,
   BookOpen,
+  FolderTree,
   Info,
   Sparkles,
 } from 'lucide-react';
@@ -67,7 +68,12 @@ export const MetadataPanel: React.FC = () => {
   const handleChange = useCallback(
     (key: string, value: any) => {
       if (!activeDocument) return;
-      const updated = { ...metadata, [key]: value };
+      const updated = { ...metadata };
+      if (value === '' || (Array.isArray(value) && value.length === 0)) {
+        delete updated[key];
+      } else {
+        updated[key] = value;
+      }
       setLocalMetadata(updated);
       updateMetadata(activeDocument.path, updated);
     },
@@ -147,9 +153,10 @@ export const MetadataPanel: React.FC = () => {
   // 予約済み標準フィールド一覧
   const standardKeys = new Set([
     'title',
+    'type',
+    'description',
     'tags',
     'summary',
-    'description',
     'id',
     'name',
     'reading',
@@ -165,10 +172,11 @@ export const MetadataPanel: React.FC = () => {
     <div className="metadata-panel-root">
       {/* 1. 基本設定 */}
       <section className="metadata-section">
+        {/* タイトル */}
         <div className="metadata-field">
           <label className="metadata-label" htmlFor="meta-title">
             <BookOpen size={13} />
-            <span>タイトル</span>
+            <span>タイトル (title)</span>
           </label>
           <input
             id="meta-title"
@@ -177,6 +185,47 @@ export const MetadataPanel: React.FC = () => {
             value={metadata.title || ''}
             onChange={(e) => handleChange('title', e.target.value)}
             placeholder="例: 第1章 運命の邂逅"
+          />
+        </div>
+
+        {/* 種別 (type) - index.md自動生成用オプショナル */}
+        <div className="metadata-field">
+          <label className="metadata-label" htmlFor="meta-type">
+            <FolderTree size={13} />
+            <span>種別 (type)</span>
+          </label>
+          <input
+            id="meta-type"
+            type="text"
+            className="metadata-input"
+            list="meta-type-presets"
+            value={metadata.type || ''}
+            onChange={(e) => handleChange('type', e.target.value)}
+            placeholder="例: chapter, character, memo..."
+          />
+          <datalist id="meta-type-presets">
+            <option value="chapter" label="小説原稿・章・話" />
+            <option value="character" label="登場人物・キャラクター" />
+            <option value="location" label="地名・舞台・世界観" />
+            <option value="plot" label="プロット・構成・年表" />
+            <option value="index" label="目次・インデックス" />
+            <option value="memo" label="メモ・覚書" />
+          </datalist>
+        </div>
+
+        {/* 概要 (description) - 1行入力 */}
+        <div className="metadata-field">
+          <label className="metadata-label" htmlFor="meta-description">
+            <ScrollText size={13} />
+            <span>概要 (description)</span>
+          </label>
+          <input
+            id="meta-description"
+            type="text"
+            className="metadata-input"
+            value={metadata.description || ''}
+            onChange={(e) => handleChange('description', e.target.value)}
+            placeholder="例: 旅立ちの朝、主人公が故郷を後にする"
           />
         </div>
 
@@ -220,22 +269,6 @@ export const MetadataPanel: React.FC = () => {
             value={currentTags.join(', ')}
             onChange={handleTagsInput}
             placeholder="例: character, 主人公, 魔法"
-          />
-        </div>
-
-        {/* あらすじ / メモ */}
-        <div className="metadata-field">
-          <label className="metadata-label" htmlFor="meta-summary">
-            <ScrollText size={13} />
-            <span>あらすじ / 概要メモ</span>
-          </label>
-          <textarea
-            id="meta-summary"
-            className="metadata-textarea"
-            rows={4}
-            value={metadata.summary || metadata.description || ''}
-            onChange={(e) => handleChange('summary', e.target.value)}
-            placeholder="このファイルに関するプロット、伏線、メモなど..."
           />
         </div>
       </section>
