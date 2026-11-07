@@ -1,5 +1,6 @@
 import { Monaco } from '@monaco-editor/react';
 import {
+  NOVEL_BRACKET_PAIRS,
   NOVEL_MONARCH_PATTERNS,
   NOVEL_PATTERNS,
 } from 'tauri-plugin-novelaid-ruby-api';
@@ -103,98 +104,114 @@ export class EditorSupport {
       },
     });
 
-    // 4. 小説モード専用の補完（三点リーダー、ダッシュ、閉じ括弧）
-    monaco.languages.registerCompletionItemProvider('novel', {
-      provideCompletionItems: (model: any, position: any) => {
-        const lineContent = model.getLineContent(position.lineNumber);
-        const charBefore =
-          position.column > 1 ? lineContent[position.column - 2] : '';
-
-        // 句読点や閉じ括弧の直後には表示しない
-        const silentChars = ['。', '、', '」', '』'];
-        if (silentChars.includes(charBefore)) {
-          return { suggestions: [] };
-        }
-
-        const suggestions: any[] = [
-          {
-            label: '……',
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: '……',
-            detail: '三点リーダー（2倍角）',
-            range: {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: position.column,
-              endColumn: position.column,
+    // 4. 小説・マークダウン執筆用の補完プロバイダ（三点リーダー、ダッシュ、ルビ、傍点、閉じ括弧）
+    ['novel', 'markdown'].forEach((lang) => {
+      monaco.languages.registerCompletionItemProvider(lang, {
+        provideCompletionItems: (model: any, position: any) => {
+          const suggestions: any[] = [
+            {
+              label: '……',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: '……',
+              detail: '三点リーダー（2倍角）',
+              documentation: '小説用三点リーダー（……）を挿入します。',
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              },
             },
-          },
-          {
-            label: '――',
-            kind: monaco.languages.CompletionItemKind.Text,
-            insertText: '――',
-            detail: 'ダッシュ（2倍角）',
-            range: {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: position.column,
-              endColumn: position.column,
+            {
+              label: '――',
+              kind: monaco.languages.CompletionItemKind.Text,
+              insertText: '――',
+              detail: 'ダッシュ（2倍角）',
+              documentation: '小説用ダッシュ（――）を挿入します。',
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              },
             },
-          },
-        ];
+            {
+              label: '｜漢字《かんじ》',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: '｜${1:漢字}《${2:よみ}》',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              detail: 'ルビ記法（novelaid標準）',
+              documentation: '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              },
+            },
+            {
+              label: '《《傍点》》',
+              kind: monaco.languages.CompletionItemKind.Snippet,
+              insertText: '《《${1:テキスト}》》',
+              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+              detail: '傍点記法（強調）',
+              documentation: '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
+              range: {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              },
+            },
+          ];
 
-        // 閉じ括弧の補完ロジック
-        const textBefore = model.getValueInRange({
-          startLineNumber: 1,
-          startColumn: 1,
-          endLineNumber: position.lineNumber,
-          endColumn: position.column,
-        });
-        const textAfter = model.getValueInRange({
-          startLineNumber: position.lineNumber,
-          startColumn: position.column,
-          endLineNumber: model.getLineCount(),
-          endColumn: model.getLineMaxColumn(model.getLineCount()),
-        });
+          // 閉じ括弧の補完ロジック（tauri-plugin-novelaid-ruby 一元管理定義を使用）
+          const textBefore = model.getValueInRange({
+            startLineNumber: 1,
+            startColumn: 1,
+            endLineNumber: position.lineNumber,
+            endColumn: position.column,
+          });
+          const textAfter = model.getValueInRange({
+            startLineNumber: position.lineNumber,
+            startColumn: position.column,
+            endLineNumber: model.getLineCount(),
+            endColumn: model.getLineMaxColumn(model.getLineCount()),
+          });
 
-        const bracketPairs = [
-          { open: '「', close: '」', label: '」 を閉じる' },
-          { open: '『', close: '』', label: '』 を閉じる' },
-          { open: '（', close: '）', label: '） を閉じる' },
-          { open: '［', close: '］', label: '］ を閉じる' },
-          { open: '【', close: '】', label: '】 を閉じる' },
-        ];
+          const bracketPairs = NOVEL_BRACKET_PAIRS;
 
-        for (const pair of bracketPairs) {
-          const lastOpenIdx = textBefore.lastIndexOf(pair.open);
-          const lastCloseIdx = textBefore.lastIndexOf(pair.close);
+          for (const pair of bracketPairs) {
+            const lastOpenIdx = textBefore.lastIndexOf(pair.open);
+            const lastCloseIdx = textBefore.lastIndexOf(pair.close);
 
-          if (lastOpenIdx > lastCloseIdx) {
-            const nextOpenIdx = textAfter.indexOf(pair.open);
-            const nextCloseIdx = textAfter.indexOf(pair.close);
+            if (lastOpenIdx > lastCloseIdx) {
+              const nextOpenIdx = textAfter.indexOf(pair.open);
+              const nextCloseIdx = textAfter.indexOf(pair.close);
 
-            if (
-              nextCloseIdx === -1 ||
-              (nextOpenIdx !== -1 && nextCloseIdx > nextOpenIdx)
-            ) {
-              suggestions.push({
-                label: pair.close,
-                kind: monaco.languages.CompletionItemKind.Text,
-                insertText: pair.close,
-                detail: pair.label,
-                range: {
-                  startLineNumber: position.lineNumber,
-                  endLineNumber: position.lineNumber,
-                  startColumn: position.column,
-                  endColumn: position.column,
-                },
-              });
+              if (
+                nextCloseIdx === -1 ||
+                (nextOpenIdx !== -1 && nextCloseIdx > nextOpenIdx)
+              ) {
+                suggestions.push({
+                  label: pair.close,
+                  kind: monaco.languages.CompletionItemKind.Text,
+                  insertText: pair.close,
+                  detail: pair.label,
+                  range: {
+                    startLineNumber: position.lineNumber,
+                    endLineNumber: position.lineNumber,
+                    startColumn: position.column,
+                    endColumn: position.column,
+                  },
+                });
+              }
             }
           }
-        }
 
-        return { suggestions };
-      },
+          return { suggestions };
+        },
+      });
     });
 
     // 5. 小説・マークダウン共通のメタデータ補完（登場人物・場所等）
@@ -331,9 +348,7 @@ export class EditorSupport {
         contextMenuOrder: 1.6,
         run: () => this.wrapSelection(editor, '《《', '》》', 'insert-bouten'),
       });
-    }
 
-    if (isNovel) {
       // 「」を追加
       editor.addAction({
         id: 'insert-corner-brackets',

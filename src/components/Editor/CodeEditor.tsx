@@ -457,6 +457,13 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     );
   }
 
+  // 小説・マークダウン執筆モードの判定
+  const isWritingMode =
+    effectiveLanguage === 'novel' ||
+    effectiveLanguage === 'markdown' ||
+    documentType === 'novel' ||
+    documentType === 'markdown';
+
   return (
     <div className="code-editor-container">
       <MonacoEditor
@@ -487,10 +494,19 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             ambiguousCharacters: false,
             invisibleCharacters: false,
           },
-          quickSuggestions: {
+          // 小説執筆時は自動サジェスチョンを完全停止（明示的なCtrl+Space時のみ表示）
+          quickSuggestions: isWritingMode ? false : {
             strings: true,
             comments: false,
             other: true,
+          },
+          suggestOnTriggerCharacters: !isWritingMode,
+          wordBasedSuggestions: isWritingMode ? 'off' : 'matchingDocuments',
+          acceptSuggestionOnEnter: 'on',
+          tabCompletion: 'on',
+          suggest: {
+            showWords: !isWritingMode,
+            showSnippets: true,
           },
         }}
       />

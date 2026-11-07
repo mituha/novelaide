@@ -127,3 +127,46 @@ export const NOVEL_MONARCH_PATTERNS = {
   ...RUBY_PATTERNS.MONARCH,
   ...DIALOGUE_PATTERNS.MONARCH,
 };
+
+/**
+ * 括弧ペアの定義インターフェース
+ */
+export interface BracketPair {
+  /** 開始括弧 */
+  open: string;
+  /** 終了括弧 */
+  close: string;
+  /** 補完表示用ラベル */
+  label: string;
+  /** 括弧の名称・用途 */
+  name?: string;
+}
+
+/**
+ * 小説執筆で使用される代表的な括弧ペア一覧（一元管理用）
+ */
+export const NOVEL_BRACKET_PAIRS: BracketPair[] = [
+  { open: '「', close: '」', label: '」 を閉じる', name: '鉤括弧（会話文）' },
+  { open: '『', close: '』', label: '』 を閉じる', name: '二重鉤括弧（セリフ・強調・電話）' },
+  { open: '（', close: '）', label: '） を閉じる', name: '丸括弧（心情・補足）' },
+  { open: '【', close: '】', label: '】 を閉じる', name: '隅付き括弧（見出し・場面）' },
+  { open: '［', close: '］', label: '］ を閉じる', name: '角括弧' },
+  { open: '〈', close: '〉', label: '〉 を閉じる', name: '山括弧' },
+  { open: '《', close: '》', label: '》 を閉じる', name: '二重山括弧（ルビ等）' },
+  { open: '〔', close: '〕', label: '〕 を閉じる', name: '亀甲括弧' },
+];
+
+/**
+ * 括弧に関するユーティリティ・パターン
+ */
+export const BRACKET_PATTERNS = {
+  /** 括弧ペア一覧 */
+  PAIRS: NOVEL_BRACKET_PAIRS,
+  /** 開始括弧文字一覧 */
+  OPEN_CHARS: NOVEL_BRACKET_PAIRS.map((p) => p.open),
+  /** 終了括弧文字一覧 */
+  CLOSE_CHARS: NOVEL_BRACKET_PAIRS.map((p) => p.close),
+  /** 文末・閉じ文字一覧（句読点および終了括弧） */
+  SILENT_CHARS: ['。', '、', ...NOVEL_BRACKET_PAIRS.map((p) => p.close)],
+};
+

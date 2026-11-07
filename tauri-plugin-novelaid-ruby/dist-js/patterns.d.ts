@@ -125,3 +125,33 @@ export declare const NOVEL_MONARCH_PATTERNS: {
     /** 傍点（Monarch用） */
     BOUTEN: RegExp;
 };
+/**
+ * 括弧ペアの定義インターフェース
+ */
+export interface BracketPair {
+    /** 開始括弧 */
+    open: string;
+    /** 終了括弧 */
+    close: string;
+    /** 補完表示用ラベル */
+    label: string;
+    /** 括弧の名称・用途 */
+    name?: string;
+}
+/**
+ * 小説執筆で使用される代表的な括弧ペア一覧（一元管理用）
+ */
+export declare const NOVEL_BRACKET_PAIRS: BracketPair[];
+/**
+ * 括弧に関するユーティリティ・パターン
+ */
+export declare const BRACKET_PATTERNS: {
+    /** 括弧ペア一覧 */
+    PAIRS: BracketPair[];
+    /** 開始括弧文字一覧 */
+    OPEN_CHARS: string[];
+    /** 終了括弧文字一覧 */
+    CLOSE_CHARS: string[];
+    /** 文末・閉じ文字一覧（句読点および終了括弧） */
+    SILENT_CHARS: string[];
+};
