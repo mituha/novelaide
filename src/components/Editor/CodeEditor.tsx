@@ -9,6 +9,7 @@ import { EditorSupport } from './EditorSupport';
 import { RubyDialog } from './RubyDialog';
 import { DocumentViewProps } from '../../types/viewPlugin';
 import { formatSmartRuby } from 'tauri-plugin-novelaid-ruby-api';
+import { parseFirstLineRubies } from '../../utils/entityRubyParser';
 import './CodeEditor.css';
 
 // Monaco Editor 公式日本語パック (_VSCODE_NLS_MESSAGES) の先行読み込み
@@ -193,8 +194,14 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
         };
         collect(entries);
 
-        const completions: Array<{ name: string; type: 'character' | 'location' }> = [];
-        const seenNames = new Set<string>();
+        const completions: Array<{
+          name: string;
+          rubyText: string;
+          reading?: string;
+          type: 'character' | 'location';
+          isPart?: boolean;
+        }> = [];
+        const seenRubyTexts = new Set<string>();
 
         for (const file of files) {
           const doc = await fileService.readFile(file.path);
@@ -214,13 +221,73 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
             lowerPath.includes('世界観');
 
           if (isChara || isLoc) {
-            const candidateName = meta.name || meta.title || file.baseName.replace(/\.[^/.]+$/, '');
-            if (candidateName && !seenNames.has(candidateName)) {
-              seenNames.add(candidateName);
-              completions.push({
-                name: candidateName,
-                type: isChara ? 'character' : 'location',
-              });
+            const entityType = isChara ? 'character' : 'location';
+            // 本文1行目からルビ付き表記を解析
+            const parsed = await parseFirstLineRubies(doc.content || '');
+
+            if (parsed && parsed.hasRuby) {
+              // 1. 全体アイテム（例: 勝魚《かつお》武市《ぶし》）
+              if (!seenRubyTexts.has(parsed.rubyTextFull)) {
+                seenRubyTexts.add(parsed.rubyTextFull);
+                completions.push({
+                  name: parsed.surfaceFull,
+                  rubyText: parsed.rubyTextFull,
+                  reading: parsed.readingFull || meta.reading,
+                  type: entityType,
+                  isPart: false,
+                });
+              }
+
+              // 2. 分割アイテム（例: 勝魚《かつお》、武市《ぶし》）
+              if (parsed.parts && parsed.parts.length >= 2) {
+                for (const part of parsed.parts) {
+                  if (!seenRubyTexts.has(part.rubyText)) {
+                    seenRubyTexts.add(part.rubyText);
+                    completions.push({
+                      name: part.surface,
+                      rubyText: part.rubyText,
+                      reading: part.ruby,
+                      type: entityType,
+                      isPart: true,
+                    });
+                  }
+                }
+              }
+            } else {
+              // ルビなしの場合のフォールバック
+              const candidateName =
+                parsed?.surfaceFull ||
+                meta.name ||
+                meta.title ||
+                file.baseName.replace(/\.[^/.]+$/, '');
+
+              if (candidateName && !seenRubyTexts.has(candidateName)) {
+                seenRubyTexts.add(candidateName);
+                completions.push({
+                  name: candidateName,
+                  rubyText: candidateName,
+                  reading: meta.reading,
+                  type: entityType,
+                  isPart: false,
+                });
+
+                // スペース区切りの姓名がある場合は分割も追加
+                if (candidateName.includes(' ') || candidateName.includes('　')) {
+                  const parts = candidateName.split(/[ 　]+/);
+                  for (const p of parts) {
+                    const trimmed = p.trim();
+                    if (trimmed && !seenRubyTexts.has(trimmed)) {
+                      seenRubyTexts.add(trimmed);
+                      completions.push({
+                        name: trimmed,
+                        rubyText: trimmed,
+                        type: entityType,
+                        isPart: true,
+                      });
+                    }
+                  }
+                }
+              }
             }
           }
         }

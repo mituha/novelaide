@@ -246,30 +246,76 @@ export class EditorSupport {
       });
     });
 
-    // 5. 小説・マークダウン共通のメタデータ補完（登場人物・場所等）
+    // 5. 小説・マークダウン共通のメタデータ補完（登場人物・場所等：ルビ付き対応）
     ['novel', 'markdown'].forEach((lang) => {
       monaco.languages.registerCompletionItemProvider(lang, {
-        provideCompletionItems: (_model: any, position: any) => {
-          const metaEntries: Array<{ name: string; type: 'character' | 'location' }> =
-            (window as any).__novelaid_metadata_completions || [];
+        provideCompletionItems: (model: any, position: any) => {
+          const metaEntries: Array<{
+            name: string;
+            rubyText: string;
+            reading?: string;
+            type: 'character' | 'location';
+            isPart?: boolean;
+          }> = (window as any).__novelaid_metadata_completions || [];
 
           if (!metaEntries.length) return { suggestions: [] };
 
-          const suggestions = metaEntries.map((entry) => ({
-            label: entry.name,
-            kind:
-              entry.type === 'character'
+          // アクティブなエディターから選択範囲および選択テキストを取得
+          const activeEditor = monaco.editor
+            .getEditors()
+            .find((ed: any) => ed.getModel() === model);
+          const selection = activeEditor?.getSelection();
+          const hasSelection = !!(selection && !selection.isEmpty());
+          const selectedText = hasSelection ? model.getValueInRange(selection) : '';
+
+          // 適用対象の範囲（単一 IRange）
+          const targetRange = hasSelection
+            ? {
+                startLineNumber: selection.startLineNumber,
+                startColumn: selection.startColumn,
+                endLineNumber: selection.endLineNumber,
+                endColumn: selection.endColumn,
+              }
+            : {
+                startLineNumber: position.lineNumber,
+                endLineNumber: position.lineNumber,
+                startColumn: position.column,
+                endColumn: position.column,
+              };
+
+          // 選択テキストがある場合は filterText 先頭に付与して完全一致スコアを獲得
+          const prefixFilter = selectedText ? `${selectedText} ` : '';
+
+          const suggestions = metaEntries.map((entry) => {
+            const isChara = entry.type === 'character';
+            const detailLabel = isChara
+              ? entry.isPart
+                ? '登場人物（姓名・一部）'
+                : '登場人物（ルビ付き）'
+              : entry.isPart
+                ? '地名・舞台（一部）'
+                : '地名・舞台（ルビ付き）';
+
+            // 検索キーワード: 選択テキスト + 親文字 + 読み + ルビ表記
+            const searchTerms = [
+              entry.name,
+              entry.reading || '',
+              entry.rubyText,
+            ].filter(Boolean).join(' ');
+
+            return {
+              label: entry.rubyText,
+              kind: isChara
                 ? monaco.languages.CompletionItemKind.User
                 : monaco.languages.CompletionItemKind.Class,
-            insertText: entry.name,
-            detail: entry.type === 'character' ? '登場人物' : '地名・舞台',
-            range: {
-              startLineNumber: position.lineNumber,
-              endLineNumber: position.lineNumber,
-              startColumn: position.column,
-              endColumn: position.column,
-            },
-          }));
+              insertText: entry.rubyText,
+              detail: detailLabel,
+              documentation: `【${detailLabel}】\n親文字: ${entry.name}\n読み: ${entry.reading || 'なし'}\n挿入記法: ${entry.rubyText}`,
+              filterText: `${prefixFilter}${searchTerms}`,
+              range: targetRange,
+              sortText: entry.isPart ? '07_entity_part' : '06_entity_full',
+            };
+          });
 
           return { suggestions };
         },
