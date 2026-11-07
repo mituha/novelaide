@@ -1,3 +1,15 @@
+---
+title: "GitHub ビルドおよびリリースワークフロー仕様書"
+type: specification
+description: "novelaide の GitHub Actions による CI/CD ワークフロー、Tauri アプリ自動ビルド、リリースノート自動生成設定の仕様"
+tags:
+  - specification
+  - github-actions
+  - release
+  - ci-cd
+  - tauri
+---
+
 # GitHub ビルドおよびリリースワークフロー仕様書
 
 ## 1. 概要
@@ -44,6 +56,15 @@
    - `novelaide_<version>_x64_en-US.msi`（Windows Installer パッケージ）
 3. **公開設定**:
    - `releaseDraft: true`（ドラフト状態で作成され、内容確認後に即時正式公開可能）
+4. **リリースノート自動生成（Changelog）**:
+   - `generateReleaseNotes: true`: GitHub の Release Notes 生成 API を呼び出し、前バージョンからのコミット一覧やマージされたプルリクエストを自動収集・挿入。
+   - `releaseBody`: インストーラーと自動更新用シグネチャの案内テキストを定義。末尾に区切り線（`---`）を配置し、その直下に自動生成された Changelog が結合される設計。
+   - `.github/release.yml`: リリースノートの自動カテゴリ分類設定。Conventional Commits（`feat:`, `fix:`, `docs:`, `refactor:`, `perf:` 等）およびラベルに基づき、以下のセクションに整理分類して出力：
+     - 🚀 Features / 新機能
+     - 🐛 Bug Fixes / 不具合修正
+     - 📝 Documentation / ドキュメント更新
+     - 🔧 Maintenance & Improvements / 保守・内部改善
+     - ※ 自動リリース用のバージョン管理コミット（`chore(release)`）などは自動除外。
 
 ---
 

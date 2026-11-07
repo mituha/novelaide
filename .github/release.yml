@@ -1,0 +1,17 @@
+changelog:
+  categories:
+    - title: '✨ 新機能・改善 (Features & Improvements)'
+      labels:
+        - 'feature'
+        - 'enhancement'
+    - title: '🐛 バグ修正 (Bug Fixes)'
+      labels:
+        - 'bug'
+        - 'fix'
+    - title: '📝 ドキュメント・メイキング連載 (Documentation)'
+      labels:
+        - 'documentation'
+        - 'docs'
+    - title: '🛠️ 内部改善・メンテナンス (Maintenance)'
+      labels:
+        - '*'

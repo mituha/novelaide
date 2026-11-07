@@ -52,6 +52,7 @@ jobs:
         with:
           tagName: v__VERSION__
           releaseName: 'novelaide v__VERSION__'
+          generateReleaseNotes: true
           releaseBody: |
             ## novelaide v__VERSION__ リリース 🎉
 
@@ -60,5 +61,7 @@ jobs:
 
             ### インストール方法
             - **Windows**: `novelaide_${{ github.ref_name }}_x64-setup.exe` または `.msi` をダウンロードして実行してください。
+
+            ---
           releaseDraft: false
           prerelease: false
