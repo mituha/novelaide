@@ -491,6 +491,15 @@ export const CodeEditor: React.FC<CodeEditorProps> = ({
     window.addEventListener('editor-jump-to', handleEditorJumpTo);
     window.addEventListener('novelaide:document-reloaded', handleDocumentReloaded);
 
+    // マウント時に保留中のジャンプ要求（未マウント時クリック）があれば適用
+    const pendingJump = (window as any).__novelaid_pending_jump;
+    if (pendingJump && pendingJump.path === path) {
+      delete (window as any).__novelaid_pending_jump;
+      setTimeout(() => {
+        handleEditorJumpTo({ detail: pendingJump });
+      }, 50);
+    }
+
     // クリーンアップ
     editor.onDidDispose(() => {
       window.removeEventListener('calibration-issues-update', handleCalibrationIssues);

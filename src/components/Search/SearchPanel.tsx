@@ -71,9 +71,46 @@ export const SearchPanel: React.FC<PanelProps> = () => {
     }
   }, [searchText, selectedProviderId, caseSensitive, wholeWord, useRegex, projectPath]);
 
-  // 該当箇所クリックでドキュメントを開く
-  const handleMatchClick = (filePath: string) => {
-    openDocument(filePath);
+  // 該当箇所クリックでドキュメントを開き、マッチ行へジャンプ＆フォーカス
+  const handleMatchClick = async (match: SearchMatch) => {
+    const jumpDetail = {
+      path: match.filePath,
+      line: match.lineNumber,
+      column: match.column,
+      endLine: match.lineNumber,
+      endColumn: match.column + (match.matchLength || 0),
+    };
+
+    // 1. 未マウント時用の保留ジャンプ情報をセット
+    (window as any).__novelaid_pending_jump = jumpDetail;
+
+    // 2. ドキュメントを開く (アクティブ化)
+    await openDocument(match.filePath);
+
+    // 3. 既にマウント済みのエディター向けにイベント発行
+    window.dispatchEvent(
+      new CustomEvent('editor-jump-to', {
+        detail: jumpDetail,
+      })
+    );
+
+    // 4. タブ切り替え・DOM更新直後のフォールバック通知
+    setTimeout(() => {
+      window.dispatchEvent(
+        new CustomEvent('editor-jump-to', {
+          detail: jumpDetail,
+        })
+      );
+    }, 100);
+  };
+
+  // ファイルヘッダーのクリックハンドラ（最初のマッチ項目へジャンプ）
+  const handleGroupHeaderClick = (filePath: string, firstMatch?: SearchMatch) => {
+    if (firstMatch) {
+      handleMatchClick(firstMatch);
+    } else {
+      openDocument(filePath);
+    }
   };
 
   const fileCount = Object.keys(groupedResults).length;
@@ -175,7 +212,7 @@ export const SearchPanel: React.FC<PanelProps> = () => {
           <div key={filePath} className="search-file-group">
             <div
               className="search-file-header"
-              onClick={() => handleMatchClick(filePath)}
+              onClick={() => handleGroupHeaderClick(filePath, group.matches[0])}
             >
               <FileText size={13} style={{ opacity: 0.7 }} />
               <span>{group.fileTitle}</span>
@@ -187,7 +224,7 @@ export const SearchPanel: React.FC<PanelProps> = () => {
                 <div
                   key={idx}
                   className="search-match-item"
-                  onClick={() => handleMatchClick(m.filePath)}
+                  onClick={() => handleMatchClick(m)}
                   title={`行 ${m.lineNumber}: ${m.previewLine}`}
                 >
                   <span className="search-match-line-num">{m.lineNumber}:</span>
