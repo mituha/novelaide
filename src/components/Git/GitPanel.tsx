@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   GitBranch,
   RefreshCw,
@@ -10,6 +10,7 @@ import {
   ChevronRight,
   GitCommit,
   FolderGit2,
+  UploadCloud,
 } from 'lucide-react';
 import { useGit } from '../../contexts/GitContext';
 import { GitGraph } from './GitGraph';
@@ -32,21 +33,42 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
   const {
     isRepo,
     currentBranch,
+    remotes,
     staged,
     unstaged,
     untracked,
     history,
     isLoading,
+    isPushing,
     refresh,
     initRepo,
     stageFiles,
     unstageFiles,
     commit,
+    push,
     discardFile,
   } = useGit();
 
   const [commitMessage, setCommitMessage] = useState('');
   const [isCommitting, setIsCommitting] = useState(false);
+  const [selectedRemote, setSelectedRemote] = useState<string>('origin');
+
+  useEffect(() => {
+    if (remotes.length > 0) {
+      if (!remotes.includes(selectedRemote)) {
+        setSelectedRemote(remotes[0]);
+      }
+    }
+  }, [remotes, selectedRemote]);
+
+  const handlePush = async () => {
+    if (isPushing) return;
+    try {
+      await push(selectedRemote, currentBranch);
+    } catch (e) {
+      console.error('[GitPanel] Push failed:', e);
+    }
+  };
 
   // アコーディオン開閉状態
   const [expandedStaged, setExpandedStaged] = useState(true);
@@ -200,12 +222,23 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
           <span>{currentBranch || 'HEAD'}</span>
         </div>
         <div className="git-header-actions">
+          {remotes.length > 0 && (
+            <button
+              type="button"
+              className={`git-action-icon-btn ${isPushing ? 'spinning' : ''}`}
+              onClick={handlePush}
+              title={`リモートへプッシュ (${selectedRemote}/${currentBranch || 'HEAD'})`}
+              disabled={isPushing || isLoading}
+            >
+              {isPushing ? <RefreshCw size={14} /> : <UploadCloud size={14} />}
+            </button>
+          )}
           <button
             type="button"
             className={`git-action-icon-btn ${isLoading ? 'spinning' : ''}`}
             onClick={refresh}
             title="リポジトリ状態を更新"
-            disabled={isLoading}
+            disabled={isLoading || isPushing}
           >
             <RefreshCw size={14} />
           </button>
@@ -235,6 +268,50 @@ export const GitPanel: React.FC<GitPanelProps> = ({ onOpenFileDiff }) => {
           <Check size={14} />
           <span>{staged.length > 0 ? 'Commit (Staged)' : 'Commit All'}</span>
         </button>
+
+        {/* Push コントロール */}
+        {remotes.length > 0 && (
+          <div className="git-push-row">
+            {remotes.length > 1 ? (
+              <select
+                className="git-remote-select"
+                value={selectedRemote}
+                onChange={(e) => setSelectedRemote(e.target.value)}
+                disabled={isPushing}
+                title="プッシュ先リモートを選択"
+              >
+                {remotes.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span className="git-remote-badge" title="プッシュ先リモート">
+                {selectedRemote}
+              </span>
+            )}
+            <button
+              type="button"
+              className="git-push-btn"
+              onClick={handlePush}
+              disabled={isPushing || isLoading}
+              title={`リモート (${selectedRemote}) にコミットをプッシュ`}
+            >
+              {isPushing ? (
+                <>
+                  <RefreshCw size={13} className="spinning" />
+                  <span>Pushing...</span>
+                </>
+              ) : (
+                <>
+                  <UploadCloud size={13} />
+                  <span>Push</span>
+                </>
+              )}
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ボディ（アコーディオンリスト） */}
