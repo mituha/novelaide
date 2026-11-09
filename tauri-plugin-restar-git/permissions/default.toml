@@ -10,4 +10,6 @@ permissions = [
     "allow-git-log",
     "allow-git-diff-file",
     "allow-git-discard",
+    "allow-git-get-remotes",
+    "allow-git-push",
 ]

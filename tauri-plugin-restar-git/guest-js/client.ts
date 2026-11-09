@@ -103,4 +103,26 @@ export const gitClient = {
   discard: async (path: string, filePath: string): Promise<void> => {
     return await invoke('plugin:restar-git|git_discard', { path, filePath });
   },
+
+  getRemotes: async (path: string): Promise<string[]> => {
+    try {
+      return await invoke<string[]>('plugin:restar-git|git_get_remotes', { path });
+    } catch {
+      return ['origin']; // モック環境用
+    }
+  },
+
+  push: async (
+    path: string,
+    remote?: string,
+    branch?: string,
+    setUpstream?: boolean
+  ): Promise<string> => {
+    return await invoke<string>('plugin:restar-git|git_push', {
+      path,
+      remote,
+      branch,
+      setUpstream,
+    });
+  },
 };

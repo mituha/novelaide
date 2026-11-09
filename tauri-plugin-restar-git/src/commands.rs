@@ -292,3 +292,50 @@ pub async fn git_discard(path: String, file_path: String) -> Result<()> {
     run_git(&path, &["checkout", "--", &file_path])?;
     Ok(())
 }
+
+#[tauri::command]
+pub async fn git_get_remotes(path: String) -> Result<Vec<String>> {
+    let output = match run_git(&path, &["remote"]) {
+        Ok(out) => out,
+        Err(_) => return Ok(Vec::new()),
+    };
+
+    let remotes = output
+        .lines()
+        .map(|s| s.trim().to_string())
+        .filter(|s| !s.is_empty())
+        .collect();
+
+    Ok(remotes)
+}
+
+#[tauri::command]
+pub async fn git_push(
+    path: String,
+    remote: Option<String>,
+    branch: Option<String>,
+    set_upstream: Option<bool>,
+) -> Result<String> {
+    let remote_name = remote.unwrap_or_else(|| "origin".to_string());
+    let branch_name = match branch {
+        Some(b) if !b.trim().is_empty() => b.trim().to_string(),
+        _ => {
+            let out = run_git(&path, &["branch", "--show-current"])?;
+            out.trim().to_string()
+        }
+    };
+
+    if branch_name.is_empty() {
+        return Err(Error::Git("No current branch to push.".to_string()));
+    }
+
+    let mut args = vec!["push"];
+    if set_upstream.unwrap_or(false) {
+        args.push("-u");
+    }
+    args.push(&remote_name);
+    args.push(&branch_name);
+
+    let res = run_git(&path, &args)?;
+    Ok(res)
+}

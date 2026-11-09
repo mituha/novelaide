@@ -331,6 +331,18 @@
           "markdownDescription": "Denies the git_discard command without any pre-configured scope."
         },
         {
+          "description": "Enables the git_get_remotes command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-git-get-remotes",
+          "markdownDescription": "Enables the git_get_remotes command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the git_get_remotes command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-git-get-remotes",
+          "markdownDescription": "Denies the git_get_remotes command without any pre-configured scope."
+        },
+        {
           "description": "Enables the git_init command without any pre-configured scope.",
           "type": "string",
           "const": "allow-git-init",
@@ -365,6 +377,18 @@
           "type": "string",
           "const": "deny-git-log",
           "markdownDescription": "Denies the git_log command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the git_push command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-git-push",
+          "markdownDescription": "Enables the git_push command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the git_push command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-git-push",
+          "markdownDescription": "Denies the git_push command without any pre-configured scope."
         },
         {
           "description": "Enables the git_stage command without any pre-configured scope.",
@@ -403,10 +427,10 @@
           "markdownDescription": "Denies the git_unstage command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for restar-git plugin\n#### This default permission set includes:\n\n- `allow-git-is-repo`\n- `allow-git-init`\n- `allow-git-status`\n- `allow-git-stage`\n- `allow-git-unstage`\n- `allow-git-commit`\n- `allow-git-log`\n- `allow-git-diff-file`\n- `allow-git-discard`",
+          "description": "Default permissions for restar-git plugin\n#### This default permission set includes:\n\n- `allow-git-is-repo`\n- `allow-git-init`\n- `allow-git-status`\n- `allow-git-stage`\n- `allow-git-unstage`\n- `allow-git-commit`\n- `allow-git-log`\n- `allow-git-diff-file`\n- `allow-git-discard`\n- `allow-git-get-remotes`\n- `allow-git-push`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for restar-git plugin\n#### This default permission set includes:\n\n- `allow-git-is-repo`\n- `allow-git-init`\n- `allow-git-status`\n- `allow-git-stage`\n- `allow-git-unstage`\n- `allow-git-commit`\n- `allow-git-log`\n- `allow-git-diff-file`\n- `allow-git-discard`"
+          "markdownDescription": "Default permissions for restar-git plugin\n#### This default permission set includes:\n\n- `allow-git-is-repo`\n- `allow-git-init`\n- `allow-git-status`\n- `allow-git-stage`\n- `allow-git-unstage`\n- `allow-git-commit`\n- `allow-git-log`\n- `allow-git-diff-file`\n- `allow-git-discard`\n- `allow-git-get-remotes`\n- `allow-git-push`"
         }
       ]
     }

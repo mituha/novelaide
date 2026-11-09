@@ -13,6 +13,8 @@ Default permissions for restar-git plugin
 - `allow-git-log`
 - `allow-git-diff-file`
 - `allow-git-discard`
+- `allow-git-get-remotes`
+- `allow-git-push`
 
 ## Permission Table
 
@@ -104,6 +106,32 @@ Denies the git_discard command without any pre-configured scope.
 <tr>
 <td>
 
+`restar-git:allow-git-get-remotes`
+
+</td>
+<td>
+
+Enables the git_get_remotes command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`restar-git:deny-git-get-remotes`
+
+</td>
+<td>
+
+Denies the git_get_remotes command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
 `restar-git:allow-git-init`
 
 </td>
@@ -175,6 +203,32 @@ Enables the git_log command without any pre-configured scope.
 <td>
 
 Denies the git_log command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`restar-git:allow-git-push`
+
+</td>
+<td>
+
+Enables the git_push command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`restar-git:deny-git-push`
+
+</td>
+<td>
+
+Denies the git_push command without any pre-configured scope.
 
 </td>
 </tr>

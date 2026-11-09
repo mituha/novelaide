@@ -20,6 +20,8 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::git_log,
             commands::git_diff_file,
             commands::git_discard,
+            commands::git_get_remotes,
+            commands::git_push,
         ])
         .build()
 }

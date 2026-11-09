@@ -8,6 +8,8 @@ const COMMANDS: &[&str] = &[
     "git_log",
     "git_diff_file",
     "git_discard",
+    "git_get_remotes",
+    "git_push",
 ];
 
 fn main() {
