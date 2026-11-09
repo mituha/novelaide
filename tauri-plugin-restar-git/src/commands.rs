@@ -47,12 +47,22 @@ pub struct GitDiffResult {
     pub diff_text: String,
 }
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
 fn run_git(repo_path: &str, args: &[&str]) -> Result<String> {
-    let output = std::process::Command::new("git")
-        .current_dir(Path::new(repo_path))
+    let mut cmd = std::process::Command::new("git");
+    cmd.current_dir(Path::new(repo_path))
         .args(["-c", "core.quotepath=false"]) // 日本語ファイル名のエスケープ防止
-        .args(args)
-        .output()?;
+        .args(args);
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output()?;
 
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
