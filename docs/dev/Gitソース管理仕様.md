@@ -113,6 +113,10 @@ fn run_git(repo_path: &str, args: &[&str]) -> Result<String> {
   - HEADの内容、作業ツリーの内容、および `git diff` テキストを取得
 - `git_discard(path: String, file_path: String) -> Result<(), String>`:
   - `git checkout -- <file_path>` または `git clean -f <file_path>`
+- `git_get_remotes(path: String) -> Result<Vec<String>, String>`:
+  - `git remote` を実行し、設定されているリモート名一覧（例: `["origin"]`）を取得
+- `git_push(path: String, remote: Option<String>, branch: Option<String>, set_upstream: Option<bool>) -> Result<String, String>`:
+  - `git push <remote> <branch>` を実行（`-u` オプション対応）。コンソールウィンドウ非表示でサイレント実行し、プッシュ結果またはエラーを返却
 
 ---
 
@@ -122,9 +126,10 @@ fn run_git(repo_path: &str, args: &[&str]) -> Result<String> {
    - `GitBranch` / `GitCommit` アイコンを配置（3番目）。
    - クリックで `GitPanel` が左サイドペインに展開。
 2. **`GitPanel`（左ペイン）**:
-   - **ブランチ & 再読み込み**: `🌿 main` とリフレッシュボタン。
+   - **ブランチ & アクション**: `🌿 main`、Push ボタン（`UploadCloud`）、リフレッシュボタン。リモートが存在する場合に Push ボタンが有効化。
    - **コミットメッセージ入力欄**: 複数行テキストエリア、ショートカット `Ctrl + Enter` でコミット。
    - **Commit ボタン**: 「Commit」または「Commit All」。
+   - **Push セクション**: コミットフォーム直下に、リモート選択ドロップダウン（複数リモート時）およびワンクリック Push ボタンを配置。プッシュ実行中はスピナーアニメーションを表示し、多重実行を防止。
    - **Staged Changes アコーディオン**: ステージ済みファイル、一括/個別アンステージボタン。
    - **Changes アコーディオン**: 未ステージ/新規ファイル、一括/個別ステージボタン、変更破棄ボタン。
    - **Commit History アコーディオン**: コミットハッシュ、メッセージ、作者、経過時間、SVGコミットグラフ。
