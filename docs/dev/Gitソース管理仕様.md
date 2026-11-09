@@ -1,3 +1,15 @@
+---
+title: "Gitソース管理実装仕様書"
+type: specification
+description: "tauri-plugin-restar-git によるGitソース管理機能、コマンド実行ヘルパー、Windowsコンソール非表示仕様、およびGitPanel UI連携仕様"
+tags:
+  - specification
+  - git
+  - source-control
+  - tauri-plugin
+  - windows
+---
+
 # Gitソース管理実装仕様書（tauri-plugin-restar-git）
 
 ## 1. 概要とアーキテクチャ方針
@@ -53,18 +65,30 @@ novelaide/
 ## 3. Rust実装仕様 (`src/commands.rs`)
 
 ### 3.1 実行ヘルパー関数
+
+Windows 環境における Git コマンド実行時、OS が子プロセスごとに新規のコンソールウィンドウ（コマンドプロンプト画面）を一瞬生成・ポップアップ表示してしまう現象を防止するため、Windows 向けにプロセス生成フラグ **`CREATE_NO_WINDOW`（`0x08000000`）** を設定し、完全バックグラウンド（サイレント）実行を行います。
+
 ```rust
-fn run_git_command(repo_path: &Path, args: &[&str]) -> Result<String, String> {
-    let output = std::process::Command::new("git")
-        .current_dir(repo_path)
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x08000000;
+
+fn run_git(repo_path: &str, args: &[&str]) -> Result<String> {
+    let mut cmd = std::process::Command::new("git");
+    cmd.current_dir(Path::new(repo_path))
         .args(["-c", "core.quotepath=false"]) // 日本語ファイル名エスケープ防止
-        .args(args)
-        .output()
-        .map_err(|e| format!("Failed to execute git: {}", e))?;
+        .args(args);
+
+    #[cfg(windows)]
+    cmd.creation_flags(CREATE_NO_WINDOW);
+
+    let output = cmd.output()?;
 
     if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(stderr.to_string());
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(Error::Git(stderr));
     }
 
     Ok(String::from_utf8_lossy(&output.stdout).to_string())
