@@ -13,6 +13,15 @@ export const {
   isSubPath,
 } = novelaidFs;
 
+/**
+ * Windows / Unix 共通のパス同一性判定
+ * セパレータ（/ vs \）を正規化し、Windows環境を考慮して大文字小文字を無視して比較する
+ */
+export function isSamePath(p1: string, p2: string): boolean {
+  if (!p1 || !p2) return false;
+  return normalizePath(p1).toLowerCase() === normalizePath(p2).toLowerCase();
+}
+
 // ブラウザ環境やプレビュー撮影用のモックデータ
 const MOCK_ENTRIES: DirEntry[] = [
   {
@@ -179,6 +188,7 @@ export const fileService = {
   joinPath,
   normalizePath,
   isSubPath,
+  isSamePath,
 
   // プロジェクトディレクトリの設定
   async setProjectDirectory(path: string | null): Promise<void> {

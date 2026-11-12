@@ -66,6 +66,7 @@ interface DocumentContextType {
   updateMetadata: (path: string, metadata: Record<string, any>) => void;
   saveDocument: (path?: string, options?: { force?: boolean }) => Promise<void>;
   renameDocument: (oldPath: string, newTitle: string) => Promise<boolean>;
+  updateDocumentPath: (oldPath: string, newPath: string) => void;
   setCompositionState: (isComposing: boolean) => void;
 }
 
@@ -1032,6 +1033,84 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     window.dispatchEvent(new CustomEvent('novelaide:project-refresh-needed'));
   }, [closeDocument, showBanner, showToast, dismissBanner, saveDocument, showStatusMessage]);
 
+  // ファイルまたはフォルダのリネーム・移動に伴うタブ状態のインプレース追従更新
+  const updateDocumentPath = useCallback((oldPath: string, newPath: string) => {
+    const normOld = fileService.normalizePath(oldPath);
+
+    // 1. openDocuments 内のパス、タイトル、ファイル名をインプレース更新
+    setOpenDocuments((prev) => {
+      let hasChanges = false;
+      const nextDocs = prev.map((doc) => {
+        // パターンA: ファイル自身の完全一致（大文字小文字・スラッシュを吸収）
+        if (fileService.isSamePath(doc.path, oldPath)) {
+          hasChanges = true;
+          const newBaseName = fileService.basename(newPath);
+          const newExt = fileService.extname(newPath);
+          const newTitle = fileService.stem(newPath);
+          const newDir = fileService.dirname(newPath);
+          return {
+            ...doc,
+            path: newPath,
+            absolutePath: newPath,
+            baseName: newBaseName,
+            fileTitle: newTitle,
+            extension: newExt,
+            parentDir: newDir,
+          };
+        }
+
+        // パターンB: フォルダ配下のドキュメント（親フォルダがリネーム/移動された場合）
+        if (fileService.isSubPath(doc.path, oldPath)) {
+          hasChanges = true;
+          const oldPrefixLen = normOld.length;
+          const subRelative = fileService.normalizePath(doc.path).substring(oldPrefixLen).replace(/^\/+/, '');
+          const updatedPath = fileService.joinPath(newPath, subRelative);
+          const newBaseName = fileService.basename(updatedPath);
+          const newExt = fileService.extname(updatedPath);
+          const newTitle = fileService.stem(updatedPath);
+          const newDir = fileService.dirname(updatedPath);
+          return {
+            ...doc,
+            path: updatedPath,
+            absolutePath: updatedPath,
+            baseName: newBaseName,
+            fileTitle: newTitle,
+            extension: newExt,
+            parentDir: newDir,
+          };
+        }
+
+        return doc;
+      });
+
+      if (!hasChanges) {
+        return prev;
+      }
+      openDocumentsRef.current = nextDocs;
+      return nextDocs;
+    });
+
+    // 2. activePathByPane のアクティブパス追従
+    setActivePathByPane((prev) => {
+      let hasChanges = false;
+      const updated = { ...prev };
+      (Object.keys(updated) as PaneId[]).forEach((paneId) => {
+        const cur = updated[paneId];
+        if (!cur) return;
+        if (fileService.isSamePath(cur, oldPath)) {
+          updated[paneId] = newPath;
+          hasChanges = true;
+        } else if (fileService.isSubPath(cur, oldPath)) {
+          const oldPrefixLen = normOld.length;
+          const subRelative = fileService.normalizePath(cur).substring(oldPrefixLen).replace(/^\/+/, '');
+          updated[paneId] = fileService.joinPath(newPath, subRelative);
+          hasChanges = true;
+        }
+      });
+      return hasChanges ? updated : prev;
+    });
+  }, []);
+
   // ドキュメントのリネーム（ファイル名変更）
   const renameDocument = useCallback(
     async (oldPath: string, newTitle: string): Promise<boolean> => {
@@ -1071,7 +1150,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const newPath = parentDir ? `${parentDir}${separator}${newFileName}` : newFileName;
 
       // 未保存の編集内容があれば先に保存
-      const doc = openDocuments.find((d) => d.path === oldPath);
+      const doc = openDocuments.find((d) => fileService.isSamePath(d.path, oldPath));
       if (doc && doc.isDirty) {
         await saveDocument(oldPath);
       }
@@ -1079,30 +1158,8 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       try {
         await fileService.rename(oldPath, newPath);
 
-        // openDocuments 内のパス、ファイル名、タイトルをアトミックに更新
-        setOpenDocuments((prev) =>
-          prev.map((d) =>
-            d.path === oldPath
-              ? {
-                  ...d,
-                  path: newPath,
-                  baseName: newFileName,
-                  fileTitle: trimmedTitle,
-                }
-              : d
-          )
-        );
-
-        // activePathByPane の追従
-        setActivePathByPane((prev) => {
-          const updated = { ...prev };
-          (Object.keys(updated) as PaneId[]).forEach((paneId) => {
-            if (updated[paneId] === oldPath) {
-              updated[paneId] = newPath;
-            }
-          });
-          return updated;
-        });
+        // openDocuments および activePathByPane をアトミックにインプレース更新
+        updateDocumentPath(oldPath, newPath);
 
         showToast({
           type: 'info',
@@ -1119,7 +1176,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return false;
       }
     },
-    [openDocuments, saveDocument, showToast]
+    [openDocuments, saveDocument, showToast, updateDocumentPath]
   );
 
   useEffect(() => {
@@ -1185,6 +1242,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         updateMetadata,
         saveDocument,
         renameDocument,
+        updateDocumentPath,
         setCompositionState,
       }}
     >

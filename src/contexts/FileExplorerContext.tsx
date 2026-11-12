@@ -118,7 +118,7 @@ const FileExplorerContext = createContext<FileExplorerContextType | null>(null);
 
 export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { projectPath } = useProject();
-  const { openDocument, closeTab, activePath, openDocuments } = useDocument();
+  const { openDocument, closeDocument, activePath, openDocuments, updateDocumentPath } = useDocument();
   const { showStatusMessage, confirmDialog, alertDialog } = useNotification();
   const isInitialScanRef = useRef(true);
 
@@ -191,33 +191,22 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       // 2. 削除時のタブクローズ & 選択解除
       if (action === 'delete') {
         setSelectedPath((current) => {
-          if (current && fileService.isSubPath(current, path)) {
+          if (current && (fileService.isSamePath(current, path) || fileService.isSubPath(current, path))) {
             return null;
           }
           return current;
         });
 
         for (const doc of openDocuments) {
-          if (fileService.isSubPath(doc.path, path)) {
-            await closeTab(doc.path);
+          if (fileService.isSamePath(doc.path, path) || fileService.isSubPath(doc.path, path)) {
+            await closeDocument(doc.path);
           }
         }
       }
 
-      // 3. リネーム時のタブ自動追従
+      // 3. リネーム時のタブ自動追従（インプレースアトミック更新）
       if (action === 'rename' && newPath) {
-        for (const doc of openDocuments) {
-          if (doc.path === path) {
-            await closeTab(doc.path);
-            await openDocument(newPath);
-          } else if (fileService.isSubPath(doc.path, path)) {
-            const sub = doc.path.substring(path.length);
-            const isBackslash = newPath.includes('\\');
-            const updated = `${newPath}${sub.replace(/\//g, isBackslash ? '\\' : '/')}`;
-            await closeTab(doc.path);
-            await openDocument(updated);
-          }
-        }
+        updateDocumentPath(path, newPath);
       }
     }).then((fn) => {
       unlisten = fn;
@@ -233,7 +222,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
       if (unlisten) unlisten();
       window.removeEventListener('novelaide:project-refresh-needed', handleProjectRefresh);
     };
-  }, [refreshDirectory, openDocuments, closeTab, openDocument]);
+  }, [refreshDirectory, openDocuments, closeDocument, updateDocumentPath]);
 
   const toggleFolder = useCallback((path: string) => {
     setExpandedFolders((prev) => {
@@ -440,12 +429,8 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     try {
       await fileService.rename(oldPath, newPath);
 
-      // 開いていたタブがあればパスを追従（閉じてから開く）
-      const isOpen = openDocuments.some((doc) => doc.path === oldPath);
-      if (isOpen) {
-        await closeTab(oldPath);
-        await openDocument(newPath);
-      }
+      // 開いていたタブのパスをインプレース追従更新（即時同期）
+      updateDocumentPath(oldPath, newPath);
 
       cancelRename();
       await refreshDirectory();
@@ -453,7 +438,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
     } catch (err) {
       await alertDialog(`名前の変更に失敗しました: ${err}`);
     }
-  }, [renamingPath, renamingName, entries, openDocuments, closeTab, openDocument, cancelRename, refreshDirectory, alertDialog]);
+  }, [renamingPath, renamingName, entries, updateDocumentPath, cancelRename, refreshDirectory, alertDialog]);
 
   // --- コンテキストメニュー機能 ---
   const openContextMenu = useCallback((e: React.MouseEvent, entry: DirEntry) => {
@@ -548,21 +533,8 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
         } else {
           await fileService.rename(sourcePath, destPath);
 
-          // 開いているエディタタブの追従
-          for (const doc of openDocuments) {
-            const normDoc = fileService.normalizePath(doc.path);
-            if (isDir) {
-              if (fileService.isSubPath(doc.path, sourcePath)) {
-                const sub = normDoc.substring(normSource.length);
-                const updatedDocPath = fileService.joinPath(destPath, sub.replace(/^\/+/, ''));
-                await closeTab(doc.path);
-                await openDocument(updatedDocPath);
-              }
-            } else if (normDoc === normSource) {
-              await closeTab(doc.path);
-              await openDocument(destPath);
-            }
-          }
+          // 開いているエディタタブのインプレース追従更新
+          updateDocumentPath(sourcePath, destPath);
         }
 
         // 移動・コピー先を展開
@@ -577,7 +549,7 @@ export const FileExplorerProvider: React.FC<{ children: React.ReactNode }> = ({ 
         await alertDialog(`${isCopy ? 'コピー' : '移動'}に失敗しました: ${err}`);
       }
     },
-    [projectPath, entries, openDocuments, closeTab, openDocument, expandFolder, refreshDirectory, alertDialog]
+    [projectPath, entries, updateDocumentPath, expandFolder, refreshDirectory, alertDialog]
   );
 
   // --- 手動アクティブファイル追従（同期） ---
