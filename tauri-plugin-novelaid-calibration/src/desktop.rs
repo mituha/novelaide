@@ -16,16 +16,16 @@ use crate::{Error, Result};
 
 /// デフォルトで登録するラノベ・創作小説向けの組み込みキャラクター語尾
 pub const DEFAULT_NOVEL_USER_DICT_CSV: &str = "\
-わん,カスタム語尾,ワン
-にゃん,カスタム語尾,ニャン
-ぱう,カスタム語尾,パウ
-ぴょん,カスタム語尾,ピョン
-ぽよ,カスタム語尾,ポヨ
-っす,カスタム語尾,ッス
-のじゃ,カスタム語尾,ノジャ
-なのじゃ,カスタム語尾,ナノジャ
-ござる,カスタム語尾,ゴザル
-でござる,カスタム語尾,デゴザル
+わん,\"助詞,終助詞\",ワン
+にゃん,\"助詞,終助詞\",ニャン
+ぱう,\"助詞,終助詞\",パウ
+ぴょん,\"助詞,終助詞\",ピョン
+ぽよ,\"助詞,終助詞\",ポヨ
+っす,\"助詞,終助詞\",ッス
+のじゃ,\"助詞,終助詞\",ノジャ
+なのじゃ,\"助詞,終助詞\",ナノジャ
+ござる,\"助詞,終助詞\",ゴザル
+でござる,\"助詞,終助詞\",デゴザル
 ";
 
 /// ユーザー辞書 CSV から Lindera の UserDictionary をメモリ上で構築する
@@ -469,13 +469,13 @@ mod tests {
         // 「にゃん」の詳細（品詞および読み）を検証
         let nyan_token = custom_tokens.iter_mut().find(|t| t.surface == "にゃん").unwrap();
         let details = nyan_token.details();
-        assert_eq!(details[0], "カスタム語尾");
+        assert_eq!(details[0], "助詞,終助詞");
         assert_eq!(details[7], "ニャン");
 
         // 「のじゃ」の詳細（品詞および読み）を検証
         let noja_token = custom_tokens.iter_mut().find(|t| t.surface == "のじゃ").unwrap();
         let details = noja_token.details();
-        assert_eq!(details[0], "カスタム語尾");
+        assert_eq!(details[0], "助詞,終助詞");
         assert_eq!(details[7], "ノジャ");
     }
 
