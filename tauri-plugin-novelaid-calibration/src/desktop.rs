@@ -1,9 +1,10 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::io::Cursor;
 use std::sync::{Arc, RwLock};
 use tauri::{plugin::PluginApi, AppHandle, Runtime};
 use serde::de::DeserializeOwned;
-use lindera::dictionary::load_dictionary;
+use lindera::dictionary::{load_dictionary, Dictionary, DictionaryBuilder, Metadata, UserDictionary};
 use lindera::mode::Mode;
 use lindera::segmenter::Segmenter;
 use tauri_plugin_novelaid_ruby::strip_ruby_with_map;
@@ -12,6 +13,31 @@ use crate::models::*;
 use crate::rules::context::{AnalyzedToken, CalibrationContext};
 use crate::rules::RuleRegistry;
 use crate::{Error, Result};
+
+/// デフォルトで登録するラノベ・創作小説向けの組み込みキャラクター語尾
+pub const DEFAULT_NOVEL_USER_DICT_CSV: &str = "\
+わん,カスタム語尾,ワン
+にゃん,カスタム語尾,ニャン
+ぱう,カスタム語尾,パウ
+ぴょん,カスタム語尾,ピョン
+ぽよ,カスタム語尾,ポヨ
+っす,カスタム語尾,ッス
+のじゃ,カスタム語尾,ノジャ
+なのじゃ,カスタム語尾,ナノジャ
+ござる,カスタム語尾,ゴザル
+でござる,カスタム語尾,デゴザル
+";
+
+/// ユーザー辞書 CSV から Lindera の UserDictionary をメモリ上で構築する
+pub fn build_user_dictionary(
+    metadata: &Metadata,
+    csv_data: &str,
+) -> Result<UserDictionary> {
+    let builder = DictionaryBuilder::new(metadata.clone());
+    builder
+        .build_user_dict_from_reader(Cursor::new(csv_data))
+        .map_err(|e| Error::Lindera(e.to_string()))
+}
 
 pub fn init<R: Runtime, C: DeserializeOwned>(
     app: &AppHandle<R>,
@@ -22,6 +48,7 @@ pub fn init<R: Runtime, C: DeserializeOwned>(
 
 pub struct NovelaidCalibration<R: Runtime> {
     _app: AppHandle<R>,
+    dictionary: Arc<Dictionary>,
     segmenter: Arc<RwLock<Segmenter>>,
     rule_registry: Arc<RuleRegistry>,
 }
@@ -118,14 +145,32 @@ impl<R: Runtime> NovelaidCalibration<R> {
     pub fn new(app: AppHandle<R>) -> Result<Self> {
         let dictionary = load_dictionary("embedded://ipadic")
             .map_err(|e| Error::Lindera(e.to_string()))?;
-        let segmenter = Segmenter::new(Mode::Normal, dictionary, None);
+        let user_dict = build_user_dictionary(&dictionary.metadata, DEFAULT_NOVEL_USER_DICT_CSV)?;
+        let segmenter = Segmenter::new(Mode::Normal, dictionary.clone(), Some(user_dict));
         let rule_registry = RuleRegistry::new_with_defaults();
 
         Ok(Self {
             _app: app,
+            dictionary: Arc::new(dictionary),
             segmenter: Arc::new(RwLock::new(segmenter)),
             rule_registry: Arc::new(rule_registry),
         })
+    }
+
+    /// 組み込み語尾に加え、プロジェクト固有の辞書 CSV を動的に結合して Segmenter を再構築する
+    pub fn reload_user_dictionary(&self, additional_csv: Option<&str>) -> Result<()> {
+        let combined_csv = if let Some(extra) = additional_csv {
+            format!("{}\n{}", DEFAULT_NOVEL_USER_DICT_CSV.trim(), extra.trim())
+        } else {
+            DEFAULT_NOVEL_USER_DICT_CSV.to_string()
+        };
+
+        let user_dict = build_user_dictionary(&self.dictionary.metadata, &combined_csv)?;
+        let new_segmenter = Segmenter::new(Mode::Normal, (*self.dictionary).clone(), Some(user_dict));
+
+        let mut segmenter_lock = self.segmenter.write().map_err(|e| Error::Other(e.to_string()))?;
+        *segmenter_lock = new_segmenter;
+        Ok(())
     }
 
     pub fn ping(&self, payload: PingRequest) -> Result<PingResponse> {
@@ -393,6 +438,78 @@ mod tests {
         assert_eq!(details[6], "関西国際空港");
         assert_eq!(details[7], "カンサイコクサイクウコウ");
         assert_eq!(super::katakana_to_hiragana(details[7]), "かんさいこくさいくうこう");
+    }
+
+    #[test]
+    fn test_character_endings_user_dict() {
+        let dictionary = load_dictionary("embedded://ipadic").expect("Failed to load embedded ipadic");
+
+        // 1. 辞書なしでの挙動確認: 「にゃん」が「にゃ(助詞)」+「ん(助動詞)」に分断される
+        let default_segmenter = Segmenter::new(Mode::Normal, dictionary.clone(), None);
+        let sample_text = "そうだわん！　あっちにゃん。不思議ぱう。知っておるのじゃ。真実なのじゃ。了解っす！";
+        let mut default_tokens = default_segmenter.segment(Cow::Borrowed(sample_text)).unwrap();
+        assert!(default_tokens.iter_mut().any(|t| t.surface == "にゃ"));
+
+        // 2. 組み込みデフォルト語尾辞書の適用
+        let user_dict = build_user_dictionary(&dictionary.metadata, DEFAULT_NOVEL_USER_DICT_CSV)
+            .expect("Failed to build user dict");
+
+        let custom_segmenter = Segmenter::new(Mode::Normal, dictionary, Some(user_dict));
+        let mut custom_tokens = custom_segmenter.segment(Cow::Borrowed(sample_text)).unwrap();
+
+        // 3. ユーザー辞書適用後は各語尾が1トークン（カスタム語尾）として抽出される
+        let surfaces: Vec<String> = custom_tokens.iter().map(|t| t.surface.to_string()).collect();
+        assert!(surfaces.contains(&"わん".to_string()));
+        assert!(surfaces.contains(&"にゃん".to_string()));
+        assert!(surfaces.contains(&"ぱう".to_string()));
+        assert!(surfaces.contains(&"のじゃ".to_string()));
+        assert!(surfaces.contains(&"なのじゃ".to_string()));
+        assert!(surfaces.contains(&"っす".to_string()));
+
+        // 「にゃん」の詳細（品詞および読み）を検証
+        let nyan_token = custom_tokens.iter_mut().find(|t| t.surface == "にゃん").unwrap();
+        let details = nyan_token.details();
+        assert_eq!(details[0], "カスタム語尾");
+        assert_eq!(details[7], "ニャン");
+
+        // 「のじゃ」の詳細（品詞および読み）を検証
+        let noja_token = custom_tokens.iter_mut().find(|t| t.surface == "のじゃ").unwrap();
+        let details = noja_token.details();
+        assert_eq!(details[0], "カスタム語尾");
+        assert_eq!(details[7], "ノジャ");
+    }
+
+    #[test]
+    fn test_reload_user_dictionary() {
+        let dictionary = load_dictionary("embedded://ipadic").expect("Failed to load embedded ipadic");
+        let user_dict = build_user_dictionary(&dictionary.metadata, DEFAULT_NOVEL_USER_DICT_CSV)
+            .expect("Failed to build user dict");
+        let segmenter = Segmenter::new(Mode::Normal, dictionary.clone(), Some(user_dict));
+
+        struct DummyState {
+            dictionary: Arc<Dictionary>,
+            segmenter: Arc<RwLock<Segmenter>>,
+        }
+        let state = DummyState {
+            dictionary: Arc::new(dictionary),
+            segmenter: Arc::new(RwLock::new(segmenter)),
+        };
+
+        // 追加のプロジェクト固有辞書を動的リロード
+        let additional_csv = "クポ,カスタム語尾,クポ\nぴぴぴ,カスタム語尾,ピピピ\n";
+        let combined_csv = format!("{}\n{}", DEFAULT_NOVEL_USER_DICT_CSV.trim(), additional_csv.trim());
+        let new_user_dict = build_user_dictionary(&state.dictionary.metadata, &combined_csv).unwrap();
+        let new_segmenter = Segmenter::new(Mode::Normal, (*state.dictionary).clone(), Some(new_user_dict));
+        *state.segmenter.write().unwrap() = new_segmenter;
+
+        // 検証: 初期語尾「にゃん」と動的追加「クポ」「ぴぴぴ」の両方が1トークンとして認識されること
+        let text = "元気クポ！　受信ぴぴぴ。あっちにゃん。";
+        let segmenter_read = state.segmenter.read().unwrap();
+        let tokens = segmenter_read.segment(Cow::Borrowed(text)).unwrap();
+        let surfaces: Vec<String> = tokens.iter().map(|t| t.surface.to_string()).collect();
+        assert!(surfaces.contains(&"クポ".to_string()));
+        assert!(surfaces.contains(&"ぴぴぴ".to_string()));
+        assert!(surfaces.contains(&"にゃん".to_string()));
     }
 
     #[test]
