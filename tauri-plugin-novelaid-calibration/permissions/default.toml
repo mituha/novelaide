@@ -5,4 +5,5 @@ permissions = [
     "allow-check-text",
     "allow-tokenize-text",
     "allow-get-ruby-candidates",
+    "allow-update-project-dictionary",
 ]

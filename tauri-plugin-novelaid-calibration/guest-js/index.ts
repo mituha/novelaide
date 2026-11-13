@@ -1,6 +1,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import {
   CheckTextResult,
+  ProjectDictionaryEntry,
   RubyCandidate,
   TokenInfo,
 } from './models';
@@ -30,5 +31,11 @@ export async function tokenizeText(text: string): Promise<TokenInfo[]> {
 export async function getRubyCandidates(text: string): Promise<RubyCandidate[]> {
   return await invoke<RubyCandidate[]>('plugin:novelaid-calibration|get_ruby_candidates', {
     text,
+  });
+}
+
+export async function updateProjectDictionary(entries: ProjectDictionaryEntry[]): Promise<void> {
+  return await invoke<void>('plugin:novelaid-calibration|update_project_dictionary', {
+    entries,
   });
 }

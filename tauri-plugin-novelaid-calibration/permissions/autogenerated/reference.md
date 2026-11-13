@@ -8,6 +8,7 @@ Default permissions for novelaid-calibration plugin
 - `allow-check-text`
 - `allow-tokenize-text`
 - `allow-get-ruby-candidates`
+- `allow-update-project-dictionary`
 
 ## Permission Table
 
@@ -118,6 +119,32 @@ Enables the tokenize_text command without any pre-configured scope.
 <td>
 
 Denies the tokenize_text command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-calibration:allow-update-project-dictionary`
+
+</td>
+<td>
+
+Enables the update_project_dictionary command without any pre-configured scope.
+
+</td>
+</tr>
+
+<tr>
+<td>
+
+`novelaid-calibration:deny-update-project-dictionary`
+
+</td>
+<td>
+
+Denies the update_project_dictionary command without any pre-configured scope.
 
 </td>
 </tr>

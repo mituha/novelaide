@@ -8,6 +8,8 @@ export type CheckTextResult = { issues: Array<CalibrationIssue>, frequencies: Ar
 
 export type FrequencyItem = { word: string, count: number, pos: string, };
 
+export type ProjectDictionaryEntry = { surface: string, pos: string | null, reading: string | null, };
+
 export type RubyCandidate = { surface: string, ruby: string, range: CalibrationRange, };
 
 export type TokenInfo = { surface: string, pos: string, reading: string | null, baseForm: string | null, range: CalibrationRange | null, };

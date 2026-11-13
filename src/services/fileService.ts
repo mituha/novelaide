@@ -1,5 +1,6 @@
 import * as novelaidFs from "tauri-plugin-novelaid-fs-api";
 import * as novelaidMetadata from "tauri-plugin-novelaid-metadata-api";
+import * as novelaidCalibration from "tauri-plugin-novelaid-calibration-api";
 import { DirEntry, FileDocument } from "../types/document";
 
 // パス操作ユーティリティの公開
@@ -413,7 +414,10 @@ export const fileService = {
   // プロジェクトメタデータの一括スキャン
   async scanProjectMetadata(projectPath: string) {
     try {
-      return await novelaidMetadata.scanProject(projectPath);
+      const res = await novelaidMetadata.scanProject(projectPath);
+      // メタデータスキャン後に形態素解析エンジン（Lindera）辞書へ自動同期
+      await this.syncProjectMetadataToMorphology();
+      return res;
     } catch (err) {
       console.warn("scanProjectMetadata failed:", err);
       return null;
@@ -447,6 +451,85 @@ export const fileService = {
     } catch (err) {
       console.warn("getCalibrationContext failed:", err);
       return { entities: [], rubyDictionary: [] };
+    }
+  },
+
+  /**
+   * プロジェクトメタデータ（人名・地名・用語・ルビ辞書）を形態素解析エンジン（Lindera）の辞書に動的同期する
+   */
+  async syncProjectMetadataToMorphology(): Promise<void> {
+    try {
+      const ctx = await this.getCalibrationContext();
+      const entriesMap = new Map<string, novelaidCalibration.ProjectDictionaryEntry>();
+
+      const toKatakana = (s?: string | null): string | null => {
+        if (!s) return null;
+        const cleaned = s.replace(/[\s　]+/g, "").trim();
+        if (!cleaned) return null;
+        return cleaned.replace(/[\u3041-\u3096]/g, (ch) =>
+          String.fromCharCode(ch.charCodeAt(0) + 0x60)
+        );
+      };
+
+      // 1. エンティティ（人名・地名・用語など）
+      if (ctx.entities && Array.isArray(ctx.entities)) {
+        for (const entity of ctx.entities) {
+          let pos = "名詞,固有名詞,一般,*";
+          if (entity.category === "character") {
+            pos = "名詞,固有名詞,人名,一般";
+          } else if (entity.category === "location") {
+            pos = "名詞,固有名詞,地域,一般";
+          }
+
+          const reading = toKatakana(entity.reading);
+
+          // 代表名
+          const name = entity.name?.trim();
+          if (name && !entriesMap.has(name)) {
+            entriesMap.set(name, {
+              surface: name,
+              pos,
+              reading,
+            });
+          }
+
+          // 別名・愛称（aliases）
+          if (Array.isArray(entity.aliases)) {
+            for (const alias of entity.aliases) {
+              const trimmedAlias = alias?.trim();
+              if (trimmedAlias && !entriesMap.has(trimmedAlias)) {
+                entriesMap.set(trimmedAlias, {
+                  surface: trimmedAlias,
+                  pos,
+                  reading: null,
+                });
+              }
+            }
+          }
+        }
+      }
+
+      // 2. ルビ辞書
+      if (ctx.rubyDictionary && Array.isArray(ctx.rubyDictionary)) {
+        for (const rubyEntry of ctx.rubyDictionary) {
+          const surface = rubyEntry.surface?.trim();
+          if (!surface || entriesMap.has(surface)) continue;
+
+          const reading = toKatakana(rubyEntry.canonicalRuby);
+
+          entriesMap.set(surface, {
+            surface,
+            pos: "名詞,固有名詞,一般,*",
+            reading,
+          });
+        }
+      }
+
+      const entries = Array.from(entriesMap.values());
+      await novelaidCalibration.updateProjectDictionary(entries);
+      console.log(`[calibration] Synced ${entries.length} project dictionary entries to morphology engine.`);
+    } catch (err) {
+      console.warn("syncProjectMetadataToMorphology failed:", err);
     }
   },
 };

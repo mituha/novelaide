@@ -343,10 +343,22 @@
           "markdownDescription": "Denies the tokenize_text command without any pre-configured scope."
         },
         {
-          "description": "Default permissions for novelaid-calibration plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-check-text`\n- `allow-tokenize-text`\n- `allow-get-ruby-candidates`",
+          "description": "Enables the update_project_dictionary command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-update-project-dictionary",
+          "markdownDescription": "Enables the update_project_dictionary command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the update_project_dictionary command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-update-project-dictionary",
+          "markdownDescription": "Denies the update_project_dictionary command without any pre-configured scope."
+        },
+        {
+          "description": "Default permissions for novelaid-calibration plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-check-text`\n- `allow-tokenize-text`\n- `allow-get-ruby-candidates`\n- `allow-update-project-dictionary`",
           "type": "string",
           "const": "default",
-          "markdownDescription": "Default permissions for novelaid-calibration plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-check-text`\n- `allow-tokenize-text`\n- `allow-get-ruby-candidates`"
+          "markdownDescription": "Default permissions for novelaid-calibration plugin\n#### This default permission set includes:\n\n- `allow-ping`\n- `allow-check-text`\n- `allow-tokenize-text`\n- `allow-get-ruby-candidates`\n- `allow-update-project-dictionary`"
         }
       ]
     }

@@ -3,6 +3,7 @@ const COMMANDS: &[&str] = &[
     "check_text",
     "tokenize_text",
     "get_ruby_candidates",
+    "update_project_dictionary",
 ];
 
 fn main() {

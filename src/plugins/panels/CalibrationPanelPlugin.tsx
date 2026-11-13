@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useDocument } from '../../contexts/DocumentContext';
 import { useNotification } from '../../contexts/NotificationContext';
+import { fileService } from '../../services/fileService';
 import {
   checkText,
   getRubyCandidates,
@@ -39,12 +40,13 @@ export const CalibrationPanel: React.FC = () => {
   const [showAllFreq, setShowAllFreq] = useState<boolean>(false);
   const [includeSingleCharFreq, setIncludeSingleCharFreq] = useState<boolean>(false);
   const activePathRef = useRef<string | null>(activeDocument?.path ?? null);
+  const isDictSyncedRef = useRef<boolean>(false);
 
   useEffect(() => {
     activePathRef.current = activeDocument?.path ?? null;
   }, [activeDocument?.path]);
 
-  const runCalibration = useCallback(async () => {
+  const runCalibration = useCallback(async (forceSyncDict: boolean = false) => {
     // novel 形式以外のドキュメント、または本文が空の場合は校正を実行しない
     if (!activeDocument?.content || activeDocument.documentType !== 'novel') {
       setResult(null);
@@ -61,6 +63,10 @@ export const CalibrationPanel: React.FC = () => {
 
     setLoading(true);
     try {
+      if (forceSyncDict || !isDictSyncedRef.current) {
+        await fileService.syncProjectMetadataToMorphology();
+        isDictSyncedRef.current = true;
+      }
       const [res, rubyRes] = await Promise.all([
         checkText(activeDocument.content),
         getRubyCandidates(activeDocument.content),
@@ -84,6 +90,10 @@ export const CalibrationPanel: React.FC = () => {
       setLoading(false);
     }
   }, [activeDocument?.path, activeDocument?.content, showToast]);
+
+  const handleManualRefresh = useCallback(async () => {
+    await runCalibration(true);
+  }, [runCalibration]);
 
   useEffect(() => {
     runCalibration();
@@ -220,7 +230,7 @@ export const CalibrationPanel: React.FC = () => {
           <span>校正・解析</span>
         </div>
         <button
-          onClick={runCalibration}
+          onClick={handleManualRefresh}
           disabled={loading || !activeDocument || !isNovel}
           title={!isNovel ? '小説（novel）編集時のみ実行可能' : '再検証を実行'}
           style={{

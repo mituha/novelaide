@@ -39,15 +39,58 @@ pub fn build_user_dictionary(
         .map_err(|e| Error::Lindera(e.to_string()))
 }
 
-pub fn init<R: Runtime, C: DeserializeOwned>(
-    app: &AppHandle<R>,
-    _api: PluginApi<R, C>,
-) -> Result<NovelaidCalibration<R>> {
-    NovelaidCalibration::new(app.clone())
+/// ProjectDictionaryEntry リストを Lindera の 3列 CSV 形式に変換する
+pub fn format_user_dict_csv(entries: &[ProjectDictionaryEntry]) -> String {
+    let mut lines = Vec::new();
+    for entry in entries {
+        let surface = entry.surface.trim();
+        if surface.is_empty() {
+            continue;
+        }
+        let pos = entry.pos.as_deref().unwrap_or("名詞,固有名詞,一般,*").trim();
+        let reading = entry.reading.as_deref().unwrap_or("*").trim();
+        let escaped_pos = if pos.contains(',') || pos.contains('"') {
+            format!("\"{}\"", pos.replace('"', "\"\""))
+        } else {
+            pos.to_string()
+        };
+        lines.push(format!("{},{},{}", surface, escaped_pos, reading));
+    }
+    lines.join("\n")
 }
 
-pub struct NovelaidCalibration<R: Runtime> {
-    _app: AppHandle<R>,
+/// details から (pos_main, pos_sub1, pos_full, reading) を正規化して抽出する
+pub fn extract_token_details(details: &[&str]) -> (String, String, String, Option<String>) {
+    let raw_pos = details.get(0).copied().unwrap_or("*");
+    let (pos_main, pos_sub1, pos_full) = if raw_pos.contains(',') {
+        let parts: Vec<&str> = raw_pos.split(',').filter(|s| *s != "*").collect();
+        let main = parts.first().copied().unwrap_or("*").to_string();
+        let sub1 = parts.get(1).copied().unwrap_or("*").to_string();
+        (main, sub1, raw_pos.to_string())
+    } else {
+        let parts: Vec<&str> = details.iter().take(4).copied().filter(|s| *s != "*").collect();
+        let main = parts.first().copied().unwrap_or("*").to_string();
+        let sub1 = parts.get(1).copied().unwrap_or("*").to_string();
+        let full = if parts.is_empty() { "*".to_string() } else { parts.join(",") };
+        (main, sub1, full)
+    };
+
+    // ipadic 標準では details[7] が読み、ユーザー辞書形式(surface,pos,reading)では details[2] が読み
+    let reading = details.get(7)
+        .or_else(|| details.get(2))
+        .and_then(|&s| if s == "*" { None } else { Some(s.to_string()) });
+
+    (pos_main, pos_sub1, pos_full, reading)
+}
+
+pub fn init<R: Runtime, C: DeserializeOwned>(
+    _app: &AppHandle<R>,
+    _api: PluginApi<R, C>,
+) -> Result<NovelaidCalibration> {
+    NovelaidCalibration::new()
+}
+
+pub struct NovelaidCalibration {
     dictionary: Arc<Dictionary>,
     segmenter: Arc<RwLock<Segmenter>>,
     rule_registry: Arc<RuleRegistry>,
@@ -141,8 +184,8 @@ pub fn build_byte_to_char_index(clean_text: &str, total_chars: usize) -> Vec<usi
     byte_to_char
 }
 
-impl<R: Runtime> NovelaidCalibration<R> {
-    pub fn new(app: AppHandle<R>) -> Result<Self> {
+impl NovelaidCalibration {
+    pub fn new() -> Result<Self> {
         let dictionary = load_dictionary("embedded://ipadic")
             .map_err(|e| Error::Lindera(e.to_string()))?;
         let user_dict = build_user_dictionary(&dictionary.metadata, DEFAULT_NOVEL_USER_DICT_CSV)?;
@@ -150,7 +193,6 @@ impl<R: Runtime> NovelaidCalibration<R> {
         let rule_registry = RuleRegistry::new_with_defaults();
 
         Ok(Self {
-            _app: app,
             dictionary: Arc::new(dictionary),
             segmenter: Arc::new(RwLock::new(segmenter)),
             rule_registry: Arc::new(rule_registry),
@@ -171,6 +213,12 @@ impl<R: Runtime> NovelaidCalibration<R> {
         let mut segmenter_lock = self.segmenter.write().map_err(|e| Error::Other(e.to_string()))?;
         *segmenter_lock = new_segmenter;
         Ok(())
+    }
+
+    /// プロジェクトの固有名詞・用語・ルビ辞書エントリを動的に反映し Segmenter を再構築する
+    pub fn update_project_dictionary(&self, entries: &[ProjectDictionaryEntry]) -> Result<()> {
+        let custom_csv = format_user_dict_csv(entries);
+        self.reload_user_dictionary(Some(&custom_csv))
     }
 
     pub fn ping(&self, payload: PingRequest) -> Result<PingResponse> {
@@ -194,24 +242,9 @@ impl<R: Runtime> NovelaidCalibration<R> {
             let byte_start = t.byte_start;
             let byte_end = t.byte_end;
             let details = t.details();
-
-            let pos_parts: Vec<&str> = details.iter()
-                .take(4)
-                .copied()
-                .filter(|s| *s != "*")
-                .collect();
-
-            let pos = if pos_parts.is_empty() {
-                "不明".to_string()
-            } else {
-                pos_parts.join(",")
-            };
+            let (_pos_main, _pos_sub1, pos, reading) = extract_token_details(&details);
 
             let base_form = details.get(6).and_then(|s| {
-                if *s == "*" { None } else { Some(s.to_string()) }
-            });
-
-            let reading = details.get(7).and_then(|s| {
                 if *s == "*" { None } else { Some(s.to_string()) }
             });
 
@@ -330,9 +363,7 @@ impl<R: Runtime> NovelaidCalibration<R> {
             let byte_start = t.byte_start;
             let byte_end = t.byte_end;
             let details = t.details();
-            let pos_main = details.get(0).copied().unwrap_or("*").to_string();
-            let pos_sub1 = details.get(1).copied().unwrap_or("*").to_string();
-            let reading = details.get(7).and_then(|&s| if s == "*" { None } else { Some(s.to_string()) });
+            let (pos_main, pos_sub1, _pos_full, reading) = extract_token_details(&details);
 
             // 元テキスト上の正確な行・列を復元
             let (start_line, start_column, end_line, end_column) =
@@ -650,5 +681,52 @@ mod tests {
         assert_eq!(s_col2, 11); // 元テキストの 》 の次 = 11列目！
         assert_eq!(e_line2, 1);
         assert_eq!(e_col2, 13);
+    }
+
+    #[test]
+    fn test_project_dictionary_update_and_frequency() {
+        let cal = NovelaidCalibration::new().expect("Failed to create test calibration instance");
+
+        // 1. プロジェクト辞書登録前のトークナイズ確認（「東雲美羽」は分断される）
+        let text = "東雲美羽はアルテリア帝国に向かったにゃん。東雲美羽は言った。";
+        let tokens_before = cal.tokenize_text(text).unwrap();
+        let surfaces_before: Vec<String> = tokens_before.iter().map(|t| t.surface.clone()).collect();
+        assert!(!surfaces_before.contains(&"東雲美羽".to_string()));
+
+        // 2. プロジェクト辞書（人名・地名）を動的更新
+        let entries = vec![
+            ProjectDictionaryEntry {
+                surface: "東雲美羽".to_string(),
+                pos: Some("名詞,固有名詞,人名,一般".to_string()),
+                reading: Some("シノノメミウ".to_string()),
+            },
+            ProjectDictionaryEntry {
+                surface: "アルテリア帝国".to_string(),
+                pos: Some("名詞,固有名詞,地域,一般".to_string()),
+                reading: Some("アルテリアテイコク".to_string()),
+            },
+        ];
+        cal.update_project_dictionary(&entries).unwrap();
+
+        // 3. 更新後のトークナイズ確認（固有名詞として1語になり、組み込み語尾「にゃん」も共存）
+        let tokens_after = cal.tokenize_text(text).unwrap();
+        let surfaces_after: Vec<String> = tokens_after.iter().map(|t| t.surface.clone()).collect();
+        assert!(surfaces_after.contains(&"東雲美羽".to_string()));
+        assert!(surfaces_after.contains(&"アルテリア帝国".to_string()));
+        assert!(surfaces_after.contains(&"にゃん".to_string()));
+
+        let shinonome_token = tokens_after.iter().find(|t| t.surface == "東雲美羽").unwrap();
+        assert_eq!(shinonome_token.pos, "名詞,固有名詞,人名,一般");
+        assert_eq!(shinonome_token.reading.as_deref(), Some("シノノメミウ"));
+
+        // 4. 校正チェック（check_text）で頻出語ランキングに「東雲美羽」が集計されることを確認
+        let result = cal.check_text(text).unwrap();
+        let shinonome_freq = result.frequencies.iter().find(|f| f.word == "東雲美羽");
+        assert!(shinonome_freq.is_some());
+        assert_eq!(shinonome_freq.unwrap().count, 2);
+
+        let empire_freq = result.frequencies.iter().find(|f| f.word == "アルテリア帝国");
+        assert!(empire_freq.is_some());
+        assert_eq!(empire_freq.unwrap().count, 1);
     }
 }

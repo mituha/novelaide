@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-update-project-dictionary"
+description = "Enables the update_project_dictionary command without any pre-configured scope."
+commands.allow = ["update_project_dictionary"]
+
+[[permission]]
+identifier = "deny-update-project-dictionary"
+description = "Denies the update_project_dictionary command without any pre-configured scope."
+commands.deny = ["update_project_dictionary"]

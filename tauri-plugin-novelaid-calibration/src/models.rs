@@ -64,6 +64,15 @@ pub struct CheckTextResult {
     pub hiragana_ratio: f32,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export, export_to = "../guest-js/models.ts")]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectDictionaryEntry {
+    pub surface: String,
+    pub pos: Option<String>,
+    pub reading: Option<String>,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PingRequest {

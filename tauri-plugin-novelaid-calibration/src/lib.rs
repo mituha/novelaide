@@ -19,12 +19,12 @@ pub use error::{Error, Result};
 use desktop::NovelaidCalibration;
 
 pub trait NovelaidCalibrationExt<R: Runtime> {
-    fn novelaid_calibration(&self) -> &NovelaidCalibration<R>;
+    fn novelaid_calibration(&self) -> &NovelaidCalibration;
 }
 
 impl<R: Runtime, T: Manager<R>> NovelaidCalibrationExt<R> for T {
-    fn novelaid_calibration(&self) -> &NovelaidCalibration<R> {
-        self.state::<NovelaidCalibration<R>>().inner()
+    fn novelaid_calibration(&self) -> &NovelaidCalibration {
+        self.state::<NovelaidCalibration>().inner()
     }
 }
 
@@ -35,6 +35,7 @@ pub fn init<R: Runtime>() -> TauriPlugin<R> {
             commands::check_text,
             commands::tokenize_text,
             commands::get_ruby_candidates,
+            commands::update_project_dictionary,
         ])
         .setup(|app, api| {
             #[cfg(desktop)]
