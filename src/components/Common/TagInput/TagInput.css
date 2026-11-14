@@ -1,0 +1,99 @@
+.tag-input-container {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: 34px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color, #333333);
+  background-color: var(--bg-secondary, #252526);
+  box-sizing: border-box;
+  cursor: text;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tag-input-container:focus-within {
+  border-color: var(--accent-color, #007acc);
+  box-shadow: 0 0 0 1px var(--accent-color, #007acc);
+}
+
+.tag-input-container.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 個別タグバッジ (Chip / ピル) */
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  line-height: 1.4;
+  background-color: var(--hover-color, #383838);
+  border: 1px solid var(--border-color, #444444);
+  color: var(--text-primary, #e0e0e0);
+  user-select: none;
+  animation: tag-chip-appear 0.12s ease-out;
+}
+
+@keyframes tag-chip-appear {
+  from {
+    opacity: 0;
+    transform: scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.tag-chip-text {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 削除 × ボタン */
+.tag-chip-remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--text-secondary, #858585);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.tag-chip-remove:hover {
+  color: #ff6b6b;
+  background-color: rgba(255, 107, 107, 0.2);
+}
+
+/* 内部入力インプット */
+.tag-input-field {
+  flex: 1;
+  min-width: 60px;
+  border: none;
+  outline: none;
+  background: transparent;
+  color: var(--text-primary, #cccccc);
+  font-size: 12px;
+  font-family: inherit;
+  padding: 2px 4px;
+  box-sizing: border-box;
+}
+
+.tag-input-field::placeholder {
+  color: var(--text-secondary, #666666);
+}

@@ -14,6 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { useDocument } from '../../contexts/DocumentContext';
+import { TagInput } from '../Common/TagInput';
 import './MetadataPanel.css';
 
 interface TagGroup {
@@ -122,15 +123,6 @@ export const MetadataPanel: React.FC = () => {
     [currentTags, handleChange]
   );
 
-  // タグ文字列の直接編集
-  const handleTagsInput = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const raw = e.target.value;
-    const splitted = raw
-      .split(',')
-      .map((s) => s.trim())
-      .filter(Boolean);
-    handleChange('tags', splitted);
-  };
 
   // カスタムフィールドの追加
   const handleAddCustomField = () => {
@@ -260,15 +252,13 @@ export const MetadataPanel: React.FC = () => {
         <div className="metadata-field">
           <label className="metadata-label" htmlFor="meta-tags">
             <Tag size={13} />
-            <span>タグ (カンマ区切り)</span>
+            <span>タグ</span>
           </label>
-          <input
+          <TagInput
             id="meta-tags"
-            type="text"
-            className="metadata-input"
-            value={currentTags.join(', ')}
-            onChange={handleTagsInput}
-            placeholder="例: character, 主人公, 魔法"
+            tags={currentTags}
+            onChange={(nextTags) => handleChange('tags', nextTags)}
+            placeholder="タグを入力して Enter, Tab またはカンマ"
           />
         </div>
       </section>
