@@ -1233,9 +1233,6 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   useEffect(() => {
     externalControlService.initMcpListener();
-    return () => {
-      externalControlService.destroy();
-    };
   }, []);
 
   // 外部からの MCP 通信発生時のリアルタイムトースト通知

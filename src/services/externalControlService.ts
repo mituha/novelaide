@@ -47,8 +47,7 @@ export interface McpLogItem {
 class ExternalControlService {
   private context: ExternalControlContext | null = null;
   private unlistenMcp: (() => void) | null = null;
-  private isListening = false;
-  private initPromise: Promise<void> | null = null;
+  private hasInitialized = false;
   private handledCallIds = new Set<string>();
   private logs: McpLogItem[] = [];
   private logListeners = new Set<(logs: McpLogItem[]) => void>();
@@ -117,71 +116,63 @@ class ExternalControlService {
    * MCP サーバー（Rust）からのツール呼び出しリクエストを購読開始
    */
   public async initMcpListener(): Promise<void> {
-    if (this.isListening && this.unlistenMcp) return;
-    if (this.initPromise) return this.initPromise;
+    if (this.hasInitialized) return;
+    this.hasInitialized = true;
 
-    this.initPromise = (async () => {
-      try {
-        if (this.unlistenMcp) {
-          this.unlistenMcp();
-          this.unlistenMcp = null;
+    try {
+      if (this.unlistenMcp) {
+        this.unlistenMcp();
+        this.unlistenMcp = null;
+      }
+
+      const unlisten = await listenToolCalls(async (event: ToolCallRequestEvent) => {
+        const { callId, toolName, arguments: args } = event;
+
+        // 同一 callId の二重処理ガード
+        if (this.handledCallIds.has(callId)) {
+          return { result: { status: 'skipped', message: 'Duplicate call skipped' } };
+        }
+        this.handledCallIds.add(callId);
+        // メモリ肥大化防止（直近200件保持）
+        if (this.handledCallIds.size > 200) {
+          const first = this.handledCallIds.values().next().value;
+          if (first) this.handledCallIds.delete(first);
         }
 
-        const unlisten = await listenToolCalls(async (event: ToolCallRequestEvent) => {
-          const { callId, toolName, arguments: args } = event;
+        console.group(`%c[ExternalControl:MCP] 外部ツール呼び出し受信 🌐: ${toolName}`, 'color: #8b5cf6; font-weight: bold;');
+        console.log('▶ Tool:', toolName);
+        console.log('▶ CallId:', callId);
+        console.log('▶ Arguments:', args);
+        console.groupEnd();
 
-          // 同一 callId の二重処理ガード
-          if (this.handledCallIds.has(callId)) {
-            console.warn(`[ExternalControl:MCP] 重複 callId [${callId}] のツール呼び出しをスキップしました。`);
-            return { result: { status: 'skipped', message: 'Duplicate call skipped' } };
-          }
-          this.handledCallIds.add(callId);
-          // メモリ肥大化防止（直近200件保持）
-          if (this.handledCallIds.size > 200) {
-            const first = this.handledCallIds.values().next().value;
-            if (first) this.handledCallIds.delete(first);
-          }
+        const startTime = performance.now();
+        const nowStr = new Date().toLocaleTimeString('ja-JP', { hour12: false });
 
-          console.group(`%c[ExternalControl:MCP] 外部ツール呼び出し受信 🌐: ${toolName}`, 'color: #8b5cf6; font-weight: bold;');
-          console.log('▶ Tool:', toolName);
-          console.log('▶ CallId:', callId);
-          console.log('▶ Arguments:', args);
-          console.groupEnd();
+        const res = await this.executeTool(toolName, args, { source: 'external-mcp' });
+        const durationMs = Math.round(performance.now() - startTime);
 
-          const startTime = performance.now();
-          const nowStr = new Date().toLocaleTimeString('ja-JP', { hour12: false });
-
-          const res = await this.executeTool(toolName, args, { source: 'external-mcp' });
-          const durationMs = Math.round(performance.now() - startTime);
-
-          this.addLog({
-            id: callId,
-            timestamp: nowStr,
-            toolName,
-            arguments: args,
-            result: res.result,
-            isError: res.isError,
-            durationMs,
-          });
-
-          return {
-            result: res.result,
-            isError: res.isError,
-          };
+        this.addLog({
+          id: callId,
+          timestamp: nowStr,
+          toolName,
+          arguments: args,
+          result: res.result,
+          isError: res.isError,
+          durationMs,
         });
 
-        this.unlistenMcp = unlisten;
-        this.isListening = true;
-        console.log('[ExternalControlService] MCP ツール呼び出しリスナーを登録しました。');
-      } catch (e) {
-        console.error('[ExternalControlService] MCP リスナーの初期化に失敗しました:', e);
-        this.isListening = false;
-      } finally {
-        this.initPromise = null;
-      }
-    })();
+        return {
+          result: res.result,
+          isError: res.isError,
+        };
+      });
 
-    return this.initPromise;
+      this.unlistenMcp = unlisten;
+      console.log('[ExternalControlService] MCP ツール呼び出しリスナーを登録しました。');
+    } catch (e) {
+      console.error('[ExternalControlService] MCP リスナーの初期化に失敗しました:', e);
+      this.hasInitialized = false;
+    }
   }
 
   /**
@@ -192,8 +183,7 @@ class ExternalControlService {
       this.unlistenMcp();
       this.unlistenMcp = null;
     }
-    this.isListening = false;
-    this.initPromise = null;
+    this.hasInitialized = false;
   }
 
   /**
@@ -889,11 +879,23 @@ class ExternalControlService {
       }
     }
 
+    const summaryLines = allResults.slice(0, 15).map((r, i) => {
+      if (r.type === 'entity') {
+        return `${i + 1}. [設定] ${r.name} (${r.category}): ${r.preview || ''}`;
+      }
+      return `${i + 1}. [ファイル] ${r.title} (${r.relativePath || r.path}): ${r.snippet || ''}`;
+    });
+
+    const summaryText = allResults.length > 0
+      ? `【キーワード「${query}」の検索結果: ${allResults.length}件】\n` + summaryLines.join('\n')
+      : `キーワード「${query}」に一致する設定資料・エンティティ・原稿は見つかりませんでした。`;
+
     return {
       result: {
         status: 'success',
         query,
         matchCount: allResults.length,
+        summaryText,
         results: allResults.slice(0, 20),
       },
     };
