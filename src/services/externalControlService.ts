@@ -34,18 +34,83 @@ export interface ToolExecutionResult {
   isError?: boolean;
 }
 
+export interface McpLogItem {
+  id: string;
+  timestamp: string;
+  toolName: string;
+  arguments: Record<string, any>;
+  result?: any;
+  isError?: boolean;
+  durationMs: number;
+}
+
 class ExternalControlService {
   private context: ExternalControlContext | null = null;
   private unlistenMcp: (() => void) | null = null;
   private isListening = false;
   private initPromise: Promise<void> | null = null;
   private handledCallIds = new Set<string>();
+  private logs: McpLogItem[] = [];
+  private logListeners = new Set<(logs: McpLogItem[]) => void>();
+  private hasScannedProject = false;
+
+  /**
+   * 通信ログの取得
+   */
+  public getLogs(): McpLogItem[] {
+    return [...this.logs];
+  }
+
+  /**
+   * 通信ログのクリア
+   */
+  public clearLogs(): void {
+    this.logs = [];
+    this.notifyLogListeners();
+  }
+
+  /**
+   * 通信ログ購読
+   */
+  public subscribeLogs(listener: (logs: McpLogItem[]) => void): () => void {
+    this.logListeners.add(listener);
+    listener([...this.logs]);
+    return () => {
+      this.logListeners.delete(listener);
+    };
+  }
+
+  private notifyLogListeners(): void {
+    const copy = [...this.logs];
+    this.logListeners.forEach((l) => {
+      try {
+        l(copy);
+      } catch (e) {
+        console.warn('[ExternalControlService] Error in log listener:', e);
+      }
+    });
+  }
+
+  private addLog(item: McpLogItem): void {
+    this.logs.unshift(item);
+    if (this.logs.length > 50) {
+      this.logs.pop();
+    }
+    this.notifyLogListeners();
+  }
 
   /**
    * React (DocumentContext 等) からの実行コンテキストをバインド
    */
   public bindContext(ctx: ExternalControlContext) {
     this.context = ctx;
+    // プロジェクトパスが変わった場合はスキャンフラグをリセット
+    if (ctx.projectPath && !this.hasScannedProject) {
+      this.hasScannedProject = true;
+      fileService.scanProjectMetadata(ctx.projectPath).catch((e) => {
+        console.warn('[ExternalControlService] Initial metadata scan failed:', e);
+      });
+    }
   }
 
   /**
@@ -83,7 +148,22 @@ class ExternalControlService {
           console.log('▶ Arguments:', args);
           console.groupEnd();
 
+          const startTime = performance.now();
+          const nowStr = new Date().toLocaleTimeString('ja-JP', { hour12: false });
+
           const res = await this.executeTool(toolName, args, { source: 'external-mcp' });
+          const durationMs = Math.round(performance.now() - startTime);
+
+          this.addLog({
+            id: callId,
+            timestamp: nowStr,
+            toolName,
+            arguments: args,
+            result: res.result,
+            isError: res.isError,
+            durationMs,
+          });
+
           return {
             result: res.result,
             isError: res.isError,
@@ -704,45 +784,119 @@ class ExternalControlService {
     const query = String(args.query || args.keyword || args.text || '').trim().toLowerCase();
     const category = args.category ? String(args.category).toLowerCase() : undefined;
 
+    const allResults: any[] = [];
+
+    // 1. プロジェクトエンティティ（Frontmatter 等から抽出された人物・用語・世界設定）
     try {
+      if (this.context?.projectPath && !this.hasScannedProject) {
+        this.hasScannedProject = true;
+        await fileService.scanProjectMetadata(this.context.projectPath);
+      }
       const entities: ProjectEntity[] = await getEntities();
-      const matched = entities.filter((e: ProjectEntity) => {
+      const matchedEntities = entities.filter((e: ProjectEntity) => {
         const nameMatch = !query || e.name.toLowerCase().includes(query) || (e.aliases && e.aliases.some((a: string) => a.toLowerCase().includes(query)));
         const catMatch = category ? e.category.toLowerCase() === category : true;
         return nameMatch && catMatch;
       });
 
-      return {
-        result: {
-          status: 'success',
-          query,
-          matchCount: matched.length,
-          results: matched.slice(0, 30),
-        },
-      };
-    } catch {
-      // フォールバック: 開いている設定ファイルの全文から検索
-      const openDocuments = this.context?.openDocuments || [];
-      const matched = openDocuments.filter(
-        (d) =>
-          d.path.includes('setting') ||
-          d.path.includes('plot') ||
-          (!query || d.fileTitle.toLowerCase().includes(query) || d.content.toLowerCase().includes(query))
-      );
-      const results = matched.slice(0, 10).map((d) => ({
-        title: d.fileTitle,
-        path: d.path,
-        preview: d.content.slice(0, 200).replace(/\n/g, ' ') + '...',
-      }));
-      return {
-        result: {
-          status: 'success',
-          query,
-          matchCount: results.length,
-          results,
-        },
-      };
+      for (const ent of matchedEntities) {
+        allResults.push({
+          type: 'entity',
+          category: ent.category,
+          name: ent.name,
+          aliases: ent.aliases,
+          sourcePath: ent.sourcePath,
+          preview: ent.summary || ent.role || `${ent.category}: ${ent.name}`,
+        });
+      }
+    } catch (e) {
+      console.warn('[ExternalControlService] getEntities failed:', e);
     }
+
+    // 2. プロジェクト内の設定・プロット・原稿ファイルのテキスト全文検索
+    try {
+      const openDocs = this.context?.openDocuments || [];
+      const projectFiles = this.context?.projectFiles || [];
+
+      // 設定・プロット資料系ファイルを優先して探索
+      const isPriorityFile = (p: string) => /settings|plot|wiki|character|world|00_|10_/i.test(p);
+      const sortedFiles = [...projectFiles].sort((a, b) => {
+        const aPri = isPriorityFile(a.path || a.relativePath) ? 1 : 0;
+        const bPri = isPriorityFile(b.path || b.relativePath) ? 1 : 0;
+        return bPri - aPri;
+      });
+
+      // 最大15ファイルを精査
+      const targetFiles = sortedFiles.slice(0, 30);
+
+      for (const fileItem of targetFiles) {
+        if (allResults.length >= 25) break;
+
+        let content = '';
+        const openDoc = openDocs.find((d) => d.path === fileItem.path);
+        if (openDoc) {
+          content = openDoc.content;
+        } else {
+          try {
+            const f = await fileService.readFile(fileItem.path);
+            content = f.content;
+          } catch {
+            continue;
+          }
+        }
+
+        const lowerContent = content.toLowerCase();
+        const lowerName = fileItem.name.toLowerCase();
+
+        if (lowerName.includes(query) || lowerContent.includes(query)) {
+          // マッチ箇所のスニペット抽出
+          let snippet = '';
+          const matchIdx = lowerContent.indexOf(query);
+          if (matchIdx !== -1) {
+            const start = Math.max(0, matchIdx - 60);
+            const end = Math.min(content.length, matchIdx + query.length + 80);
+            snippet = (start > 0 ? '...' : '') + content.slice(start, end).replace(/\n/g, ' ') + (end < content.length ? '...' : '');
+          } else {
+            snippet = content.slice(0, 150).replace(/\n/g, ' ') + '...';
+          }
+
+          allResults.push({
+            type: 'file_match',
+            path: fileItem.path,
+            relativePath: fileItem.relativePath,
+            title: fileItem.stem || fileItem.name,
+            snippet,
+          });
+        }
+      }
+    } catch (e) {
+      console.warn('[ExternalControlService] Fulltext search fallback failed:', e);
+    }
+
+    // 3. 開いているドキュメントのフォールバック探索
+    if (allResults.length === 0) {
+      const openDocuments = this.context?.openDocuments || [];
+      for (const doc of openDocuments) {
+        const lower = doc.content.toLowerCase();
+        if (doc.fileTitle.toLowerCase().includes(query) || lower.includes(query)) {
+          allResults.push({
+            type: 'open_document',
+            path: doc.path,
+            title: doc.fileTitle,
+            snippet: doc.content.slice(0, 150).replace(/\n/g, ' ') + '...',
+          });
+        }
+      }
+    }
+
+    return {
+      result: {
+        status: 'success',
+        query,
+        matchCount: allResults.length,
+        results: allResults.slice(0, 20),
+      },
+    };
   }
 }
 

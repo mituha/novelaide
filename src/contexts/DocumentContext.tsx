@@ -1238,6 +1238,23 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, []);
 
+  // 外部からの MCP 通信発生時のリアルタイムトースト通知
+  const lastToastIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    const unsub = externalControlService.subscribeLogs((logs) => {
+      const latest = logs[0];
+      if (latest && latest.id !== lastToastIdRef.current) {
+        lastToastIdRef.current = latest.id;
+        showToast({
+          message: `🌐 外部AI (MCP): [${latest.toolName}] を実行 (${latest.durationMs}ms)`,
+          type: latest.isError ? 'warning' : 'info',
+          duration: 3000,
+        });
+      }
+    });
+    return unsub;
+  }, [showToast]);
+
   return (
     <DocumentContext.Provider
       value={{

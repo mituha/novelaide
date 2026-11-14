@@ -12,7 +12,8 @@ import {
   McpStatus,
   McpPermissionLevel,
 } from 'tauri-plugin-novelaid-mcp-api';
-import { RefreshCw, Eye, EyeOff, CheckCircle2, Server, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { externalControlService, McpLogItem } from '../../services/externalControlService';
+import { RefreshCw, Eye, EyeOff, CheckCircle2, Server, ShieldCheck, ShieldAlert, Activity, Trash2, ChevronDown, ChevronRight } from 'lucide-react';
 
 export const DEFAULT_AI_SCOPED_MODELS = [
   'gemini:gemini-2.5-flash',
@@ -38,6 +39,16 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
   const [detectedEnvKey, setDetectedEnvKey] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
+  const [mcpLogs, setMcpLogs] = useState<McpLogItem[]>([]);
+  const [expandedLogId, setExpandedLogId] = useState<string | null>(null);
+
+  // MCP 通信ログのリアルタイム購読
+  useEffect(() => {
+    const unsub = externalControlService.subscribeLogs((logs) => {
+      setMcpLogs(logs);
+    });
+    return unsub;
+  }, []);
 
   // MCP サーバー状態の取得と同期
   const refreshMcpStatus = useCallback(async () => {
@@ -447,6 +458,160 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
           </div>
         </div>
       )}
+
+      {/* リアルタイム通信ログ */}
+      <div style={{ marginTop: '20px', borderTop: '1px solid var(--border-color, #e0e0e0)', paddingTop: '16px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+          <div style={{ fontSize: '14px', fontWeight: 600, color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <Activity size={16} style={{ color: '#8b5cf6' }} />
+            リアルタイム通信ログ（最新 {mcpLogs.length} 件）
+          </div>
+          {mcpLogs.length > 0 && (
+            <button
+              type="button"
+              className="setting-button"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontSize: '11px',
+                padding: '3px 8px',
+                background: 'transparent',
+                border: '1px solid var(--border-color, #e0e0e0)',
+                color: 'var(--text-secondary)',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+              onClick={() => externalControlService.clearLogs()}
+            >
+              <Trash2 size={12} />
+              ログ消去
+            </button>
+          )}
+        </div>
+
+        {mcpLogs.length === 0 ? (
+          <div
+            style={{
+              padding: '16px',
+              textAlign: 'center',
+              backgroundColor: 'var(--bg-secondary, #f9fafb)',
+              borderRadius: '6px',
+              border: '1px dashed var(--border-color, #e0e0e0)',
+              color: 'var(--text-secondary)',
+              fontSize: '12px',
+              lineHeight: 1.6,
+            }}
+          >
+            現在、外部からの通信ログはありません。<br />
+            外部 AI（LM Studio, Claude Desktop, Cursor 等）からツールを実行すると、ここに通信ログがリアルタイム表示されます。
+          </div>
+        ) : (
+          <div
+            style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '6px',
+              maxHeight: '260px',
+              overflowY: 'auto',
+              paddingRight: '4px',
+            }}
+          >
+            {mcpLogs.map((log) => {
+              const isExpanded = expandedLogId === log.id;
+              const hasError = log.isError;
+              return (
+                <div
+                  key={log.id}
+                  style={{
+                    backgroundColor: 'var(--bg-secondary, #f8f9fa)',
+                    border: `1px solid ${hasError ? '#fca5a5' : 'var(--border-color, #e0e0e0)'}`,
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    overflow: 'hidden',
+                  }}
+                >
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      userSelect: 'none',
+                    }}
+                    onClick={() => setExpandedLogId(isExpanded ? null : log.id)}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                      {isExpanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+                      <span style={{ fontFamily: 'monospace', color: 'var(--text-secondary)', fontSize: '11px' }}>
+                        [{log.timestamp}]
+                      </span>
+                      <span
+                        style={{
+                          backgroundColor: '#ede9fe',
+                          color: '#6d28d9',
+                          padding: '1px 6px',
+                          borderRadius: '4px',
+                          fontWeight: 600,
+                          fontSize: '11px',
+                          fontFamily: 'monospace',
+                        }}
+                      >
+                        {log.toolName}
+                      </span>
+                      <span
+                        style={{
+                          color: hasError ? '#dc2626' : '#16a34a',
+                          fontWeight: 600,
+                          fontSize: '11px',
+                        }}
+                      >
+                        {hasError ? 'ERROR' : 'OK'}
+                      </span>
+                      <span style={{ color: 'var(--text-secondary)', fontSize: '11px' }}>
+                        ({log.durationMs}ms)
+                      </span>
+                    </div>
+                  </div>
+
+                  {isExpanded && (
+                    <div
+                      style={{
+                        padding: '8px 12px',
+                        borderTop: '1px solid var(--border-color, #e0e0e0)',
+                        backgroundColor: 'var(--bg-primary, #ffffff)',
+                        fontSize: '11px',
+                        fontFamily: 'monospace',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                          ▶ 受信引数 (Arguments):
+                        </div>
+                        <pre style={{ margin: 0, padding: '4px 8px', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px', overflowX: 'auto' }}>
+                          {JSON.stringify(log.arguments, null, 2)}
+                        </pre>
+                      </div>
+                      <div>
+                        <div style={{ fontWeight: 600, color: 'var(--text-secondary)', marginBottom: '2px' }}>
+                          ▶ 返却結果 (Result):
+                        </div>
+                        <pre style={{ margin: 0, padding: '4px 8px', background: 'var(--bg-secondary, #f3f4f6)', borderRadius: '4px', overflowX: 'auto', maxHeight: '140px' }}>
+                          {JSON.stringify(log.result, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 };
