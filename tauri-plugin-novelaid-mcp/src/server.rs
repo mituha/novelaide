@@ -587,6 +587,29 @@ fn get_tool_definitions(permission: McpPermissionLevel) -> Vec<McpToolInfo> {
                 }
             }),
         },
+        McpToolInfo {
+            name: "find_mentions".to_string(),
+            description: "指定した登場人物名・アイテム名・重要語がどの小説エピソードに何回登場しているかのタイムライン分布（初出・最新・出現話数）を取得します。".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "target": { "type": "string", "description": "検索対象の登場人物名・アイテム名・キーワード（例: ミラ, 賢者の石, 水龍レヴィ）" },
+                    "scope": { "type": "string", "enum": ["novel_only", "all"], "description": "検索範囲（省略時は novel_only: 小説原稿のみ）" },
+                    "case_sensitive": { "type": "boolean", "description": "大文字と小文字を区別するかどうか（省略時は false）" }
+                },
+                "required": ["target"]
+            }),
+        },
+        McpToolInfo {
+            name: "get_writing_stats".to_string(),
+            description: "プロジェクト全体の総文字数、400字詰原稿用紙換算枚数、各話文字数内訳、平均文字数、会話文比率などの執筆統計サマリーを取得します。".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "path_filter": { "type": "string", "description": "特定フォルダーや部での絞り込み（例: 01_第1部）" }
+                }
+            }),
+        },
     ];
 
     if permission == McpPermissionLevel::Write {

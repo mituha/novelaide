@@ -381,6 +381,16 @@ class ExternalControlService {
           return await this.handleGetProjectOutline(args);
         }
 
+        case 'find_mentions':
+        case 'mentions': {
+          return await this.handleFindMentions(args);
+        }
+
+        case 'get_writing_stats':
+        case 'stats': {
+          return await this.handleGetWritingStats(args);
+        }
+
         default:
           return {
             result: {
@@ -1362,6 +1372,309 @@ class ExternalControlService {
         totalEpisodes: outlineItems.length,
         summaryText: summaryLines.join('\n'),
         outline: outlineItems,
+      },
+    };
+  }
+
+  private async handleFindMentions(args: Record<string, any>): Promise<ToolExecutionResult> {
+    const rawTarget = String(args.target || args.keyword || args.query || '').trim();
+    if (!rawTarget) {
+      return {
+        result: { status: 'error', message: '検索対象の名前・キーワード (target) が指定されていません。' },
+        isError: true,
+      };
+    }
+
+    const scope = args.scope ? String(args.scope).toLowerCase() : 'novel_only';
+    const caseSensitive = !!args.case_sensitive;
+    const target = caseSensitive ? rawTarget : rawTarget.toLowerCase();
+
+    // プロジェクトファイル一覧の準備
+    let projectFiles = this.context?.projectFiles || [];
+    const projectPath = this.context?.projectPath;
+    if (projectFiles.length === 0 && projectPath) {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
+        const collect = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (!item.isDirectory) {
+              allFiles.push({
+                path: item.path,
+                relativePath: item.relativePath || item.name,
+                name: item.name,
+                stem: item.fileTitle || fileService.stem(item.name),
+              });
+            }
+            if (item.children) collect(item.children);
+          }
+        };
+        collect(entries);
+        projectFiles = allFiles;
+        if (this.context) this.context.projectFiles = allFiles;
+      } catch (e) {
+        console.warn('[ExternalControlService] readDirectory failed in handleFindMentions:', e);
+      }
+    }
+
+    const openDocs = this.context?.openDocuments || [];
+
+    // スコープに応じたファイル抽出
+    const candidateFiles = projectFiles.filter((f) => {
+      const p = (f.relativePath || f.path).toLowerCase();
+      const ext = p.split('.').pop() || '';
+      if (!['md', 'txt', 'novel'].includes(ext)) return false;
+      if (scope === 'novel_only') {
+        return !p.includes('character') && !p.includes('setting') && !p.includes('.git');
+      }
+      return true;
+    });
+
+    // 自然順序（Natural Sort）でソート
+    candidateFiles.sort((a, b) =>
+      (a.relativePath || a.name).localeCompare(b.relativePath || b.name, 'ja', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+
+    interface MentionItem {
+      order: number;
+      relativePath: string;
+      fileName: string;
+      mentionCount: number;
+      firstLineNumber: number;
+      sampleSnippet: string;
+    }
+
+    const mentionItems: MentionItem[] = [];
+    let totalMentions = 0;
+
+    for (let i = 0; i < candidateFiles.length; i++) {
+      const fileItem = candidateFiles[i];
+      let content = '';
+
+      const openDoc = openDocs.find((d) => fileService.isSamePath(d.path, fileItem.path));
+      if (openDoc) {
+        content = openDoc.content;
+      } else {
+        try {
+          const f = await fileService.readFile(fileItem.path);
+          content = f.content;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!content) continue;
+
+      const lines = content.split(/\r?\n/);
+      let fileCount = 0;
+      let firstLine = -1;
+      let sampleSnippet = '';
+
+      for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+        const line = lines[lineIdx];
+        const lineToSearch = caseSensitive ? line : line.toLowerCase();
+        let pos = 0;
+        while ((pos = lineToSearch.indexOf(target, pos)) !== -1) {
+          fileCount++;
+          if (firstLine === -1) {
+            firstLine = lineIdx + 1;
+            sampleSnippet = line.trim();
+          }
+          pos += target.length;
+        }
+      }
+
+      if (fileCount > 0) {
+        totalMentions += fileCount;
+        mentionItems.push({
+          order: i + 1,
+          relativePath: fileItem.relativePath || fileItem.name,
+          fileName: fileItem.name,
+          mentionCount: fileCount,
+          firstLineNumber: firstLine,
+          sampleSnippet,
+        });
+      }
+    }
+
+    const summaryLines = [
+      `【言及タイムライン検索】対象: 「${rawTarget}」 (スコープ: ${scope === 'novel_only' ? '小説原稿のみ' : '全体'})`,
+      `合計: ${mentionItems.length} エピソードで計 ${totalMentions} 回言及`,
+    ];
+
+    if (mentionItems.length === 0) {
+      summaryLines.push('作中で言及されている箇所は見つかりませんでした。');
+    } else {
+      summaryLines.push(`- 初出: ${mentionItems[0].relativePath} (L${mentionItems[0].firstLineNumber})`);
+      summaryLines.push(`- 最新: ${mentionItems[mentionItems.length - 1].relativePath} (L${mentionItems[mentionItems.length - 1].firstLineNumber})`);
+      summaryLines.push('\n【登場エピソード一覧】');
+      for (const item of mentionItems) {
+        summaryLines.push(
+          `- ${item.relativePath}: ${item.mentionCount} 回 (初出: L${item.firstLineNumber} "${item.sampleSnippet.slice(0, 40)}...")`
+        );
+      }
+    }
+
+    return {
+      result: {
+        status: 'success',
+        target: rawTarget,
+        totalMentions,
+        totalEpisodesWithMentions: mentionItems.length,
+        summaryText: summaryLines.join('\n'),
+        firstMention: mentionItems[0] || null,
+        latestMention: mentionItems[mentionItems.length - 1] || null,
+        episodes: mentionItems,
+      },
+    };
+  }
+
+  private async handleGetWritingStats(args: Record<string, any>): Promise<ToolExecutionResult> {
+    const pathFilter = args.path_filter ? String(args.path_filter).toLowerCase() : '';
+
+    let projectFiles = this.context?.projectFiles || [];
+    const projectPath = this.context?.projectPath;
+    if (projectFiles.length === 0 && projectPath) {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
+        const collect = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (!item.isDirectory) {
+              allFiles.push({
+                path: item.path,
+                relativePath: item.relativePath || item.name,
+                name: item.name,
+                stem: item.fileTitle || fileService.stem(item.name),
+              });
+            }
+            if (item.children) collect(item.children);
+          }
+        };
+        collect(entries);
+        projectFiles = allFiles;
+        if (this.context) this.context.projectFiles = allFiles;
+      } catch (e) {
+        console.warn('[ExternalControlService] readDirectory failed in handleGetWritingStats:', e);
+      }
+    }
+
+    const openDocs = this.context?.openDocuments || [];
+
+    // 原稿ファイル（.md, .txt）を抽出
+    const targetFiles = projectFiles.filter((f) => {
+      const p = (f.relativePath || f.path).toLowerCase();
+      if (pathFilter && !p.includes(pathFilter)) return false;
+      const ext = p.split('.').pop() || '';
+      return ['md', 'txt', 'novel'].includes(ext) && !p.includes('character') && !p.includes('setting') && !p.includes('.git');
+    });
+
+    targetFiles.sort((a, b) =>
+      (a.relativePath || a.name).localeCompare(b.relativePath || b.name, 'ja', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+
+    interface EpisodeStat {
+      order: number;
+      relativePath: string;
+      fileName: string;
+      charCount: number;
+      manuscriptPages: number; // 400字詰原稿用紙換算
+      dialogueCharCount: number;
+      dialogueRatio: number; // パーセント
+    }
+
+    const episodeStats: EpisodeStat[] = [];
+    let totalChars = 0;
+    let totalDialogueChars = 0;
+
+    for (let i = 0; i < targetFiles.length; i++) {
+      const fileItem = targetFiles[i];
+      let content = '';
+
+      const openDoc = openDocs.find((d) => fileService.isSamePath(d.path, fileItem.path));
+      if (openDoc) {
+        content = openDoc.content;
+      } else {
+        try {
+          const f = await fileService.readFile(fileItem.path);
+          content = f.content;
+        } catch {
+          continue;
+        }
+      }
+
+      const charCount = content.length;
+      totalChars += charCount;
+
+      // 会話文の抽出（「...」および『...』）
+      let dialogueChars = 0;
+      const dialogueMatches = content.match(/「[^」]*」|『[^』]*』/g);
+      if (dialogueMatches) {
+        for (const d of dialogueMatches) {
+          dialogueChars += d.length;
+        }
+      }
+      totalDialogueChars += dialogueChars;
+
+      const dialogueRatio = charCount > 0 ? Math.round((dialogueChars / charCount) * 1000) / 10 : 0;
+      const manuscriptPages = Math.ceil(charCount / 400);
+
+      episodeStats.push({
+        order: i + 1,
+        relativePath: fileItem.relativePath || fileItem.name,
+        fileName: fileItem.name,
+        charCount,
+        manuscriptPages,
+        dialogueCharCount: dialogueChars,
+        dialogueRatio,
+      });
+    }
+
+    const totalPages = Math.ceil(totalChars / 400);
+    const avgCharsPerEpisode = episodeStats.length > 0 ? Math.round(totalChars / episodeStats.length) : 0;
+    const overallDialogueRatio = totalChars > 0 ? Math.round((totalDialogueChars / totalChars) * 1000) / 10 : 0;
+
+    // 最長・最短エピソード
+    const sortedByLen = [...episodeStats].sort((a, b) => b.charCount - a.charCount);
+    const longest = sortedByLen[0] || null;
+    const shortest = sortedByLen[sortedByLen.length - 1] || null;
+
+    const summaryLines = [
+      `【執筆メトリクス・文字数サマリー】(プロジェクトルート: ${projectPath || '未定'})`,
+      `- 総文字数: ${totalChars.toLocaleString()} 字`,
+      `- 原稿用紙換算 (400字詰): 約 ${totalPages.toLocaleString()} 枚`,
+      `- 総エピソード数: ${episodeStats.length} 話 (平均 ${avgCharsPerEpisode.toLocaleString()} 字/話)`,
+      `- 全体の会話文比率: 約 ${overallDialogueRatio} %`,
+      longest ? `- 最長話: ${longest.relativePath} (${longest.charCount.toLocaleString()} 字)` : '',
+      shortest ? `- 最短話: ${shortest.relativePath} (${shortest.charCount.toLocaleString()} 字)` : '',
+      '\n【各話の内訳】',
+    ].filter(Boolean);
+
+    for (const ep of episodeStats) {
+      summaryLines.push(
+        `${ep.order}. ${ep.relativePath}: ${ep.charCount.toLocaleString()}字 (原稿用紙 約${ep.manuscriptPages}枚, 会話比率 ${ep.dialogueRatio}%)`
+      );
+    }
+
+    return {
+      result: {
+        status: 'success',
+        projectPath: projectPath || '',
+        totalCharacters: totalChars,
+        totalManuscriptPages: totalPages,
+        totalEpisodes: episodeStats.length,
+        averageCharsPerEpisode: avgCharsPerEpisode,
+        overallDialogueRatio,
+        longestEpisode: longest,
+        shortestEpisode: shortest,
+        summaryText: summaryLines.join('\n'),
+        episodes: episodeStats,
       },
     };
   }

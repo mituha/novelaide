@@ -85,6 +85,18 @@
 8. **`search_text`** (Read)
    - 引数: `query` (string, 必須), `path_filter` (string, optional), `case_sensitive` (boolean, optional)
    - 挙動: プロジェクト内の全テキストファイル（未保存バッファ優先）を対象にキーワードを全文検索し、マッチしたファイルパス、行番号、該当行テキスト（前後スニペット）、合計件数、要約テキスト（`summaryText`）を返却。
+9. **`find_files`** (Read)
+   - 引数: `pattern` (string, 必須), `type` (string, optional)
+   - 挙動: ワイルドカード（`*`, `?`）パターンまたはドキュメント種別でファイルを高速探索。
+10. **`get_project_outline`** (Read)
+    - 引数: `include_summary` (boolean, optional), `include_headings` (boolean, optional)
+    - 挙動: 全小説エピソードの目次・章題・概要（Frontmatter description）・見出しを一括取得し、プロット構成を返却。
+11. **`find_mentions`** (Read)
+    - 引数: `target` (string, 必須), `scope` (string, optional), `case_sensitive` (boolean, optional)
+    - 挙動: 特定の登場人物や重要語の登場話数一覧・初出・最新言及タイムラインを取得。
+12. **`get_writing_stats`** (Read)
+    - 引数: `path_filter` (string, optional)
+    - 挙動: 総文字数、400字詰原稿用紙換算枚数、各話文字数内訳、平均文字数、会話文比率などの統計サマリーを取得。
 
 ---
 
