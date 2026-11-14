@@ -82,3 +82,58 @@
 7. **`search_metadata`** (Read)
    - 引数: `query` (string), `category` (string, optional)
    - 挙動: 人名・地名・組織などのプロジェクト内メタデータを前方一致検索。
+8. **`search_text`** (Read)
+   - 引数: `query` (string, 必須), `path_filter` (string, optional), `case_sensitive` (boolean, optional)
+   - 挙動: プロジェクト内の全テキストファイル（未保存バッファ優先）を対象にキーワードを全文検索し、マッチしたファイルパス、行番号、該当行テキスト（前後スニペット）、合計件数、要約テキスト（`summaryText`）を返却。
+
+---
+
+## 5. 情報検索・探索系ツールの体系と拡張ロードマップ
+
+長編小説の執筆支援において、外部 AI（Claude Desktop, Cursor, LM Studio 等）が作品世界やプロットを正確に把握するためには、**「必要な情報へ最小限のトークン消費で安全かつ高速にアクセスできる検索機能群」**が不可欠です。
+
+一般的な情報検索系 MCP サーバー（Grep/Ripgrep, GitHub, Knowledge Graph, Filesystem）の思想を取り入れつつ、小説執筆に特化した以下の検索ツール群を段階的に拡充します。
+
+```mermaid
+flowchart TD
+    subgraph Step1 ["【Step 1: 全文検索基盤】"]
+        S_Text["search_text\n(全ファイル全文キーワード検索・行番号・前後スニペット)"]
+    end
+
+    subgraph Step2 ["【Step 2: ファイル特定】"]
+        S_Files["find_files\n(グロブ・パスパターンによるファイル絞り込み)"]
+    end
+
+    subgraph Step3 ["【Step 3: 構成・プロット把握】"]
+        S_Outline["get_project_outline\n(全エピソード目次・章題・Frontmatter概要の一括俯瞰)"]
+    end
+
+    subgraph Step4 ["【Step 4: 伏線・キャラクター追跡】"]
+        S_Mentions["find_mentions\n(特定人物・用語の登場話数・言及頻度タイムライン検索)"]
+    end
+
+    subgraph Step5 ["【Step 5: 執筆進捗・分析】"]
+        S_Stats["get_writing_stats\n(総文字数・各話文字数・原稿用紙換算・会話文比率サマリー)"]
+    end
+
+    Step1 --> Step2 --> Step3 --> Step4 --> Step5
+```
+
+### 5.1 各ツールの詳細仕様と役割
+
+| ツール名 | 分類 | 主な用途・AIプロンプト例 | 引数仕様 |
+| :--- | :--- | :--- | :--- |
+| **`search_text`** | テキスト全文検索 | 「作中で『賢者の石』という単語が出てくる箇所をすべて教えて」「あのセリフは第何話で言っていた？」 | `query` (string, 必須)<br>`path_filter` (string, optional)<br>`case_sensitive` (boolean, optional) |
+| **`find_files`** | パス・ファイル探索 | 「第1部の原稿ファイルだけを抽出して」「設定資料フォルダ内のキャラクターシート一覧を見せて」 | `pattern` (string, 必須, 例: `*第1部*`, `characters/*.md`)<br>`type` (string, optional, `novel`/`markdown`/`all`) |
+| **`get_project_outline`** | 構成・目次検索 | 「この小説全体のあらすじと章立ての流れを教えて」「現在何話まで書かれていてどんなプロット構成？」 | `include_summary` (boolean, optional, Frontmatter descriptionを含めるか) |
+| **`find_mentions`** | ナレッジ・伏線検索 | 「登場人物『ミラ』が作中で言及されている話数一覧と初出箇所を教えて」「伏線アイテムの出現間隔を確認して」 | `target` (string, 必須, 人物名・アイテム名等)<br>`scope` (string, optional, `novel_only`/`all`) |
+| **`get_writing_stats`** | 執筆メトリクス検索 | 「現在の総文字数と400字詰原稿用紙換算枚数は？」「会話文が極端に多いエピソードはある？」 | `path_filter` (string, optional) |
+
+### 5.2 段階的実装スケジュール
+1. **フェーズ 1 (先行実装)**: **`search_text`（単純全文横断検索）**
+   - 未保存バッファ最優先、行番号・スニペット抜粋、LLMフレンドリーな `summaryText` 返却を実装。
+2. **フェーズ 2**: **`find_files` & `get_project_outline`**
+   - ファイル絞り込みと、作品全体のプロット構成を最小限のトークンでAIに俯瞰させる目次サマリー。
+3. **フェーズ 3**: **`find_mentions` & `get_writing_stats`**
+   - 小説特化の伏線追跡と、進捗・文体バランス分析機能の追加。
+
