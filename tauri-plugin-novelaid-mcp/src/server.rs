@@ -150,7 +150,8 @@ impl McpServerManager {
             let _ = sender.send(payload);
             Ok(())
         } else {
-            Err(Error::Other(format!("Pending tool call not found: {}", payload.call_id)))
+            eprintln!("[novelaid-mcp] Warning: Pending tool call not found (already resolved or timed out): {}", payload.call_id);
+            Ok(())
         }
     }
 }

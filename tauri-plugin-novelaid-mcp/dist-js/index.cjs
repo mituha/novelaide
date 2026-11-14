@@ -225,7 +225,7 @@ async function listenToolCalls(handler) {
                 callId,
                 result,
                 isError: !!isError,
-            });
+            }).catch((err) => console.warn('[novelaid-mcp] Failed to respond tool call:', err));
         }
         catch (err) {
             await respondToolCall({
@@ -234,7 +234,7 @@ async function listenToolCalls(handler) {
                     error: String(err?.message || err),
                 },
                 isError: true,
-            });
+            }).catch((err2) => console.warn('[novelaid-mcp] Failed to respond error tool call:', err2));
         }
     });
 }

@@ -38,6 +38,8 @@ class ExternalControlService {
   private context: ExternalControlContext | null = null;
   private unlistenMcp: (() => void) | null = null;
   private isListening = false;
+  private initPromise: Promise<void> | null = null;
+  private handledCallIds = new Set<string>();
 
   /**
    * React (DocumentContext 等) からの実行コンテキストをバインド
@@ -50,28 +52,56 @@ class ExternalControlService {
    * MCP サーバー（Rust）からのツール呼び出しリクエストを購読開始
    */
   public async initMcpListener(): Promise<void> {
-    if (this.isListening) return;
-    this.isListening = true;
+    if (this.isListening && this.unlistenMcp) return;
+    if (this.initPromise) return this.initPromise;
 
-    try {
-      this.unlistenMcp = await listenToolCalls(async (event: ToolCallRequestEvent) => {
-        const { toolName, arguments: args } = event;
-        console.group(`%c[ExternalControl:MCP] 外部ツール呼び出し受信 🌐: ${toolName}`, 'color: #8b5cf6; font-weight: bold;');
-        console.log('▶ Tool:', toolName);
-        console.log('▶ Arguments:', args);
-        console.groupEnd();
+    this.initPromise = (async () => {
+      try {
+        if (this.unlistenMcp) {
+          this.unlistenMcp();
+          this.unlistenMcp = null;
+        }
 
-        const res = await this.executeTool(toolName, args, { source: 'external-mcp' });
-        return {
-          result: res.result,
-          isError: res.isError,
-        };
-      });
-      console.log('[ExternalControlService] MCP ツール呼び出しリスナーを登録しました。');
-    } catch (e) {
-      console.error('[ExternalControlService] MCP リスナーの初期化に失敗しました:', e);
-      this.isListening = false;
-    }
+        const unlisten = await listenToolCalls(async (event: ToolCallRequestEvent) => {
+          const { callId, toolName, arguments: args } = event;
+
+          // 同一 callId の二重処理ガード
+          if (this.handledCallIds.has(callId)) {
+            console.warn(`[ExternalControl:MCP] 重複 callId [${callId}] のツール呼び出しをスキップしました。`);
+            return { result: { status: 'skipped', message: 'Duplicate call skipped' } };
+          }
+          this.handledCallIds.add(callId);
+          // メモリ肥大化防止（直近200件保持）
+          if (this.handledCallIds.size > 200) {
+            const first = this.handledCallIds.values().next().value;
+            if (first) this.handledCallIds.delete(first);
+          }
+
+          console.group(`%c[ExternalControl:MCP] 外部ツール呼び出し受信 🌐: ${toolName}`, 'color: #8b5cf6; font-weight: bold;');
+          console.log('▶ Tool:', toolName);
+          console.log('▶ CallId:', callId);
+          console.log('▶ Arguments:', args);
+          console.groupEnd();
+
+          const res = await this.executeTool(toolName, args, { source: 'external-mcp' });
+          return {
+            result: res.result,
+            isError: res.isError,
+          };
+        });
+
+        this.unlistenMcp = unlisten;
+        this.isListening = true;
+        console.log('[ExternalControlService] MCP ツール呼び出しリスナーを登録しました。');
+      } catch (e) {
+        console.error('[ExternalControlService] MCP リスナーの初期化に失敗しました:', e);
+        this.isListening = false;
+      } finally {
+        this.initPromise = null;
+      }
+    })();
+
+    return this.initPromise;
   }
 
   /**
@@ -83,6 +113,7 @@ class ExternalControlService {
       this.unlistenMcp = null;
     }
     this.isListening = false;
+    this.initPromise = null;
   }
 
   /**
@@ -231,6 +262,10 @@ class ExternalControlService {
           return await this.handleReadFile(args);
         }
 
+        case 'get_active_document': {
+          return await this.handleGetActiveDocument(args);
+        }
+
         case 'write':
         case 'write_file': {
           return await this.handleWriteFile(args);
@@ -241,7 +276,9 @@ class ExternalControlService {
           return await this.handleEditFile(args);
         }
 
-        case 'list_files': {
+        case 'list_files':
+        case 'get_project_structure':
+        case 'get_open_documents': {
           return await this.handleListFiles(args);
         }
 
@@ -492,6 +529,45 @@ class ExternalControlService {
     };
   }
 
+  private async handleGetActiveDocument(_args: Record<string, any>): Promise<ToolExecutionResult> {
+    const activeDoc = this.context?.activeDocument;
+    if (!activeDoc) {
+      const firstDoc = this.context?.openDocuments?.[0];
+      if (firstDoc) {
+        return {
+          result: {
+            status: 'success',
+            path: firstDoc.path,
+            fileTitle: firstDoc.fileTitle,
+            baseName: firstDoc.baseName,
+            content: firstDoc.content,
+            isDirty: !!firstDoc.isDirty,
+            totalCharacters: firstDoc.content.length,
+          },
+        };
+      }
+      return {
+        result: {
+          status: 'error',
+          message: '現在開かれているアクティブなドキュメントがありません。',
+        },
+        isError: true,
+      };
+    }
+
+    return {
+      result: {
+        status: 'success',
+        path: activeDoc.path,
+        fileTitle: activeDoc.fileTitle,
+        baseName: activeDoc.baseName,
+        content: activeDoc.content,
+        isDirty: !!activeDoc.isDirty,
+        totalCharacters: activeDoc.content.length,
+      },
+    };
+  }
+
   private async handleListFiles(args: Record<string, any>): Promise<ToolExecutionResult> {
     const projectFiles = this.context?.projectFiles || [];
     const openDocs = (this.context?.openDocuments || []).map((d) => ({
@@ -625,13 +701,13 @@ class ExternalControlService {
   }
 
   private async handleSearchMetadata(args: Record<string, any>): Promise<ToolExecutionResult> {
-    const query = String(args.query || '').trim().toLowerCase();
+    const query = String(args.query || args.keyword || args.text || '').trim().toLowerCase();
     const category = args.category ? String(args.category).toLowerCase() : undefined;
 
     try {
       const entities: ProjectEntity[] = await getEntities();
       const matched = entities.filter((e: ProjectEntity) => {
-        const nameMatch = e.name.toLowerCase().includes(query) || (e.aliases && e.aliases.some((a: string) => a.toLowerCase().includes(query)));
+        const nameMatch = !query || e.name.toLowerCase().includes(query) || (e.aliases && e.aliases.some((a: string) => a.toLowerCase().includes(query)));
         const catMatch = category ? e.category.toLowerCase() === category : true;
         return nameMatch && catMatch;
       });
@@ -641,7 +717,7 @@ class ExternalControlService {
           status: 'success',
           query,
           matchCount: matched.length,
-          results: matched.slice(0, 20),
+          results: matched.slice(0, 30),
         },
       };
     } catch {
@@ -651,10 +727,9 @@ class ExternalControlService {
         (d) =>
           d.path.includes('setting') ||
           d.path.includes('plot') ||
-          d.fileTitle.toLowerCase().includes(query) ||
-          d.content.toLowerCase().includes(query)
+          (!query || d.fileTitle.toLowerCase().includes(query) || d.content.toLowerCase().includes(query))
       );
-      const results = matched.slice(0, 5).map((d) => ({
+      const results = matched.slice(0, 10).map((d) => ({
         title: d.fileTitle,
         path: d.path,
         preview: d.content.slice(0, 200).replace(/\n/g, ' ') + '...',
