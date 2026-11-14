@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-stop-mcp-server"
+description = "Enables the stop_mcp_server command without any pre-configured scope."
+commands.allow = ["stop_mcp_server"]
+
+[[permission]]
+identifier = "deny-stop-mcp-server"
+description = "Denies the stop_mcp_server command without any pre-configured scope."
+commands.deny = ["stop_mcp_server"]

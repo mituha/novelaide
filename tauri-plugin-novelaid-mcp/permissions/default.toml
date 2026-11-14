@@ -1,0 +1,9 @@
+[default]
+description = "Default permissions for novelaid-mcp plugin"
+permissions = [
+    "allow-get-mcp-status",
+    "allow-start-mcp-server",
+    "allow-stop-mcp-server",
+    "allow-respond-tool-call",
+    "allow-update-mcp-config",
+]

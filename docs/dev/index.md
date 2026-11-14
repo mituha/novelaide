@@ -34,6 +34,7 @@ graph TD
         P_FS["novelaid-fs (パス一元化, バックエンドファイルI/O)"]
         P_Meta["novelaid-metadata (メタデータスキャン, 作品知識ハブ)"]
         P_Ruby["novelaid-ruby (Rustルビパーサー, 文字数算出)"]
+        P_Mcp["novelaid-mcp (MCPサーバー, 外部AI制御, SSE)"]
         P_Git["restar-git (Gitソース管理, 差分解析)"]
         P_Settings["restar-settings (設定ストア, 暗号署名自動更新)"]
     end
@@ -54,6 +55,7 @@ graph TD
 | **`tauri-plugin-novelaid-calibration`** | 文章校正・形態素解析 / 純Rust製 `Lindera 6.x` | [ドキュメント一覧](../../tauri-plugin-novelaid-calibration/docs/README.md) |
 | **`tauri-plugin-novelaid-fs`** | ファイル操作基盤・パス一元管理 / `notify` イベント通知 | [ドキュメント一覧](../../tauri-plugin-novelaid-fs/docs/README.md) |
 | **`tauri-plugin-novelaid-metadata`** | メタデータスキャン・作品知識ハブ / Frontmatter抽出 | [ドキュメント一覧](../../tauri-plugin-novelaid-metadata/docs/README.md) |
+| **`tauri-plugin-novelaid-mcp`** | MCPサーバー・外部AIエージェント連携 / SSE トランスポート | [ドキュメント一覧](../../tauri-plugin-novelaid-mcp/README.md) |
 | **`tauri-plugin-novelaid-ruby`** | 小説ルビ・傍点・文字数カウント / 高速Rustパーサー | [ドキュメント一覧](../../tauri-plugin-novelaid-ruby/docs/README.md) |
 | **`tauri-plugin-restar-git`** | Gitソース管理・履歴追跡 / `git2-rs` | [ドキュメント一覧](../../tauri-plugin-restar-git/docs/README.md) |
 | **`tauri-plugin-restar-settings`** | 環境設定ストア・Tauri v2暗号署名自動更新 | [ドキュメント一覧](../../tauri-plugin-restar-settings/docs/README.md) |

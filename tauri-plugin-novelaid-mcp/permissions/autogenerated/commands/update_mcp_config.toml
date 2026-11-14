@@ -1,0 +1,13 @@
+# Automatically generated - DO NOT EDIT!
+
+"$schema" = "../../schemas/schema.json"
+
+[[permission]]
+identifier = "allow-update-mcp-config"
+description = "Enables the update_mcp_config command without any pre-configured scope."
+commands.allow = ["update_mcp_config"]
+
+[[permission]]
+identifier = "deny-update-mcp-config"
+description = "Denies the update_mcp_config command without any pre-configured scope."
+commands.deny = ["update_mcp_config"]

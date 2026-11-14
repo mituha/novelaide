@@ -15,7 +15,8 @@
     "build:plugin:calibration": "npm run build --prefix tauri-plugin-novelaid-calibration",
     "build:plugin:ruby": "npm run build --prefix tauri-plugin-novelaid-ruby",
     "build:plugin:metadata": "npm run build --prefix tauri-plugin-novelaid-metadata",
-    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai && npm run build:plugin:git && npm run build:plugin:settings && npm run build:plugin:calibration && npm run build:plugin:ruby && npm run build:plugin:metadata",
+    "build:plugin:mcp": "npm run build --prefix tauri-plugin-novelaid-mcp",
+    "build:plugins": "npm run build:plugin:fs && npm run build:plugin:ai && npm run build:plugin:git && npm run build:plugin:settings && npm run build:plugin:calibration && npm run build:plugin:ruby && npm run build:plugin:metadata && npm run build:plugin:mcp",
     "build:plugin": "npm run build:plugins",
     "typegen": "cargo test --manifest-path tauri-plugin-novelaid-fs/Cargo.toml && npm run build:plugin",
     "release": "node scripts/release.mjs"
@@ -44,6 +45,7 @@
     "tauri-plugin-novelaid-ai-api": "file:tauri-plugin-novelaid-ai",
     "tauri-plugin-novelaid-calibration-api": "file:tauri-plugin-novelaid-calibration",
     "tauri-plugin-novelaid-fs-api": "file:tauri-plugin-novelaid-fs",
+    "tauri-plugin-novelaid-mcp-api": "file:tauri-plugin-novelaid-mcp",
     "tauri-plugin-novelaid-metadata-api": "file:tauri-plugin-novelaid-metadata",
     "tauri-plugin-novelaid-ruby-api": "file:tauri-plugin-novelaid-ruby"
   },

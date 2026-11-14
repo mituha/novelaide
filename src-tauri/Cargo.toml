@@ -28,6 +28,7 @@ tauri-plugin-novelaid-ai = { path = "../tauri-plugin-novelaid-ai" }
 tauri-plugin-novelaid-calibration = { path = "../tauri-plugin-novelaid-calibration" }
 tauri-plugin-novelaid-ruby = { path = "../tauri-plugin-novelaid-ruby" }
 tauri-plugin-novelaid-metadata = { path = "../tauri-plugin-novelaid-metadata" }
+tauri-plugin-novelaid-mcp = { path = "../tauri-plugin-novelaid-mcp" }
 tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 serde = { version = "1", features = ["derive"] }
