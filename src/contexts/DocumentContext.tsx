@@ -4,6 +4,7 @@ import { externalControlService } from '../services/externalControlService';
 import { DocumentState, DocumentViewMode, PaneId, DocumentViewRef } from '../types/document';
 import { getInitialViewMode } from '../utils/documentSupport';
 import { useNotification } from './NotificationContext';
+import { useProject } from './ProjectContext';
 
 export type { DocumentState, PaneId, DocumentViewRef };
 
@@ -75,6 +76,7 @@ const DocumentContext = createContext<DocumentContextType | undefined>(undefined
 
 export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast, showBanner, dismissBanner, showStatusMessage } = useNotification();
+  const { projectPath: currentProjectPath } = useProject();
   const [openDocuments, setOpenDocuments] = useState<DocumentState[]>([]);
   const [activePane, setActivePane] = useState<PaneId>('editor.left');
   const [activePathByPane, setActivePathByPane] = useState<Record<PaneId, string | null>>({
@@ -1227,9 +1229,9 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         : null,
       openDocument,
       updateContent,
-      projectPath: activeDocument?.projectPath || openDocuments[0]?.projectPath || null,
+      projectPath: currentProjectPath || activeDocument?.projectPath || openDocuments[0]?.projectPath || null,
     });
-  }, [openDocuments, activeDocument, openDocument, updateContent]);
+  }, [openDocuments, activeDocument, openDocument, updateContent, currentProjectPath]);
 
   useEffect(() => {
     externalControlService.initMcpListener();

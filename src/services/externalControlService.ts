@@ -3,6 +3,7 @@ import {
   ToolCallRequestEvent,
 } from 'tauri-plugin-novelaid-mcp-api';
 import { fileService } from './fileService';
+import type { DirEntry } from '../types/document';
 import { checkText, getRubyCandidates } from 'tauri-plugin-novelaid-calibration-api';
 import { getEntities, ProjectEntity } from 'tauri-plugin-novelaid-metadata-api';
 
@@ -639,10 +640,45 @@ class ExternalControlService {
   }
 
   private async handleListFiles(args: Record<string, any>): Promise<ToolExecutionResult> {
-    const projectFiles = this.context?.projectFiles || [];
+    let projectFiles = this.context?.projectFiles || [];
+    const projectPath = this.context?.projectPath;
+
+    // projectFiles が未ロードの場合、または直接要求された場合は実ディレクトリを走査
+    if (projectFiles.length === 0 && projectPath) {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
+
+        const collect = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (!item.isDirectory) {
+              allFiles.push({
+                path: item.path,
+                relativePath: item.relativePath || item.name,
+                name: item.name,
+                stem: item.fileTitle || fileService.stem(item.name),
+              });
+            }
+            if (item.children) {
+              collect(item.children);
+            }
+          }
+        };
+
+        collect(entries);
+        projectFiles = allFiles;
+        if (this.context) {
+          this.context.projectFiles = allFiles;
+        }
+      } catch (e) {
+        console.warn('[ExternalControlService] readDirectory failed in handleListFiles:', e);
+      }
+    }
+
     const openDocs = (this.context?.openDocuments || []).map((d) => ({
       path: d.path,
       title: d.fileTitle,
+      baseName: d.baseName,
       isDirty: !!d.isDirty,
     }));
 
@@ -651,12 +687,38 @@ class ExternalControlService {
       ? projectFiles.filter((f) => f.path.toLowerCase().includes(pathFilter) || f.relativePath.toLowerCase().includes(pathFilter))
       : projectFiles;
 
+    // AI（LLM）が即座に理解できる要約ツリーテキスト（summaryText）を生成
+    const openDocsSummary = openDocs.length > 0
+      ? `【現在開いているタブ (${openDocs.length}件)】\n` + openDocs.map((d) => `- ${d.title} (${d.baseName}, 未保存: ${d.isDirty ? 'あり' : 'なし'})`).join('\n')
+      : '【現在開いているタブ】なし';
+
+    // 優先フォルダ（設定資料・プロット・原稿）を上位に整列
+    const sorted = [...filteredFiles].sort((a, b) => {
+      const aIsSetting = /00_|settings|plot|character|world|wiki/i.test(a.relativePath) ? 1 : 0;
+      const bIsSetting = /00_|settings|plot|character|world|wiki/i.test(b.relativePath) ? 1 : 0;
+      if (aIsSetting !== bIsSetting) return bIsSetting - aIsSetting;
+      return a.relativePath.localeCompare(b.relativePath, 'ja');
+    });
+
+    const fileListSample = sorted.slice(0, 40).map((f) => `- ${f.relativePath}`);
+    const remainingCount = sorted.length - fileListSample.length;
+
+    const summaryText = [
+      `【プロジェクト構成】全 ${filteredFiles.length} ファイル (プロジェクトルート: ${projectPath || '未定'})`,
+      openDocsSummary,
+      `【プロジェクト内ファイル一覧 (抜粋 ${fileListSample.length}件)】`,
+      ...fileListSample,
+      remainingCount > 0 ? `...他 ${remainingCount} 件` : '',
+    ].filter(Boolean).join('\n');
+
     return {
       result: {
         status: 'success',
-        totalCount: filteredFiles.length,
+        projectPath: projectPath || '',
+        totalFiles: filteredFiles.length,
+        summaryText,
         openDocuments: openDocs,
-        files: filteredFiles.map((f) => ({
+        files: filteredFiles.slice(0, 100).map((f) => ({
           path: f.path,
           relativePath: f.relativePath,
           name: f.name,
