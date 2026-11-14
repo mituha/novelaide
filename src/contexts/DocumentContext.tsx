@@ -1258,6 +1258,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         baseName: d.baseName,
         relativePath: d.relativePath,
         content: d.content,
+        metadata: d.metadata || {},
         isDirty: d.isDirty,
       })),
       activeDocument: activeDocument
@@ -1267,6 +1268,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             baseName: activeDocument.baseName,
             relativePath: activeDocument.relativePath,
             content: activeDocument.content,
+            metadata: activeDocument.metadata || {},
             isDirty: activeDocument.isDirty,
           }
         : null,

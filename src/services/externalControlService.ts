@@ -13,6 +13,7 @@ export interface OpenDocItem {
   baseName: string;
   relativePath: string;
   content: string;
+  metadata?: Record<string, any>;
   isDirty?: boolean;
 }
 
@@ -368,6 +369,16 @@ class ExternalControlService {
         case 'search_text':
         case 'grep': {
           return await this.handleSearchText(args);
+        }
+
+        case 'find_files':
+        case 'glob': {
+          return await this.handleFindFiles(args);
+        }
+
+        case 'get_project_outline':
+        case 'outline': {
+          return await this.handleGetProjectOutline(args);
         }
 
         default:
@@ -1118,6 +1129,239 @@ class ExternalControlService {
         totalMatches: matches.length,
         summaryText,
         matches,
+      },
+    };
+  }
+
+  private async handleFindFiles(args: Record<string, any>): Promise<ToolExecutionResult> {
+    const rawPattern = String(args.pattern || args.query || '').trim();
+    if (!rawPattern) {
+      return {
+        result: { status: 'error', message: '探索パターン (pattern) が指定されていません。' },
+        isError: true,
+      };
+    }
+
+    const typeFilter = args.type ? String(args.type).toLowerCase() : 'all';
+
+    // プロジェクトファイル一覧の準備
+    let projectFiles = this.context?.projectFiles || [];
+    const projectPath = this.context?.projectPath;
+    if (projectFiles.length === 0 && projectPath) {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
+        const collect = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (!item.isDirectory) {
+              allFiles.push({
+                path: item.path,
+                relativePath: item.relativePath || item.name,
+                name: item.name,
+                stem: item.fileTitle || fileService.stem(item.name),
+              });
+            }
+            if (item.children) collect(item.children);
+          }
+        };
+        collect(entries);
+        projectFiles = allFiles;
+        if (this.context) this.context.projectFiles = allFiles;
+      } catch (e) {
+        console.warn('[ExternalControlService] readDirectory failed in handleFindFiles:', e);
+      }
+    }
+
+    // グロブ風パターンを正規表現へ変換
+    const regexPattern = rawPattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*/g, '.*')
+      .replace(/\?/g, '.');
+    const regex = new RegExp(regexPattern, 'i');
+
+    const matchedFiles = projectFiles.filter((f) => {
+      // パスパターンまたはファイル名にマッチするか
+      const p = (f.relativePath || f.path).replace(/\\/g, '/');
+      const name = f.name;
+      const match = regex.test(p) || regex.test(name);
+      if (!match) return false;
+
+      // 種別フィルター
+      if (typeFilter !== 'all') {
+        const ext = (name.split('.').pop() || '').toLowerCase();
+        if (typeFilter === 'novel' && !['md', 'txt', 'novel'].includes(ext)) return false;
+        if (typeFilter === 'markdown' && ext !== 'md') return false;
+        if (typeFilter === 'chat' && ext !== 'ch') return false;
+      }
+
+      return true;
+    });
+
+    const summaryLines = [
+      `【ファイル探索結果】パターン「${rawPattern}」: 合計 ${matchedFiles.length} 件ヒット`,
+    ];
+
+    if (matchedFiles.length === 0) {
+      summaryLines.push('条件に一致するファイルは見つかりませんでした。');
+    } else {
+      for (const f of matchedFiles.slice(0, 30)) {
+        summaryLines.push(`- ${f.relativePath}`);
+      }
+      if (matchedFiles.length > 30) {
+        summaryLines.push(`...他 ${matchedFiles.length - 30} 件`);
+      }
+    }
+
+    return {
+      result: {
+        status: 'success',
+        pattern: rawPattern,
+        totalFiles: matchedFiles.length,
+        summaryText: summaryLines.join('\n'),
+        files: matchedFiles.map((f) => ({
+          path: f.path,
+          relativePath: f.relativePath,
+          name: f.name,
+        })),
+      },
+    };
+  }
+
+  private async handleGetProjectOutline(args: Record<string, any>): Promise<ToolExecutionResult> {
+    const includeSummary = args.include_summary !== false;
+    const includeHeadings = !!args.include_headings;
+
+    let projectFiles = this.context?.projectFiles || [];
+    const projectPath = this.context?.projectPath;
+    if (projectFiles.length === 0 && projectPath) {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
+        const collect = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (!item.isDirectory) {
+              allFiles.push({
+                path: item.path,
+                relativePath: item.relativePath || item.name,
+                name: item.name,
+                stem: item.fileTitle || fileService.stem(item.name),
+              });
+            }
+            if (item.children) collect(item.children);
+          }
+        };
+        collect(entries);
+        projectFiles = allFiles;
+        if (this.context) this.context.projectFiles = allFiles;
+      } catch (e) {
+        console.warn('[ExternalControlService] readDirectory failed in handleGetProjectOutline:', e);
+      }
+    }
+
+    const openDocs = this.context?.openDocuments || [];
+
+    // 原稿ファイル（.md, .txt）およびプロットファイルを抽出
+    const episodeFiles = projectFiles.filter((f) => {
+      const p = (f.relativePath || f.path).toLowerCase();
+      const ext = p.split('.').pop() || '';
+      return ['md', 'txt', 'novel'].includes(ext) && !p.includes('character') && !p.includes('setting') && !p.includes('.git');
+    });
+
+    // 自然順序（Natural Sort）でエピソードをソート
+    episodeFiles.sort((a, b) =>
+      (a.relativePath || a.name).localeCompare(b.relativePath || b.name, 'ja', {
+        numeric: true,
+        sensitivity: 'base',
+      })
+    );
+
+    interface OutlineItem {
+      order: number;
+      relativePath: string;
+      fileName: string;
+      title: string;
+      description?: string;
+      charCount: number;
+      tags?: string[];
+      headings?: string[];
+    }
+
+    const outlineItems: OutlineItem[] = [];
+
+    for (let i = 0; i < episodeFiles.length; i++) {
+      const fileItem = episodeFiles[i];
+      let content = '';
+      let metadata: Record<string, any> = {};
+
+      const openDoc = openDocs.find((d) => fileService.isSamePath(d.path, fileItem.path));
+      if (openDoc) {
+        content = openDoc.content;
+        metadata = openDoc.metadata || {};
+      } else {
+        try {
+          const f = await fileService.readFile(fileItem.path);
+          content = f.content;
+          metadata = f.metadata || {};
+        } catch {
+          continue;
+        }
+      }
+
+      const title = String(metadata.title || fileItem.stem || fileItem.name);
+      const description = includeSummary ? String(metadata.description || metadata.summary || '') : undefined;
+      const tags = Array.isArray(metadata.tags) ? metadata.tags : undefined;
+
+      const headings: string[] = [];
+      if (includeHeadings && content) {
+        const lines = content.split(/\r?\n/);
+        for (const line of lines) {
+          if (/^#{1,3}\s+/.test(line)) {
+            headings.push(line.trim());
+          }
+        }
+      }
+
+      outlineItems.push({
+        order: i + 1,
+        relativePath: fileItem.relativePath || fileItem.name,
+        fileName: fileItem.name,
+        title,
+        description: description || undefined,
+        charCount: content.length,
+        tags,
+        headings: headings.length > 0 ? headings : undefined,
+      });
+    }
+
+    // AI（LLM）向け要約テキストの生成
+    const summaryLines = [
+      `【作品目次・構成サマリー】全 ${outlineItems.length} エピソード (プロジェクトルート: ${projectPath || '未定'})`,
+    ];
+
+    if (outlineItems.length === 0) {
+      summaryLines.push('原稿ファイルが見つかりませんでした。');
+    } else {
+      for (const item of outlineItems) {
+        const descStr = item.description ? `\n     概要: ${item.description}` : '';
+        const tagsStr = item.tags && item.tags.length > 0 ? ` [タグ: ${item.tags.join(', ')}]` : '';
+        summaryLines.push(
+          `${item.order}. ${item.relativePath} (タイトル: ${item.title}, 約${item.charCount.toLocaleString()}字)${tagsStr}${descStr}`
+        );
+        if (item.headings && item.headings.length > 0) {
+          for (const h of item.headings.slice(0, 3)) {
+            summaryLines.push(`     ${h}`);
+          }
+        }
+      }
+    }
+
+    return {
+      result: {
+        status: 'success',
+        projectPath: projectPath || '',
+        totalEpisodes: outlineItems.length,
+        summaryText: summaryLines.join('\n'),
+        outline: outlineItems,
       },
     };
   }

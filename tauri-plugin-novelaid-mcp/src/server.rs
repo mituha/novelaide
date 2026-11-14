@@ -564,6 +564,29 @@ fn get_tool_definitions(permission: McpPermissionLevel) -> Vec<McpToolInfo> {
                 "properties": {}
             }),
         },
+        McpToolInfo {
+            name: "find_files".to_string(),
+            description: "プロジェクト内のファイルをパターン（ワイルドカード * 対応、例: *第1部*, characters/*.md）またはドキュメント種別で高速探索します。".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "pattern": { "type": "string", "description": "ファイル名またはパスの検索パターン（例: *第1章*, 00_*, characters/*.md, *.ch）" },
+                    "type": { "type": "string", "enum": ["all", "novel", "markdown", "chat", "code"], "description": "ファイル種別による絞り込み（省略時は all）" }
+                },
+                "required": ["pattern"]
+            }),
+        },
+        McpToolInfo {
+            name: "get_project_outline".to_string(),
+            description: "プロジェクト内の全小説エピソードの目次・章題・概要（Frontmatter description）・見出しを一括取得し、プロット構成を俯瞰します。".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "include_summary": { "type": "boolean", "description": "Frontmatter の概要 (description) を含めるか（省略時は true）" },
+                    "include_headings": { "type": "boolean", "description": "本文内の Markdown 見出し (#, ##) を含めるか（省略時は false）" }
+                }
+            }),
+        },
     ];
 
     if permission == McpPermissionLevel::Write {
