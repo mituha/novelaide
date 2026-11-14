@@ -3,6 +3,7 @@ import { fileService } from '../services/fileService';
 import { externalControlService } from '../services/externalControlService';
 import { DocumentState, DocumentViewMode, PaneId, DocumentViewRef } from '../types/document';
 import { getInitialViewMode } from '../utils/documentSupport';
+import { recentDocumentStorage } from '../utils/recentDocumentStorage';
 import { useNotification } from './NotificationContext';
 import { useProject } from './ProjectContext';
 
@@ -181,6 +182,18 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
   }, [getActiveDocumentForPane, isSplit]);
 
+  // 左ペインのアクティブドキュメントが novel の場合、最後に開いたエピソードとして永続化
+  useEffect(() => {
+    if (currentProjectPath && activeLeftItem && activeLeftItem.documentType === 'novel') {
+      const activeLeftDoc = openDocuments.find((d) => d.path === activeLeftItem.path);
+      recentDocumentStorage.save(currentProjectPath, {
+        path: activeLeftItem.path,
+        relativePath: activeLeftDoc?.relativePath || activeLeftItem.path,
+        fileTitle: activeLeftItem.fileTitle || activeLeftItem.baseName,
+      });
+    }
+  }, [currentProjectPath, activeLeftItem, openDocuments]);
+
   // 後方互換用
   const isSplitActive = isSplit;
 
@@ -280,6 +293,18 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
         const displayTitle = docToSave.fileTitle || docToSave.baseName;
         showStatusMessage(`保存完了: ${displayTitle}`, 2500);
+
+        // 保存されたドキュメントが novel かつ左ペインに関連している場合、最後に扱ったエピソードとして永続化
+        const isLeftRelated =
+          docToSave.views.some((v) => v.viewId === 'editor.left') ||
+          activePathByPane['editor.left'] === targetPath;
+        if (currentProjectPath && docToSave.documentType === 'novel' && isLeftRelated) {
+          recentDocumentStorage.save(currentProjectPath, {
+            path: docToSave.path,
+            relativePath: docToSave.relativePath || docToSave.path,
+            fileTitle: docToSave.fileTitle || docToSave.baseName,
+          });
+        }
       } catch (err) {
         console.error('[DocumentContext] Save Error:', err);
         showToast({
@@ -293,7 +318,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }, 800);
       }
     },
-    [activePath, showBanner, dismissBanner, showStatusMessage, showToast]
+    [activePath, activePathByPane, currentProjectPath, showBanner, dismissBanner, showStatusMessage, showToast]
   );
 
   // ファイルを開く（参照カウント式）
@@ -1164,6 +1189,24 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         // openDocuments および activePathByPane をアトミックにインプレース更新
         updateDocumentPath(oldPath, newPath);
 
+        // 最後に開いていた novel のパスと一致する場合は追従更新
+        if (currentProjectPath) {
+          const lastNovel = recentDocumentStorage.get(currentProjectPath);
+          if (
+            lastNovel &&
+            (fileService.isSamePath(lastNovel.path, oldPath) || lastNovel.relativePath === oldPath)
+          ) {
+            const base = newPath.split(/[\\/]/).pop() || newFileName;
+            recentDocumentStorage.save(currentProjectPath, {
+              path: newPath,
+              relativePath: lastNovel.relativePath
+                ? lastNovel.relativePath.replace(/[^\\/]+$/, base)
+                : base,
+              fileTitle: trimmedTitle,
+            });
+          }
+        }
+
         showToast({
           type: 'info',
           message: `「${newFileName}」に名前を変更しました`,
@@ -1179,7 +1222,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return false;
       }
     },
-    [openDocuments, saveDocument, showToast, updateDocumentPath]
+    [openDocuments, saveDocument, showToast, updateDocumentPath, currentProjectPath]
   );
 
   useEffect(() => {
@@ -1253,6 +1296,51 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     });
     return unsub;
   }, [showToast]);
+
+  // プロジェクト切替 / クローズ時に開いているドキュメントをクリア
+  const prevProjectPathRef = useRef<string | null>(currentProjectPath);
+  useEffect(() => {
+    if (prevProjectPathRef.current && prevProjectPathRef.current !== currentProjectPath) {
+      setOpenDocuments([]);
+      setActivePathByPane({
+        'editor.left': null,
+        'editor.right': null,
+      });
+      setIsSplit(false);
+    }
+    prevProjectPathRef.current = currentProjectPath;
+  }, [currentProjectPath]);
+
+  // プロジェクト初回読み込み時、最後に左ペインで開いていた（または保存した）novel ドキュメントを自動復元
+  const autoRestoredProjectRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!currentProjectPath) return;
+    if (autoRestoredProjectRef.current === currentProjectPath) return;
+
+    // まだドキュメントが1つも開かれていない場合にのみ実行
+    if (openDocumentsRef.current.length === 0) {
+      autoRestoredProjectRef.current = currentProjectPath;
+      const lastNovel = recentDocumentStorage.get(currentProjectPath);
+      if (!lastNovel?.path) return;
+
+      const restoreDoc = async () => {
+        try {
+          const stat = await fileService.getDocumentStat(lastNovel.path);
+          if (stat && stat.exists) {
+            console.log('[DocumentContext] Auto-restoring last novel document into left pane:', lastNovel.path);
+            await openDocument(lastNovel.path, { paneId: 'editor.left' });
+          } else {
+            console.warn('[DocumentContext] Last novel document not found, clearing:', lastNovel.path);
+            recentDocumentStorage.remove(currentProjectPath);
+          }
+        } catch (e) {
+          console.warn('[DocumentContext] Failed to auto-restore last novel document:', e);
+        }
+      };
+
+      restoreDoc();
+    }
+  }, [currentProjectPath, openDocument]);
 
   return (
     <DocumentContext.Provider
