@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { fileService } from '../services/fileService';
+import { externalControlService } from '../services/externalControlService';
 import { DocumentState, DocumentViewMode, PaneId, DocumentViewRef } from '../types/document';
 import { getInitialViewMode } from '../utils/documentSupport';
 import { useNotification } from './NotificationContext';
@@ -1202,6 +1203,40 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       window.removeEventListener('blur', handleBlur);
     };
   }, [checkExternalChanges, clearAutoSaveTimer, saveDocument]);
+
+  // 外部制御（MCP サーバー / 共通ツールディスパッチャー）へのコンテキスト同期とリスナー起動
+  useEffect(() => {
+    externalControlService.bindContext({
+      openDocuments: openDocuments.map((d) => ({
+        path: d.path,
+        fileTitle: d.fileTitle,
+        baseName: d.baseName,
+        relativePath: d.relativePath,
+        content: d.content,
+        isDirty: d.isDirty,
+      })),
+      activeDocument: activeDocument
+        ? {
+            path: activeDocument.path,
+            fileTitle: activeDocument.fileTitle,
+            baseName: activeDocument.baseName,
+            relativePath: activeDocument.relativePath,
+            content: activeDocument.content,
+            isDirty: activeDocument.isDirty,
+          }
+        : null,
+      openDocument,
+      updateContent,
+      projectPath: activeDocument?.projectPath || openDocuments[0]?.projectPath || null,
+    });
+  }, [openDocuments, activeDocument, openDocument, updateContent]);
+
+  useEffect(() => {
+    externalControlService.initMcpListener();
+    return () => {
+      externalControlService.destroy();
+    };
+  }, []);
 
   return (
     <DocumentContext.Provider
