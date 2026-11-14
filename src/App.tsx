@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { ThemeProvider, useTheme, type Theme } from "./contexts/ThemeContext";
-import { SettingsProvider, SettingsModal } from "restar-app-settings";
+import { SettingsProvider, SettingsModal, useSettings } from "restar-app-settings";
+import { updateMcpConfig } from "tauri-plugin-novelaid-mcp-api";
 import "restar-app-settings/styles.css";
 import "./core/settingsRegistry";
 import { NotificationProvider } from "./contexts/NotificationContext";
@@ -50,6 +51,20 @@ function AutoUpdateHandler() {
   );
 }
 
+function McpSettingsSync() {
+  const { settings } = useSettings();
+  useEffect(() => {
+    if (settings) {
+      updateMcpConfig({
+        enabled: !!settings.mcpEnabled,
+        port: typeof settings.mcpPort === 'number' ? settings.mcpPort : 3000,
+        permission: settings.mcpPermission === 'write' ? 'write' : 'read',
+      }).catch((e) => console.warn('Failed to sync initial MCP config:', e));
+    }
+  }, [settings?.mcpEnabled, settings?.mcpPort, settings?.mcpPermission]);
+  return null;
+}
+
 function SettingsBoundApp() {
   const { setTheme } = useTheme();
 
@@ -66,6 +81,7 @@ function SettingsBoundApp() {
         }
       }}
     >
+      <McpSettingsSync />
       <NotificationProvider>
         <ProjectProvider>
           <GitProvider>

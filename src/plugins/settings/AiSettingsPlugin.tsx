@@ -6,7 +6,13 @@ import {
   AiModelInfo,
   DEFAULT_LM_STUDIO_URL,
 } from 'tauri-plugin-novelaid-ai-api';
-import { RefreshCw, Eye, EyeOff, CheckCircle2 } from 'lucide-react';
+import {
+  updateMcpConfig,
+  getMcpStatus,
+  McpStatus,
+  McpPermissionLevel,
+} from 'tauri-plugin-novelaid-mcp-api';
+import { RefreshCw, Eye, EyeOff, CheckCircle2, Server, ShieldCheck, ShieldAlert } from 'lucide-react';
 
 export const DEFAULT_AI_SCOPED_MODELS = [
   'gemini:gemini-2.5-flash',
@@ -22,11 +28,48 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
     : DEFAULT_AI_SCOPED_MODELS;
   const defaultModel = settings.aiDefaultModel || 'gemini:gemini-2.5-flash';
 
+  const mcpEnabled = !!settings.mcpEnabled;
+  const mcpPort = typeof settings.mcpPort === 'number' ? settings.mcpPort : 3000;
+  const mcpPermission: McpPermissionLevel = settings.mcpPermission === 'write' ? 'write' : 'read';
+
   const [availableModels, setAvailableModels] = useState<AiModelInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [showApiKey, setShowApiKey] = useState<boolean>(false);
   const [detectedEnvKey, setDetectedEnvKey] = useState<boolean>(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+  const [mcpStatus, setMcpStatus] = useState<McpStatus | null>(null);
+
+  // MCP サーバー状態の取得と同期
+  const refreshMcpStatus = useCallback(async () => {
+    try {
+      const status = await getMcpStatus();
+      setMcpStatus(status);
+    } catch (e) {
+      console.warn('Failed to get MCP status:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshMcpStatus();
+  }, [refreshMcpStatus]);
+
+  // MCP設定変更時のバックエンド同期
+  const handleUpdateMcpConfig = async (nextEnabled: boolean, nextPort: number, nextPerm: McpPermissionLevel) => {
+    updateSetting('mcpEnabled', nextEnabled);
+    updateSetting('mcpPort', nextPort);
+    updateSetting('mcpPermission', nextPerm);
+
+    try {
+      const updated = await updateMcpConfig({
+        enabled: nextEnabled,
+        port: nextPort,
+        permission: nextPerm,
+      });
+      setMcpStatus(updated);
+    } catch (e: any) {
+      setStatusMessage(`MCP設定更新エラー: ${e?.message || e}`);
+    }
+  };
 
   // OS 環境変数からのキー検出
   useEffect(() => {
@@ -298,6 +341,112 @@ const AiSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) =
           </select>
         </div>
       </div>
+
+      <div style={{ margin: '24px 0 16px', borderTop: '1px solid var(--border-color, #e0e0e0)' }} />
+
+      {/* MCP / 外部制御サーバー設定 */}
+      <div className="setting-header-title" style={{ fontSize: '15px', fontWeight: 600, marginBottom: '8px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <Server size={18} />
+        外部制御 / MCP サーバー連携
+      </div>
+      <div style={{ fontSize: '12px', color: 'var(--text-secondary)', marginBottom: '16px', lineHeight: 1.5 }}>
+        外部の AI エージェント（Claude Desktop, Cursor, Goose, Cline 等）から Model Context Protocol (MCP) を経由して、エディターのファイル閲覧・編集・校正・ルビ抽出を安全に実行できる連携機能です。
+      </div>
+
+      {/* MCP 有効/無効トグル */}
+      <div className="setting-row">
+        <div className="setting-info">
+          <label className="setting-label">MCP サーバーを有効にする</label>
+          <div className="setting-desc">
+            有効にするとバックエンドで SSE トランスポートサーバーが起動し、外部ツールからの接続を受け付けます。
+          </div>
+        </div>
+        <div className="setting-control">
+          <label className="setting-switch" style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer', gap: '8px' }}>
+            <input
+              type="checkbox"
+              checked={mcpEnabled}
+              onChange={(e) => handleUpdateMcpConfig(e.target.checked, mcpPort, mcpPermission)}
+            />
+            <span style={{ fontSize: '13px', fontWeight: 500 }}>
+              {mcpEnabled ? (mcpStatus?.isRunning ? '稼働中 (Active)' : '起動待機中') : '無効 (Disabled)'}
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* 権限設定（書き込み制限） */}
+      <div className="setting-row">
+        <div className="setting-info">
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <label className="setting-label">外部アクセス権限（書き込み制限）</label>
+            {mcpPermission === 'read' ? (
+              <ShieldCheck size={16} style={{ color: '#10b981' }} />
+            ) : (
+              <ShieldAlert size={16} style={{ color: '#f59e0b' }} />
+            )}
+          </div>
+          <div className="setting-desc">
+            外部 AI からの操作権限を制限します。「読み込み専用」の場合、ファイルの参照や校正・ルビ・メタデータ検索のみを許可し、新規作成や直接編集・置換は安全に拒否されます。
+          </div>
+        </div>
+        <div className="setting-control">
+          <select
+            className="setting-select"
+            value={mcpPermission}
+            onChange={(e) => handleUpdateMcpConfig(mcpEnabled, mcpPort, e.target.value as McpPermissionLevel)}
+          >
+            <option value="read">読み込み専用 (read - 推奨・安全)</option>
+            <option value="write">読み書き可能 (write - ファイル直接編集を許可)</option>
+          </select>
+        </div>
+      </div>
+
+      {/* ポート番号 */}
+      <div className="setting-row">
+        <div className="setting-info">
+          <label className="setting-label">サーバーポート番号</label>
+          <div className="setting-desc">MCP SSE 接続を受け付けるローカルポート番号です（デフォルト: 3000）。</div>
+        </div>
+        <div className="setting-control">
+          <input
+            type="number"
+            className="setting-text-input"
+            style={{ width: '120px' }}
+            value={mcpPort}
+            onChange={(e) => {
+              const p = parseInt(e.target.value, 10);
+              if (!isNaN(p) && p > 0 && p <= 65535) {
+                handleUpdateMcpConfig(mcpEnabled, p, mcpPermission);
+              }
+            }}
+          />
+        </div>
+      </div>
+
+      {/* 接続情報サマリー */}
+      {mcpEnabled && mcpStatus?.isRunning && (
+        <div
+          style={{
+            marginTop: '8px',
+            padding: '10px 14px',
+            backgroundColor: 'var(--bg-secondary, #f8f9fa)',
+            borderRadius: '6px',
+            border: '1px solid var(--border-color, #e0e0e0)',
+            fontSize: '12px',
+          }}
+        >
+          <div style={{ fontWeight: 600, color: 'var(--text-primary)', marginBottom: '4px' }}>
+            🟢 MCP サーバー接続 URL:
+          </div>
+          <code style={{ fontSize: '12px', color: '#2563eb', fontFamily: 'monospace' }}>
+            http://127.0.0.1:{mcpStatus.port}/sse
+          </code>
+          <div style={{ marginTop: '6px', color: 'var(--text-secondary)' }}>
+            外部ツール設定例: <code>{`{ "url": "http://127.0.0.1:${mcpStatus.port}/sse" }`}</code>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -307,12 +456,15 @@ export const aiSettingsPlugin: SettingTabPlugin = {
   title: 'AI執筆アシスタント',
   icon: 'Bot',
   order: 40,
-  keywords: ['AI', 'Gemini', 'LM Studio', 'モデル', 'LLM', '校正', 'パートナー', 'APIキー'],
+  keywords: ['AI', 'Gemini', 'LM Studio', 'モデル', 'LLM', '校正', 'パートナー', 'APIキー', 'MCP', '外部制御', 'Claude'],
   defaultValues: {
     aiLmStudioUrl: DEFAULT_LM_STUDIO_URL,
     aiGeminiApiKey: '',
     aiScopedModels: DEFAULT_AI_SCOPED_MODELS,
     aiDefaultModel: 'gemini:gemini-2.5-flash',
+    mcpEnabled: false,
+    mcpPort: 3000,
+    mcpPermission: 'read',
   },
   render: (props) => <AiSettingsTab {...props} />,
 };
