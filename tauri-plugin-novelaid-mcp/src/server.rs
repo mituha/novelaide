@@ -524,6 +524,19 @@ fn get_tool_definitions(permission: McpPermissionLevel) -> Vec<McpToolInfo> {
             }),
         },
         McpToolInfo {
+            name: "search_text".to_string(),
+            description: "プロジェクト内の全ファイル（原稿・設定・プロット等）を対象にキーワードを全文検索し、マッチした行番号・該当行テキスト・前後スニペットを返却します。エディターで開かれている未保存バッファを最優先で走査します。".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": { "type": "string", "description": "検索キーワード（例: 魔導書, 「行こう」, 賢者の石）" },
+                    "path_filter": { "type": "string", "description": "ファイルパスまたはフォルダー名での絞り込み（例: 01_本編, characters, .md）" },
+                    "case_sensitive": { "type": "boolean", "description": "大文字と小文字を区別するかどうか（省略時は false）" }
+                },
+                "required": ["query"]
+            }),
+        },
+        McpToolInfo {
             name: "scan_proofread".to_string(),
             description: "原稿テキストに対し、純Rust製 Lindera による本格校正（三点リーダー、会話文末、重言、ら抜き言葉等）を実行します。".to_string(),
             input_schema: json!({

@@ -365,6 +365,11 @@ class ExternalControlService {
           return await this.handleSearchMetadata(args);
         }
 
+        case 'search_text':
+        case 'grep': {
+          return await this.handleSearchText(args);
+        }
+
         default:
           return {
             result: {
@@ -959,6 +964,160 @@ class ExternalControlService {
         matchCount: allResults.length,
         summaryText,
         results: allResults.slice(0, 20),
+      },
+    };
+  }
+
+  private async handleSearchText(args: Record<string, any>): Promise<ToolExecutionResult> {
+    const rawQuery = String(args.query || args.keyword || args.text || '').trim();
+    if (!rawQuery) {
+      return {
+        result: { status: 'error', message: '検索キーワード (query) が指定されていません。' },
+        isError: true,
+      };
+    }
+
+    const caseSensitive = !!args.case_sensitive;
+    const query = caseSensitive ? rawQuery : rawQuery.toLowerCase();
+    const pathFilter = args.path_filter ? String(args.path_filter).toLowerCase() : '';
+
+    // プロジェクトファイル一覧の準備（未ロード時は走査）
+    let projectFiles = this.context?.projectFiles || [];
+    const projectPath = this.context?.projectPath;
+    if (projectFiles.length === 0 && projectPath) {
+      try {
+        const entries = await fileService.readDirectory(projectPath, true);
+        const allFiles: Array<{ path: string; relativePath: string; name: string; stem: string }> = [];
+        const collect = (items: DirEntry[]) => {
+          for (const item of items) {
+            if (!item.isDirectory) {
+              allFiles.push({
+                path: item.path,
+                relativePath: item.relativePath || item.name,
+                name: item.name,
+                stem: item.fileTitle || fileService.stem(item.name),
+              });
+            }
+            if (item.children) collect(item.children);
+          }
+        };
+        collect(entries);
+        projectFiles = allFiles;
+        if (this.context) this.context.projectFiles = allFiles;
+      } catch (e) {
+        console.warn('[ExternalControlService] readDirectory failed in handleSearchText:', e);
+      }
+    }
+
+    const openDocs = this.context?.openDocuments || [];
+
+    // 対象ファイルの絞り込み（テキスト・原稿・設定系ファイル）
+    const targetFiles = projectFiles.filter((f) => {
+      const p = (f.relativePath || f.path).toLowerCase();
+      // パスフィルター適用
+      if (pathFilter && !p.includes(pathFilter)) return false;
+      // テキスト系拡張子に限定（画像やバイナリ等を除外）
+      const ext = p.split('.').pop() || '';
+      return ['md', 'txt', 'novel', 'ch', 'json', 'yaml', 'yml'].includes(ext);
+    });
+
+    interface MatchItem {
+      filePath: string;
+      relativePath: string;
+      fileName: string;
+      lineNumber: number;
+      lineText: string;
+      snippet: string;
+    }
+
+    const matches: MatchItem[] = [];
+    const MAX_TOTAL_MATCHES = 100;
+
+    for (const fileItem of targetFiles) {
+      if (matches.length >= MAX_TOTAL_MATCHES) break;
+
+      let content = '';
+      const openDoc = openDocs.find((d) => fileService.isSamePath(d.path, fileItem.path));
+      if (openDoc) {
+        content = openDoc.content;
+      } else {
+        try {
+          const f = await fileService.readFile(fileItem.path);
+          content = f.content;
+        } catch {
+          continue;
+        }
+      }
+
+      if (!content) continue;
+
+      const lines = content.split(/\r?\n/);
+      for (let i = 0; i < lines.length; i++) {
+        if (matches.length >= MAX_TOTAL_MATCHES) break;
+
+        const currentLine = lines[i];
+        const matchFound = caseSensitive
+          ? currentLine.includes(query)
+          : currentLine.toLowerCase().includes(query);
+
+        if (matchFound) {
+          // 前後1行を含めたスニペット生成
+          const prevLine = i > 0 ? lines[i - 1] : '';
+          const nextLine = i < lines.length - 1 ? lines[i + 1] : '';
+          const snippetParts = [
+            prevLine ? `  ${i}: ${prevLine}` : null,
+            `▶ ${i + 1}: ${currentLine}`,
+            nextLine ? `  ${i + 2}: ${nextLine}` : null,
+          ].filter(Boolean);
+
+          matches.push({
+            filePath: fileItem.path,
+            relativePath: fileItem.relativePath || fileItem.name,
+            fileName: fileItem.name,
+            lineNumber: i + 1,
+            lineText: currentLine.trim(),
+            snippet: snippetParts.join('\n'),
+          });
+        }
+      }
+    }
+
+    // AI（LLM）向け要約テキストの生成
+    const summaryLines = [
+      `【全文検索結果】キーワード「${rawQuery}」: 合計 ${matches.length} 件マッチ${matches.length >= MAX_TOTAL_MATCHES ? ' (上限100件に到達)' : ''}`,
+    ];
+
+    if (matches.length === 0) {
+      summaryLines.push('該当するテキストは見つかりませんでした。');
+    } else {
+      // ファイルごとにグループ化して要約
+      const fileGroupMap = new Map<string, MatchItem[]>();
+      for (const m of matches) {
+        const list = fileGroupMap.get(m.relativePath) || [];
+        list.push(m);
+        fileGroupMap.set(m.relativePath, list);
+      }
+
+      for (const [relPath, items] of fileGroupMap.entries()) {
+        summaryLines.push(`\n📄 ${relPath} (${items.length}件):`);
+        for (const item of items.slice(0, 5)) {
+          summaryLines.push(`  - L${item.lineNumber}: ${item.lineText}`);
+        }
+        if (items.length > 5) {
+          summaryLines.push(`  ...他 ${items.length - 5} 件`);
+        }
+      }
+    }
+
+    const summaryText = summaryLines.join('\n');
+
+    return {
+      result: {
+        status: 'success',
+        query: rawQuery,
+        totalMatches: matches.length,
+        summaryText,
+        matches,
       },
     };
   }
