@@ -3,6 +3,24 @@
 var core = require('@tauri-apps/api/core');
 
 /**
+ * ルビおよび傍点に関する標準定数（入力・生成時の一元管理用）。
+ * 入力補完・挿入・生成は半角パイプ（|）に統一します。
+ */
+const RUBY_CONSTANTS = {
+    /** 入力・標準出力で使用するパイプ記号（半角統一） */
+    PIPE: '|',
+    /** 読み取り時に許容される全角パイプ記号 */
+    FULLWIDTH_PIPE: '｜',
+    /** ルビ開始括弧 */
+    OPEN_BRACKET: '《',
+    /** ルビ終了括弧 */
+    CLOSE_BRACKET: '》',
+    /** 傍点開始記法 */
+    BOUTEN_OPEN: '《《',
+    /** 傍点終了記法 */
+    BOUTEN_CLOSE: '》》',
+};
+/**
  * ルビおよび傍点に関する正規表現パターン。
  * カクヨム記法およびなろう記法に準拠したパターンを提供します。
  */
@@ -155,6 +173,69 @@ const BRACKET_PATTERNS = {
 function formatRuby(surface, ruby) {
     return `|${surface}《${ruby}》`;
 }
+/**
+ * 全角パイプ（｜）のルビ記法を、半角パイプ（|）に正規化します。
+ * 外部から読み込んだテキストや設定資料のルビ記法を半角統一する際に使用します。
+ *
+ * @param text 対象テキスト
+ * @returns 半角パイプに統一されたテキスト
+ */
+function normalizeRubyPipe(text) {
+    if (!text)
+        return '';
+    return text.replace(/｜([^|｜\n《》]+《[^《》\n]+》)/g, '|$1');
+}
+/**
+ * Monaco Editor 補完用のルビ記法スニペット定義を生成します。
+ * 入力・挿入は半角パイプ（|）で統一されます。
+ *
+ * @param selectedText エディタで選択中のテキスト（存在する場合）
+ */
+function createRubySnippet(selectedText) {
+    const hasSelection = Boolean(selectedText && selectedText.length > 0);
+    const escapedSelectedText = hasSelection ? selectedText.replace(/[$}\\]/g, '\\$&') : '';
+    return {
+        label: 'ルビ: |漢字《かんじ》',
+        insertText: hasSelection
+            ? `|${escapedSelectedText}《\${1:よみ}》`
+            : '|${1:漢字}《${2:よみ}》',
+        detail: hasSelection
+            ? `ルビ記法: |${selectedText}《…》`
+            : 'ルビ記法（novelaid標準）',
+        filterText: hasSelection
+            ? `${selectedText} ルビ るび ruby 漢字 かんじ |｜`
+            : 'ルビ るび ruby 漢字 かんじ |｜',
+        documentation: hasSelection
+            ? `選択中の「${selectedText}」にルビ記法を適用します。Tabキーで読みの入力へジャンプできます。`
+            : '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
+        sortText: '03_ruby',
+    };
+}
+/**
+ * Monaco Editor 補完用の傍点記法スニペット定義を生成します。
+ *
+ * @param selectedText エディタで選択中のテキスト（存在する場合）
+ */
+function createBoutenSnippet(selectedText) {
+    const hasSelection = Boolean(selectedText && selectedText.length > 0);
+    const escapedSelectedText = hasSelection ? selectedText.replace(/[$}\\]/g, '\\$&') : '';
+    return {
+        label: '傍点: 《《強調》》',
+        insertText: hasSelection
+            ? `《《${escapedSelectedText}》》`
+            : '《《${1:テキスト}》》',
+        detail: hasSelection
+            ? `傍点記法: 《《${selectedText}》》`
+            : '傍点記法（強調）',
+        filterText: hasSelection
+            ? `${selectedText} 傍点 ぼうてん 強調 きょうちょう 《《`
+            : '傍点 ぼうてん 強調 きょうちょう 《《',
+        documentation: hasSelection
+            ? `選択中の「${selectedText}」を傍点（《《…》》）で囲みます。`
+            : '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
+        sortText: '04_bouten',
+    };
+}
 const isHiraganaChar = (c) => c >= '\u3040' && c <= '\u309F';
 const isKanjiChar = (c) => (c >= '\u4E00' && c <= '\u9FFF') || c === '々' || c === '〇';
 /**
@@ -282,11 +363,15 @@ exports.DIALOGUE_PATTERNS = DIALOGUE_PATTERNS;
 exports.NOVEL_BRACKET_PAIRS = NOVEL_BRACKET_PAIRS;
 exports.NOVEL_MONARCH_PATTERNS = NOVEL_MONARCH_PATTERNS;
 exports.NOVEL_PATTERNS = NOVEL_PATTERNS;
+exports.RUBY_CONSTANTS = RUBY_CONSTANTS;
 exports.RUBY_PATTERNS = RUBY_PATTERNS;
 exports.countCharacters = countCharacters;
+exports.createBoutenSnippet = createBoutenSnippet;
+exports.createRubySnippet = createRubySnippet;
 exports.extractRubyText = extractRubyText;
 exports.formatRuby = formatRuby;
 exports.formatSmartRuby = formatSmartRuby;
+exports.normalizeRubyPipe = normalizeRubyPipe;
 exports.stripRuby = stripRuby;
 exports.stripRubyWithMap = stripRubyWithMap;
 exports.transformToHtml = transformToHtml;

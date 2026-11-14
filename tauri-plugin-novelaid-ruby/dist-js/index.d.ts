@@ -11,6 +11,43 @@ export * from './patterns';
  */
 export declare function formatRuby(surface: string, ruby: string): string;
 /**
+ * 全角パイプ（｜）のルビ記法を、半角パイプ（|）に正規化します。
+ * 外部から読み込んだテキストや設定資料のルビ記法を半角統一する際に使用します。
+ *
+ * @param text 対象テキスト
+ * @returns 半角パイプに統一されたテキスト
+ */
+export declare function normalizeRubyPipe(text: string): string;
+export interface RubySnippetOptions {
+    label: string;
+    insertText: string;
+    detail: string;
+    filterText: string;
+    documentation: string;
+    sortText: string;
+}
+/**
+ * Monaco Editor 補完用のルビ記法スニペット定義を生成します。
+ * 入力・挿入は半角パイプ（|）で統一されます。
+ *
+ * @param selectedText エディタで選択中のテキスト（存在する場合）
+ */
+export declare function createRubySnippet(selectedText?: string): RubySnippetOptions;
+export interface BoutenSnippetOptions {
+    label: string;
+    insertText: string;
+    detail: string;
+    filterText: string;
+    documentation: string;
+    sortText: string;
+}
+/**
+ * Monaco Editor 補完用の傍点記法スニペット定義を生成します。
+ *
+ * @param selectedText エディタで選択中のテキスト（存在する場合）
+ */
+export declare function createBoutenSnippet(selectedText?: string): BoutenSnippetOptions;
+/**
  * 送り仮名（ひらがな）を自動検知して分離し、漢字部分にのみルビを振るスマート記法を生成します。
  * 本文への確定・適用段階で呼び出します。
  *

@@ -1,10 +1,50 @@
 import { describe, it, expect } from 'vitest';
-import { formatRuby, formatSmartRuby, NOVEL_PATTERNS, NOVEL_MONARCH_PATTERNS } from '../index';
+import {
+  formatRuby,
+  formatSmartRuby,
+  normalizeRubyPipe,
+  createRubySnippet,
+  createBoutenSnippet,
+  RUBY_CONSTANTS,
+  NOVEL_PATTERNS,
+  NOVEL_MONARCH_PATTERNS,
+} from '../index';
 
 describe('tauri-plugin-novelaid-ruby guest-js tests', () => {
-  it('formatRuby should generate standard ruby syntax', () => {
+  it('formatRuby should generate standard ruby syntax with half-width pipe', () => {
     const formatted = formatRuby('漢字', 'かんじ');
     expect(formatted).toBe('|漢字《かんじ》');
+  });
+
+  it('normalizeRubyPipe should convert full-width pipe to half-width pipe for ruby syntax', () => {
+    expect(normalizeRubyPipe('｜親文字《ルビ》')).toBe('|親文字《ルビ》');
+    expect(normalizeRubyPipe('普通のテキスト｜パイプのみ')).toBe('普通のテキスト｜パイプのみ');
+    expect(normalizeRubyPipe('｜勝魚《かつお》と｜武市《ぶし》')).toBe('|勝魚《かつお》と|武市《ぶし》');
+  });
+
+  it('createRubySnippet should generate snippet options with half-width pipe', () => {
+    const snippetWithoutSelection = createRubySnippet();
+    expect(snippetWithoutSelection.label).toBe('ルビ: |漢字《かんじ》');
+    expect(snippetWithoutSelection.insertText).toBe('|${1:漢字}《${2:よみ}》');
+    expect(snippetWithoutSelection.insertText.startsWith('|')).toBe(true);
+    expect(snippetWithoutSelection.insertText.includes('｜')).toBe(false);
+
+    const snippetWithSelection = createRubySnippet('選択テキスト');
+    expect(snippetWithSelection.insertText).toBe('|選択テキスト《${1:よみ}》');
+    expect(snippetWithSelection.insertText.startsWith('|')).toBe(true);
+  });
+
+  it('createBoutenSnippet should generate bouten snippet options', () => {
+    const boutenWithoutSelection = createBoutenSnippet();
+    expect(boutenWithoutSelection.insertText).toBe('《《${1:テキスト}》》');
+
+    const boutenWithSelection = createBoutenSnippet('強調語');
+    expect(boutenWithSelection.insertText).toBe('《《強調語》》');
+  });
+
+  it('RUBY_CONSTANTS should have correct pipe characters', () => {
+    expect(RUBY_CONSTANTS.PIPE).toBe('|');
+    expect(RUBY_CONSTANTS.FULLWIDTH_PIPE).toBe('｜');
   });
 
   it('formatSmartRuby should trim okurigana properly and handle various patterns', () => {

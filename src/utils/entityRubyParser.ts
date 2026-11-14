@@ -1,4 +1,4 @@
-import { stripRubyWithMap } from 'tauri-plugin-novelaid-ruby-api';
+import { stripRubyWithMap, normalizeRubyPipe } from 'tauri-plugin-novelaid-ruby-api';
 
 export interface RubyEntityPart {
   /** 親文字（例: '勝魚'） */
@@ -112,7 +112,7 @@ export async function parseFirstLineRubies(content: string): Promise<ExtractedEn
   return {
     hasRuby,
     surfaceFull: cleanText || firstLine,
-    rubyTextFull: firstLine,
+    rubyTextFull: normalizeRubyPipe(firstLine),
     readingFull,
     parts,
   };

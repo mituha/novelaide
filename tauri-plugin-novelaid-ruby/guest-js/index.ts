@@ -16,6 +16,91 @@ export function formatRuby(surface: string, ruby: string): string {
   return `|${surface}《${ruby}》`;
 }
 
+/**
+ * 全角パイプ（｜）のルビ記法を、半角パイプ（|）に正規化します。
+ * 外部から読み込んだテキストや設定資料のルビ記法を半角統一する際に使用します。
+ *
+ * @param text 対象テキスト
+ * @returns 半角パイプに統一されたテキスト
+ */
+export function normalizeRubyPipe(text: string): string {
+  if (!text) return '';
+  return text.replace(/｜([^|｜\n《》]+《[^《》\n]+》)/g, '|$1');
+}
+
+export interface RubySnippetOptions {
+  label: string;
+  insertText: string;
+  detail: string;
+  filterText: string;
+  documentation: string;
+  sortText: string;
+}
+
+/**
+ * Monaco Editor 補完用のルビ記法スニペット定義を生成します。
+ * 入力・挿入は半角パイプ（|）で統一されます。
+ *
+ * @param selectedText エディタで選択中のテキスト（存在する場合）
+ */
+export function createRubySnippet(selectedText?: string): RubySnippetOptions {
+  const hasSelection = Boolean(selectedText && selectedText.length > 0);
+  const escapedSelectedText = hasSelection ? selectedText!.replace(/[$}\\]/g, '\\$&') : '';
+
+  return {
+    label: 'ルビ: |漢字《かんじ》',
+    insertText: hasSelection
+      ? `|${escapedSelectedText}《\${1:よみ}》`
+      : '|${1:漢字}《${2:よみ}》',
+    detail: hasSelection
+      ? `ルビ記法: |${selectedText}《…》`
+      : 'ルビ記法（novelaid標準）',
+    filterText: hasSelection
+      ? `${selectedText} ルビ るび ruby 漢字 かんじ |｜`
+      : 'ルビ るび ruby 漢字 かんじ |｜',
+    documentation: hasSelection
+      ? `選択中の「${selectedText}」にルビ記法を適用します。Tabキーで読みの入力へジャンプできます。`
+      : '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
+    sortText: '03_ruby',
+  };
+}
+
+export interface BoutenSnippetOptions {
+  label: string;
+  insertText: string;
+  detail: string;
+  filterText: string;
+  documentation: string;
+  sortText: string;
+}
+
+/**
+ * Monaco Editor 補完用の傍点記法スニペット定義を生成します。
+ *
+ * @param selectedText エディタで選択中のテキスト（存在する場合）
+ */
+export function createBoutenSnippet(selectedText?: string): BoutenSnippetOptions {
+  const hasSelection = Boolean(selectedText && selectedText.length > 0);
+  const escapedSelectedText = hasSelection ? selectedText!.replace(/[$}\\]/g, '\\$&') : '';
+
+  return {
+    label: '傍点: 《《強調》》',
+    insertText: hasSelection
+      ? `《《${escapedSelectedText}》》`
+      : '《《${1:テキスト}》》',
+    detail: hasSelection
+      ? `傍点記法: 《《${selectedText}》》`
+      : '傍点記法（強調）',
+    filterText: hasSelection
+      ? `${selectedText} 傍点 ぼうてん 強調 きょうちょう 《《`
+      : '傍点 ぼうてん 強調 きょうちょう 《《',
+    documentation: hasSelection
+      ? `選択中の「${selectedText}」を傍点（《《…》》）で囲みます。`
+      : '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
+    sortText: '04_bouten',
+  };
+}
+
 const isHiraganaChar = (c: string) => c >= '\u3040' && c <= '\u309F';
 const isKanjiChar = (c: string) => (c >= '\u4E00' && c <= '\u9FFF') || c === '々' || c === '〇';
 

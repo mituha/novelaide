@@ -1,4 +1,22 @@
 /**
+ * ルビおよび傍点に関する標準定数（入力・生成時の一元管理用）。
+ * 入力補完・挿入・生成は半角パイプ（|）に統一します。
+ */
+export declare const RUBY_CONSTANTS: {
+    /** 入力・標準出力で使用するパイプ記号（半角統一） */
+    PIPE: string;
+    /** 読み取り時に許容される全角パイプ記号 */
+    FULLWIDTH_PIPE: string;
+    /** ルビ開始括弧 */
+    OPEN_BRACKET: string;
+    /** ルビ終了括弧 */
+    CLOSE_BRACKET: string;
+    /** 傍点開始記法 */
+    BOUTEN_OPEN: string;
+    /** 傍点終了記法 */
+    BOUTEN_CLOSE: string;
+};
+/**
  * ルビおよび傍点に関する正規表現パターン。
  * カクヨム記法およびなろう記法に準拠したパターンを提供します。
  */

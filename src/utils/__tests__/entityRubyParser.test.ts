@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { extractFirstNonEmptyLine, parseRubiesSync } from '../entityRubyParser';
+import {
+  extractFirstNonEmptyLine,
+  parseRubiesSync,
+  parseFirstLineRubies,
+} from '../entityRubyParser';
 
 describe('entityRubyParser', () => {
   describe('extractFirstNonEmptyLine', () => {
@@ -43,6 +47,13 @@ describe('entityRubyParser', () => {
         { surface: '勝魚', ruby: 'かつお' },
         { surface: '武市', ruby: 'ぶし' },
       ]);
+    });
+
+    it('parseFirstLineRubiesで全角パイプが半角パイプに正規化される', async () => {
+      const content = '# ｜勝魚《かつお》｜武市《ぶし》\n本文です。';
+      const result = await parseFirstLineRubies(content);
+      expect(result).not.toBeNull();
+      expect(result?.rubyTextFull).toBe('|勝魚《かつお》|武市《ぶし》');
     });
 
     it('ルビがない場合はそのまま親文字として返す', () => {

@@ -3,6 +3,8 @@ import {
   NOVEL_BRACKET_PAIRS,
   NOVEL_MONARCH_PATTERNS,
   NOVEL_PATTERNS,
+  createRubySnippet,
+  createBoutenSnippet,
 } from 'tauri-plugin-novelaid-ruby-api';
 
 /**
@@ -116,9 +118,6 @@ export class EditorSupport {
           const hasSelection = !!(selection && !selection.isEmpty());
           const selectedText = hasSelection ? model.getValueInRange(selection) : '';
 
-          // スニペット構文用エスケープ
-          const escapedSelectedText = selectedText.replace(/([\\$}`])/g, '\\$1');
-
           // 適用対象の範囲（単一 IRange）
           // ※ Monaco は CompletionItemRanges.insert.startColumn !== replace.startColumn の場合
           // isInvalid = true として全破棄するため、必ず単一の IRange を使用する
@@ -161,44 +160,34 @@ export class EditorSupport {
               range: targetRange,
               sortText: '02_dash',
             },
-            {
-              label: 'ルビ: ｜漢字《かんじ》',
-              kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: hasSelection
-                ? `｜${escapedSelectedText}《\${1:よみ}》`
-                : '｜${1:漢字}《${2:よみ}》',
-              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              filterText: hasSelection
-                ? `${selectedText} ルビ るび ruby 漢字 かんじ ｜|`
-                : 'ルビ るび ruby 漢字 かんじ ｜|',
-              detail: hasSelection
-                ? `ルビ記法: ｜${selectedText}《…》`
-                : 'ルビ記法（novelaid標準）',
-              documentation: hasSelection
-                ? `選択中の「${selectedText}」にルビ記法を適用します。Tabキーで読みの入力へジャンプできます。`
-                : '小説ルビ記法スニペット。Tabキーで漢字と読みに順次ジャンプできます。',
-              range: targetRange,
-              sortText: '03_ruby',
-            },
-            {
-              label: '傍点: 《《強調》》',
-              kind: monaco.languages.CompletionItemKind.Snippet,
-              insertText: hasSelection
-                ? `《《${escapedSelectedText}》》`
-                : '《《${1:テキスト}》》',
-              insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
-              filterText: hasSelection
-                ? `${selectedText} 傍点 ぼうてん 強調 きょうちょう 《《`
-                : '傍点 ぼうてん 強調 きょうちょう 《《',
-              detail: hasSelection
-                ? `傍点記法: 《《${selectedText}》》`
-                : '傍点記法（強調）',
-              documentation: hasSelection
-                ? `選択中の「${selectedText}」を傍点（《《…》》）で囲みます。`
-                : '傍点記法スニペット。Tabキーでテキスト部分を直接入力できます。',
-              range: targetRange,
-              sortText: '04_bouten',
-            },
+            (() => {
+              const rubySnippet = createRubySnippet(selectedText);
+              return {
+                label: rubySnippet.label,
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                insertText: rubySnippet.insertText,
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                filterText: rubySnippet.filterText,
+                detail: rubySnippet.detail,
+                documentation: rubySnippet.documentation,
+                range: targetRange,
+                sortText: rubySnippet.sortText,
+              };
+            })(),
+            (() => {
+              const boutenSnippet = createBoutenSnippet(selectedText);
+              return {
+                label: boutenSnippet.label,
+                kind: monaco.languages.CompletionItemKind.Snippet,
+                insertText: boutenSnippet.insertText,
+                insertTextRules: monaco.languages.CompletionItemInsertTextRule.InsertAsSnippet,
+                filterText: boutenSnippet.filterText,
+                detail: boutenSnippet.detail,
+                documentation: boutenSnippet.documentation,
+                range: targetRange,
+                sortText: boutenSnippet.sortText,
+              };
+            })(),
           ];
 
           // 閉じ括弧の補完ロジック（tauri-plugin-novelaid-ruby 一元管理定義を使用）
