@@ -3,7 +3,8 @@ import { panelRegistry } from "../../core/panelRegistry";
 import { useTheme } from "../../contexts/ThemeContext";
 import { useDocument } from "../../contexts/DocumentContext";
 import { useSettings } from "restar-app-settings";
-import { Sun, Moon, Coffee, Laptop, Settings } from "lucide-react";
+import { Sun, Moon, Coffee, Laptop, Settings, HelpCircle } from "lucide-react";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import "./ActivityBar.css";
 
 export type PanelId = string | null;
@@ -104,6 +105,24 @@ export const ActivityBar: React.FC<ActivityBarProps> = ({
             aria-label="テーマ切り替え"
           >
             {getThemeIcon()}
+          </button>
+
+          <button
+            type="button"
+            className="activity-button"
+            onClick={async () => {
+              const url = "https://mituha.github.io/novelaide/manual/";
+              try {
+                await openUrl(url);
+              } catch (err) {
+                console.warn("[ActivityBar] Failed to openUrl, fallback to window.open:", err);
+                window.open(url, "_blank");
+              }
+            }}
+            title="公式Webマニュアルを開く"
+            aria-label="公式Webマニュアルを開く"
+          >
+            <HelpCircle size={20} />
           </button>
 
           <button

@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import type { SettingTabPlugin, SettingTabProps } from 'restar-app-settings';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/Update/UpdateModal';
-import { RefreshCw, CheckCircle, AlertCircle } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, BookOpen, ExternalLink, Github, FileText } from 'lucide-react';
+import { openUrl } from '@tauri-apps/plugin-opener';
 import packageJson from '../../../package.json';
 
 const GeneralSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting }) => {
@@ -117,6 +118,59 @@ const GeneralSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting
           <span>{errorMessage}</span>
         </div>
       )}
+
+      {/* 公式ドキュメント・関連リンク */}
+      <div className="setting-row" style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid var(--border-color, rgba(255, 255, 255, 0.1))' }}>
+        <div className="setting-info">
+          <label className="setting-label">公式ドキュメント・関連リンク</label>
+          <div className="setting-desc">
+            Webブラウザで公式ユーザーマニュアルや最新リリース、メイキング連載を閲覧します。
+          </div>
+        </div>
+        <div className="setting-control" style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', justifyContent: 'flex-end' }}>
+          <button
+            type="button"
+            className="theme-option-btn"
+            style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+            onClick={async () => {
+              const url = 'https://mituha.github.io/novelaide/manual/';
+              try { await openUrl(url); } catch { window.open(url, '_blank'); }
+            }}
+          >
+            <BookOpen size={13} />
+            <span>Webマニュアル</span>
+            <ExternalLink size={11} style={{ opacity: 0.6 }} />
+          </button>
+
+          <button
+            type="button"
+            className="theme-option-btn"
+            style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+            onClick={async () => {
+              const url = 'https://mituha.github.io/novelaide/notes/';
+              try { await openUrl(url); } catch { window.open(url, '_blank'); }
+            }}
+          >
+            <FileText size={13} />
+            <span>メイキング連載</span>
+            <ExternalLink size={11} style={{ opacity: 0.6 }} />
+          </button>
+
+          <button
+            type="button"
+            className="theme-option-btn"
+            style={{ padding: '6px 12px', display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '12px' }}
+            onClick={async () => {
+              const url = 'https://github.com/mituha/novelaide/releases/latest';
+              try { await openUrl(url); } catch { window.open(url, '_blank'); }
+            }}
+          >
+            <Github size={13} />
+            <span>最新リリース</span>
+            <ExternalLink size={11} style={{ opacity: 0.6 }} />
+          </button>
+        </div>
+      </div>
 
       {/* アップデートモーダル */}
       {foundUpdate && (
