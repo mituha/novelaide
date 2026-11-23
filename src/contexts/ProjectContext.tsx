@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from "react";
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from "react";
 import type { ProjectItem } from "restar-app";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
@@ -10,7 +10,8 @@ interface ProjectContextType {
   appVersion: string;
   recentProjects: ProjectItem[];
   openProject: (path: string, name?: string) => Promise<void>;
-  closeProject: () => void;
+  closeProject: () => Promise<void>;
+  registerCloseHandler: (handler: (() => Promise<void> | void) | null) => void;
   removeRecentProject: (path: string) => Promise<void>;
   addRecentProject: (name: string, path: string) => Promise<void>;
 }
@@ -44,6 +45,11 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   });
 
   const [appVersion, setAppVersion] = useState<string>("");
+  const closeHandlerRef = useRef<(() => Promise<void> | void) | null>(null);
+
+  const registerCloseHandler = useCallback((handler: (() => Promise<void> | void) | null) => {
+    closeHandlerRef.current = handler;
+  }, []);
 
   const updateTitle = useCallback(async (pName: string | null, version: string) => {
     const base = "novelaide";
@@ -104,26 +110,39 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
     });
   };
 
-  // プロジェクトを開く
-  const openProject = async (path: string, customName?: string) => {
-    const parts = path.split(/[\\/]/).filter(Boolean);
-    const name = customName || parts[parts.length - 1] || "Untitled";
-
-    bootLog("openProject called:", { path, name });
-    setProjectPath(path);
-    setProjectName(name);
-    localStorage.setItem(CURRENT_PROJECT_KEY, path);
-
-    await addRecentProject(name, path);
-  };
-
   // プロジェクトを閉じる（ランチャーへ戻る）
-  const closeProject = () => {
+  const closeProject = useCallback(async () => {
     bootLog("closeProject called");
+    if (closeHandlerRef.current) {
+      try {
+        await closeHandlerRef.current();
+      } catch (err) {
+        console.error("Failed to execute closeHandler in closeProject:", err);
+      }
+    }
     setProjectPath(null);
     setProjectName(null);
     localStorage.removeItem(CURRENT_PROJECT_KEY);
-  };
+  }, []);
+
+  // プロジェクトを開く
+  const openProject = useCallback(
+    async (path: string, customName?: string) => {
+      bootLog("openProject called:", { path, customName, currentProjectPath: projectPath });
+      if (projectPath && projectPath !== path) {
+        await closeProject();
+      }
+      const parts = path.split(/[\\/]/).filter(Boolean);
+      const name = customName || parts[parts.length - 1] || "Untitled";
+
+      setProjectPath(path);
+      setProjectName(name);
+      localStorage.setItem(CURRENT_PROJECT_KEY, path);
+
+      await addRecentProject(name, path);
+    },
+    [projectPath, closeProject]
+  );
 
   useEffect(() => {
     if (projectPath) {
@@ -142,6 +161,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
         recentProjects,
         openProject,
         closeProject,
+        registerCloseHandler,
         removeRecentProject,
         addRecentProject,
       }}

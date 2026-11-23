@@ -48,6 +48,7 @@ interface DocumentContextType {
   closeRightTabs: (path: string, paneId?: PaneId) => Promise<void>;
   closeLeftTabs: (path: string, paneId?: PaneId) => Promise<void>;
   closeAllTabs: (paneId?: PaneId) => Promise<void>;
+  closeAllDocuments: (options?: { saveDirty?: boolean }) => Promise<void>;
   switchTab: (path: string, paneId?: PaneId) => void;
   setActivePane: (paneId: PaneId) => void;
   setActivePath: (path: string) => void;
@@ -77,7 +78,7 @@ const DocumentContext = createContext<DocumentContextType | undefined>(undefined
 
 export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { showToast, showBanner, dismissBanner, showStatusMessage } = useNotification();
-  const { projectPath: currentProjectPath } = useProject();
+  const { projectPath: currentProjectPath, registerCloseHandler } = useProject();
   const [openDocuments, setOpenDocuments] = useState<DocumentState[]>([]);
   const [activePane, setActivePane] = useState<PaneId>('editor.left');
   const [activePathByPane, setActivePathByPane] = useState<Record<PaneId, string | null>>({
@@ -570,6 +571,40 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     },
     [activePane, openDocuments, closeTab]
+  );
+
+  // 全ドキュメントを閉じる（プロジェクト切替やアプリ終了時に使用）
+  const closeAllDocuments = useCallback(
+    async (options?: { saveDirty?: boolean }) => {
+      console.log('[DocumentContext] closeAllDocuments called', options);
+      if (options?.saveDirty !== false) {
+        const dirtyDocs = openDocumentsRef.current.filter((d) => d.isDirty);
+        for (const doc of dirtyDocs) {
+          clearAutoSaveTimer(doc.path);
+          try {
+            await saveDocument(doc.path);
+          } catch (e) {
+            console.error(`[DocumentContext] Failed to save dirty doc on closeAll: ${doc.path}`, e);
+          }
+        }
+      }
+
+      // 自動保存タイマーの全クリア
+      Object.keys(autoSaveTimersRef.current).forEach((p) => {
+        clearTimeout(autoSaveTimersRef.current[p]);
+      });
+      autoSaveTimersRef.current = {};
+
+      openDocumentsRef.current = [];
+      setOpenDocuments([]);
+      setActivePathByPane({
+        'editor.left': null,
+        'editor.right': null,
+      });
+      setIsSplit(false);
+      setActivePane('editor.left');
+    },
+    [clearAutoSaveTimer, saveDocument]
   );
 
   // ペインを閉じる
@@ -1299,16 +1334,36 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     return unsub;
   }, [showToast]);
 
+  // ProjectContext のクローズハンドラに自身を登録
+  useEffect(() => {
+    if (registerCloseHandler) {
+      registerCloseHandler(async () => {
+        await closeAllDocuments({ saveDirty: true });
+      });
+    }
+    return () => {
+      if (registerCloseHandler) {
+        registerCloseHandler(null);
+      }
+    };
+  }, [registerCloseHandler, closeAllDocuments]);
+
   // プロジェクト切替 / クローズ時に開いているドキュメントをクリア
   const prevProjectPathRef = useRef<string | null>(currentProjectPath);
   useEffect(() => {
     if (prevProjectPathRef.current && prevProjectPathRef.current !== currentProjectPath) {
+      console.log('[DocumentContext] currentProjectPath changed, resetting document state:', {
+        from: prevProjectPathRef.current,
+        to: currentProjectPath,
+      });
+      openDocumentsRef.current = [];
       setOpenDocuments([]);
       setActivePathByPane({
         'editor.left': null,
         'editor.right': null,
       });
       setIsSplit(false);
+      autoRestoredProjectRef.current = null;
     }
     prevProjectPathRef.current = currentProjectPath;
   }, [currentProjectPath]);
@@ -1366,6 +1421,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         closeRightTabs,
         closeLeftTabs,
         closeAllTabs,
+        closeAllDocuments,
         switchTab,
         setActivePane: handleSetActivePane,
         setActivePath,

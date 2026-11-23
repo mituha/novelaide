@@ -13,12 +13,14 @@ import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
 import { MainLayout } from "./components/Layout/MainLayout";
 import { ProjectLauncherModal } from "./components/Launcher/ProjectLauncherModal";
+import { useWindowCloseHandler } from "./hooks/useWindowCloseHandler";
 import { bootLog } from "./utils/bootLogger";
 import "./styles/theme.css";
 import "./App.css";
 
 function AppContent() {
   const { projectPath } = useProject();
+  useWindowCloseHandler();
   // プロジェクトが開かれていない場合は最初からランチャーを表示
   const [isLauncherOpen, setIsLauncherOpen] = useState<boolean>(!projectPath);
 
