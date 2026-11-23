@@ -1,0 +1,9 @@
+title: novelaide ドキュメント
+description: 小説執筆用デスクトップIDE「novelaide」の公式ドキュメント・ユーザーマニュアル
+theme: jekyll-theme-cayman
+show_downloads: true
+google_analytics:
+markdown: kramdown
+kramdown:
+  input: GFM
+  hard_wrap: false
