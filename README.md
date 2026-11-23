@@ -1,9 +1,23 @@
 # novelaide
 
+[![Documentation](https://img.shields.io/badge/docs-GitHub_Pages-blue.svg)](https://mituha.github.io/novelaide/)
+[![Latest Release](https://img.shields.io/github/v/release/mituha/novelaide?label=latest)](https://github.com/mituha/novelaide/releases/latest)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](./LICENSE)
+
 小説執筆のための次世代デスクトップ統合執筆環境（IDE）です。  
 **Tauri 2.x**, **Rust**, **React 19**, **TypeScript**, そして **Pi Coding Agent SDK** を用いて一から設計・構築されています。
 
 左手で原稿を紡ぎ、右手で世界観を紐解くための「左右独立マルチタブ分割エリア」、縦書き文庫本組版プレビュー、安心のGit履歴管理、そしてメモリ上の未保存テキストまで理解する「AI執筆パートナー」を統合し、作家が物語の世界に没頭できる最高速かつ軽量な執筆体験を提供します。
+
+---
+
+## 🌐 公式ドキュメント・Webサイト
+
+* 📖 **[公式ドキュメントポータル](https://mituha.github.io/novelaide/)**
+* 📚 **[ユーザーマニュアル一覧](https://mituha.github.io/novelaide/manual/)**
+* 🛠️ **[開発者向け仕様書](https://mituha.github.io/novelaide/dev/)**
+* 📝 **[メイキング連載・開発ノート](https://mituha.github.io/novelaide/notes/)**
+* 🚀 **[最新インストーラーのダウンロード (Releases)](https://github.com/mituha/novelaide/releases/latest)**
 
 ---
 

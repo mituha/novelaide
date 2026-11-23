@@ -1,5 +1,8 @@
 # DocumentType::Codeおよび設定ファイル編集仕様
 
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)
+
+
 ## 1. 概要
 
 本仕様書は、`novelaide` において `.gitignore` や `.novelaidattributes` などのエディター・システム設定ファイル、および JSON、CSS、YAML、TOML、シェルスクリプト等のコード・設定ファイルを Monaco Editor で汎用的に編集・保存可能とするための **`DocumentType::Code`** の仕様、ならびにドキュメントの拡張子情報の一元管理仕様を定義するものです。
@@ -124,3 +127,8 @@ export interface DocumentState {
 - **アイコン表示**: `DocumentIcon` において `code` は `<FileCode style={{ color: "#f59e0b" }} />` を表示。
 - **タブ操作制御**: `code` ドキュメントではモード切替ボタン（`[Preview]` 等）を表示せず、エディター専用タブとしてクリーンに表示。
 - **校正除外**: 小説専用の形態素解析・ルビ校正マーカーは `code` ドキュメントでは動作させない。
+
+
+---
+
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)

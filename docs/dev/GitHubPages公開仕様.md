@@ -1,5 +1,8 @@
 # システム設計 - GitHub Pages ドキュメント公開仕様書
 
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)
+
+
 ## 1. 概要
 
 本ドキュメントは、小説執筆デスクトップIDE `novelaide`（コードネーム: `novelaid-e`）における、**GitHub Pages を利用した公式ドキュメント・Webサイト公開アーキテクチャ** の設計仕様を定義するものです。
@@ -82,3 +85,8 @@ GitHub リポジトリ側で GitHub Pages のデプロイ元を Actions に変�
 2. 左メニューの **Pages** を選択。
 3. **Build and deployment** の **Source** を「`Deploy from a branch`」から「**`GitHub Actions`**」に変更。
 4. これにより、ワークフローが成功すると自動的に `https://mituha.github.io/novelaide/` に反映されます。
+
+
+---
+
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)

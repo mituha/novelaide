@@ -1,5 +1,8 @@
 # プラグインアーキテクチャおよびRust型定義自動生成仕様書
 
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)
+
+
 ## 1. 概要
 
 本ドキュメントは、**`novelaide`** における **プラグイン分離設計（Tauri Plugin Architecture）** および **RustからTypeScriptへの型定義自動生成（`ts-rs`）** のシステム構成と運用仕様を定義するものです。
@@ -177,3 +180,8 @@ npm run typegen
 | **`tauri-plugin-novelaid-git`** | 執筆履歴管理、リビジョン分岐・マージ、Git差分抽出 | Gitコマンド実行やlibgit2の隔離、UIの軽量化 |
 | **`tauri-plugin-novelaid-ai`** | ローカル/リモートLLM接続、推敲・校正アシスト、プロンプト管理 | ストリーミング通信やAPIキー保護の局所化 |
 | **`tauri-plugin-novelaid-export`**| EPUB, PDF, テキスト原稿出力、縦書きフォーマット整形 | 出力エンジン依存関係（PandocやCSS Paged Media）の分離 |
+
+
+---
+
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)

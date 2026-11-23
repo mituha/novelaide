@@ -1,5 +1,8 @@
 # Tauriインストーラー生成および日本語化仕様
 
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)
+
+
 ## 1. 概要
 
 本仕様書は、`novelaide`（Tauri v2 ベースの小説執筆用エディター）における配布用インストーラー（Windows向け NSIS / WiX）の生成仕様、日本語ローカライゼーション設定（UIメッセージ、言語優先順位、ダイアログ制御）、および最小限・安全設計の構成を定義するものです。
@@ -104,3 +107,8 @@ npm run tauri build -- --bundles msi
   * `novelaide_<version>_x64-setup.nsis.zip` : 自動アップデータ（Tauri Updater）用
 * **WiX**: `src-tauri/target/release/bundle/msi/`
   * `novelaide_<version>_x64_ja-JP.msi` : MSI パッケージ
+
+
+---
+
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)

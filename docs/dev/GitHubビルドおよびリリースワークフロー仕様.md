@@ -12,6 +12,9 @@ tags:
 
 # GitHub ビルドおよびリリースワークフロー仕様書
 
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)
+
+
 ## 1. 概要
 
 本ドキュメントは、**`novelaide`** の GitHub リポジトリ（`https://github.com/mituha/novelaide`）における継続的インテグレーション（CI）および自動リリース（CD）ワークフローの設計仕様を定義するものです。
@@ -98,3 +101,8 @@ pwsh scripts/release.ps1 -Remote github -DryRun
 ```
 
 実行後、GitHub Actions の `Release` ジョブが自動起動し、約5〜10分で [GitHub Releases](https://github.com/mituha/novelaide/releases) にインストーラー付きドラフトが生成されます。
+
+
+---
+
+[← 開発仕様書一覧に戻る](./index.md) ｜ [トップポータル](../index.md)
