@@ -43,41 +43,6 @@ jobs:
           echo "Merged docs/ and making/notes/ successfully."
           ls -la public_site/
 
-      - name: Escape Liquid syntax in Markdown for Jekyll
-        run: |
-          node -e "
-          const fs = require('fs');
-          const path = require('path');
-          function sanitize(dir) {
-            for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
-              const full = path.join(dir, item.name);
-              if (item.isDirectory()) {
-                sanitize(full);
-              } else if (item.name.endsWith('.md')) {
-                let content = fs.readFileSync(full, 'utf8');
-                let fm = '';
-                let body = content;
-                if (content.startsWith('---')) {
-                  const second = content.indexOf('\n---', 3);
-                  if (second !== -1) {
-                    const fmEnd = second + 4;
-                    fm = content.substring(0, fmEnd);
-                    body = content.substring(fmEnd);
-                  }
-                }
-                const sanitizedBody = body
-                  .replaceAll('{{', '&#123;&#123;')
-                  .replaceAll('{%', '&#123;%')
-                  .replaceAll('%}', '%&#125;')
-                  .replaceAll('}}', '&#125;&#125;');
-                fs.writeFileSync(full, fm + sanitizedBody, 'utf8');
-              }
-            }
-          }
-          sanitize('public_site');
-          console.log('Successfully sanitized Liquid syntax for all Markdown files in public_site.');
-          "
-
       - name: Build with Jekyll
         uses: actions/jekyll-build-pages@v1
         with:

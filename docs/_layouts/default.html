@@ -80,8 +80,45 @@
           document.documentElement.setAttribute('data-theme', next);
           localStorage.setItem('novelaide_docs_theme', next);
           updateButton(next);
+          // テーマ変更時にMermaid図を再描画
+          if (window.renderMermaid) {
+            window.renderMermaid(next);
+          }
         });
       })();
+    </script>
+
+    <!-- Mermaid.js 自動レンダリングスクリプト -->
+    <script type="module">
+      import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+      window.renderMermaid = function(theme) {
+        var currentTheme = theme || document.documentElement.getAttribute('data-theme') || 'dark';
+        mermaid.initialize({
+          startOnLoad: false,
+          theme: currentTheme === 'dark' ? 'dark' : 'default',
+          securityLevel: 'loose'
+        });
+
+        // Kramdownが出力する <pre><code class="language-mermaid"> を <div class="mermaid"> に変換
+        document.querySelectorAll('pre code.language-mermaid').forEach(function(codeBlock) {
+          var pre = codeBlock.parentElement;
+          var div = document.createElement('div');
+          div.className = 'mermaid';
+          div.textContent = codeBlock.textContent;
+          pre.parentNode.replaceChild(div, pre);
+        });
+
+        mermaid.run();
+      };
+
+      document.addEventListener('DOMContentLoaded', function() {
+        window.renderMermaid();
+      });
+      // DOMContentLoadedが既に発火している場合用
+      if (document.readyState === 'interactive' || document.readyState === 'complete') {
+        window.renderMermaid();
+      }
     </script>
   </body>
 </html>
