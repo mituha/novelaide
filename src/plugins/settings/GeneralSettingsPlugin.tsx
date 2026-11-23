@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import type { SettingTabPlugin, SettingTabProps } from 'restar-app-settings';
 import { updateService, type UpdateInfo } from '../../services/updateService';
 import { UpdateModal } from '../../components/Update/UpdateModal';
-import { RefreshCw, CheckCircle, AlertCircle, BookOpen, ExternalLink, Github, FileText } from 'lucide-react';
+import { RefreshCw, CheckCircle, AlertCircle, BookOpen, ExternalLink, Download, FileText } from 'lucide-react';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import packageJson from '../../../package.json';
 
@@ -165,7 +165,7 @@ const GeneralSettingsTab: React.FC<SettingTabProps> = ({ settings, updateSetting
               try { await openUrl(url); } catch { window.open(url, '_blank'); }
             }}
           >
-            <Github size={13} />
+            <Download size={13} />
             <span>最新リリース</span>
             <ExternalLink size={11} style={{ opacity: 0.6 }} />
           </button>
