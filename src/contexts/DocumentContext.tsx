@@ -49,6 +49,7 @@ interface DocumentContextType {
   closeLeftTabs: (path: string, paneId?: PaneId) => Promise<void>;
   closeAllTabs: (paneId?: PaneId) => Promise<void>;
   closeAllDocuments: (options?: { saveDirty?: boolean }) => Promise<void>;
+  saveAllDocuments: () => Promise<void>;
   switchTab: (path: string, paneId?: PaneId) => void;
   setActivePane: (paneId: PaneId) => void;
   setActivePath: (path: string) => void;
@@ -580,20 +581,26 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     [activePane, openDocuments, closeTab]
   );
 
-  // 全ドキュメントを閉じる（プロジェクト切替やアプリ終了時に使用）
+  // 未保存の全ドキュメントをディスクに保存（アプリ終了時などに使用）
+  const saveAllDocuments = useCallback(async () => {
+    console.log('[DocumentContext] saveAllDocuments called');
+    const dirtyDocs = openDocumentsRef.current.filter((d) => d.isDirty);
+    for (const doc of dirtyDocs) {
+      clearAutoSaveTimer(doc.path);
+      try {
+        await saveDocument(doc.path);
+      } catch (e) {
+        console.error(`[DocumentContext] Failed to save dirty doc on saveAll: ${doc.path}`, e);
+      }
+    }
+  }, [clearAutoSaveTimer, saveDocument]);
+
+  // 全ドキュメントを閉じる（プロジェクト切替時に使用）
   const closeAllDocuments = useCallback(
     async (options?: { saveDirty?: boolean }) => {
       console.log('[DocumentContext] closeAllDocuments called', options);
       if (options?.saveDirty !== false) {
-        const dirtyDocs = openDocumentsRef.current.filter((d) => d.isDirty);
-        for (const doc of dirtyDocs) {
-          clearAutoSaveTimer(doc.path);
-          try {
-            await saveDocument(doc.path);
-          } catch (e) {
-            console.error(`[DocumentContext] Failed to save dirty doc on closeAll: ${doc.path}`, e);
-          }
-        }
+        await saveAllDocuments();
       }
 
       // 自動保存タイマーの全クリア
@@ -611,7 +618,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       setIsSplit(false);
       setActivePane('editor.left');
     },
-    [clearAutoSaveTimer, saveDocument]
+    [saveAllDocuments]
   );
 
   // ペインを閉じる
@@ -1435,6 +1442,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         closeLeftTabs,
         closeAllTabs,
         closeAllDocuments,
+        saveAllDocuments,
         switchTab,
         setActivePane: handleSetActivePane,
         setActivePath,

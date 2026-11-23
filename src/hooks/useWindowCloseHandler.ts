@@ -1,14 +1,16 @@
 import { useEffect, useRef } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { useProject } from "../contexts/ProjectContext";
+import { exit } from "@tauri-apps/plugin-process";
+import { useDocument } from "../contexts/DocumentContext";
 import { bootLog } from "../utils/bootLogger";
 
 /**
  * アプリケーション終了（ウィンドウの×ボタンや終了操作）時に、
- * 未保存ドキュメントの保存およびプロジェクトクローズ処理を安全に完了させるフック
+ * 未保存ドキュメントの安全なディスク保存のみを行い、
+ * プロジェクト選択画面への画面リセット（closeProject）は行わずにウィンドウを安全に破棄・終了するフック
  */
 export const useWindowCloseHandler = () => {
-  const { closeProject } = useProject();
+  const { saveAllDocuments } = useDocument();
   const isClosingRef = useRef(false);
 
   useEffect(() => {
@@ -27,16 +29,21 @@ export const useWindowCloseHandler = () => {
           isClosingRef.current = true;
 
           try {
-            // プロジェクトクローズ（未保存ドキュメントの自動保存とクリーンアップ）
-            await closeProject();
+            // 未保存ドキュメントのみをディスクに自動保存（プロジェクト状態や履歴キーは維持）
+            await saveAllDocuments();
           } catch (err) {
-            console.error("[useWindowCloseHandler] Failed during closeProject on exit:", err);
+            console.error("[useWindowCloseHandler] Failed during saveAllDocuments on exit:", err);
           } finally {
             try {
               // クリーンアップ完了後にウィンドウを破棄
               await appWindow.destroy();
             } catch (destroyErr) {
-              console.error("[useWindowCloseHandler] Failed to destroy window:", destroyErr);
+              console.warn("[useWindowCloseHandler] appWindow.destroy failed, falling back to process.exit:", destroyErr);
+              try {
+                await exit(0);
+              } catch (exitErr) {
+                console.error("[useWindowCloseHandler] Failed to exit process:", exitErr);
+              }
             }
           }
         });
@@ -51,7 +58,7 @@ export const useWindowCloseHandler = () => {
     // Web環境やブラウザリロード対策としての beforeunload
     const handleBeforeUnload = () => {
       bootLog("[useWindowCloseHandler] beforeunload triggered");
-      closeProject();
+      saveAllDocuments();
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
 
@@ -61,5 +68,5 @@ export const useWindowCloseHandler = () => {
       }
       window.removeEventListener("beforeunload", handleBeforeUnload);
     };
-  }, [closeProject]);
+  }, [saveAllDocuments]);
 };
