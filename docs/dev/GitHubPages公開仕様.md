@@ -67,6 +67,11 @@ flowchart LR
   - `actions/upload-pages-artifact@v3`
   - `actions/deploy-pages@v4`
 
+### 3.4 Liquid構文衝突（`{{ ... }}`）の自動エスケープ機構
+Jekyll はコードブロック内であっても `{{ ... }}` や `{% ... %}` を Liquid テンプレート変数/タグとして解釈しようとするため、React のインラインスタイル（`style={{ color: "..." }}`）や GitHub Actions 構文（`${{ secrets... }}`）を含む技術文書で Liquid パースエラーが発生します。
+
+これを防止するため、ワークフローのデプロイ直前ステップで、公開用一時ディレクトリ `public_site/` 内の全 `.md` ファイルに対して自動的に Frontmatter を保護しつつ本文を `{% raw %}...{% endraw %}` でラップする前処理スクリプト（Node.js）を実行します。これにより、ローカルの原稿を汚すことなく、Jekyll ビルド時の Liquid 構文エラーを完全に根絶しています。
+
 ---
 
 ## 4. 初期設定手順（GitHub リポジトリ設定）
