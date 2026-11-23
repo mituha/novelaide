@@ -43,38 +43,39 @@ jobs:
           echo "Merged docs/ and making/notes/ successfully."
           ls -la public_site/
 
-      - name: Escape Liquid tags in Markdown for Jekyll
+      - name: Escape Liquid syntax in Markdown for Jekyll
         run: |
           node -e "
           const fs = require('fs');
           const path = require('path');
-          function wrap(dir) {
+          function sanitize(dir) {
             for (const item of fs.readdirSync(dir, { withFileTypes: true })) {
               const full = path.join(dir, item.name);
               if (item.isDirectory()) {
-                wrap(full);
+                sanitize(full);
               } else if (item.name.endsWith('.md')) {
                 let content = fs.readFileSync(full, 'utf8');
-                if (content.includes('{% raw %}')) continue;
+                let fm = '';
+                let body = content;
                 if (content.startsWith('---')) {
                   const second = content.indexOf('\n---', 3);
                   if (second !== -1) {
                     const fmEnd = second + 4;
-                    const fm = content.substring(0, fmEnd);
-                    const body = content.substring(fmEnd);
-                    content = fm + '\n\n{% raw %}\n' + body + '\n{% endraw %}\n';
-                  } else {
-                    content = '{% raw %}\n' + content + '\n{% endraw %}\n';
+                    fm = content.substring(0, fmEnd);
+                    body = content.substring(fmEnd);
                   }
-                } else {
-                  content = '{% raw %}\n' + content + '\n{% endraw %}\n';
                 }
-                fs.writeFileSync(full, content, 'utf8');
+                const sanitizedBody = body
+                  .replaceAll('{{', '&#123;&#123;')
+                  .replaceAll('{%', '&#123;%')
+                  .replaceAll('%}', '%&#125;')
+                  .replaceAll('}}', '&#125;&#125;');
+                fs.writeFileSync(full, fm + sanitizedBody, 'utf8');
               }
             }
           }
-          wrap('public_site');
-          console.log('Successfully escaped Liquid tags for all Markdown files in public_site.');
+          sanitize('public_site');
+          console.log('Successfully sanitized Liquid syntax for all Markdown files in public_site.');
           "
 
       - name: Build with Jekyll
