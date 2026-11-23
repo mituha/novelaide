@@ -11,6 +11,7 @@ import { MetadataPanelPlugin } from '../../plugins/panels/MetadataPanelPlugin';
 import { AiPanelPlugin } from '../../plugins/panels/AiPanelPlugin';
 import { CalibrationPanelPlugin } from '../../plugins/panels/CalibrationPanelPlugin';
 import { DebugPanelPlugin } from '../../plugins/panels/DebugPanelPlugin';
+import { BatchToolsPanelPlugin } from '../../plugins/panels/BatchToolsPanelPlugin';
 
 export const panelRegistry = new PanelRegistry();
 
@@ -27,5 +28,6 @@ panelRegistry.register(MetadataPanelPlugin);
 panelRegistry.register(CalibrationPanelPlugin);
 panelRegistry.register(AiPanelPlugin);
 panelRegistry.register(DebugPanelPlugin);
+panelRegistry.register(BatchToolsPanelPlugin);
 
 export { PanelRegistry };

@@ -1,0 +1,577 @@
+.batch-tools-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  width: 100%;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  font-size: 13px;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+.batch-tools-panel.empty {
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+/* ヘッダー */
+.batch-header {
+  padding: 12px 14px 8px 14px;
+  border-bottom: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  flex-shrink: 0;
+}
+
+.batch-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.batch-title-icon {
+  color: var(--accent-color);
+}
+
+.batch-panel-title {
+  font-weight: 600;
+  font-size: 13px;
+  letter-spacing: 0.02em;
+}
+
+/* ツール切り替えタブ */
+.batch-tool-tabs {
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+}
+
+.batch-tool-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 10px;
+  border-radius: 4px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 12px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.batch-tool-tab-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.batch-tool-tab-btn.active {
+  background: var(--bg-primary);
+  border-color: var(--border-color);
+  color: var(--accent-color);
+  font-weight: 600;
+}
+
+/* 共通セレクター領域 */
+.batch-selector-container {
+  flex: 1 1 50%;
+  min-height: 180px;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 1px solid var(--border-color);
+  overflow: hidden;
+  padding: 10px 14px;
+  gap: 8px;
+}
+
+.batch-file-selector {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 8px;
+  overflow: hidden;
+}
+
+.batch-selector-row {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.batch-selector-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.batch-folder-select-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.batch-select-input {
+  flex: 1;
+  padding: 5px 8px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 12px;
+  outline: none;
+}
+
+.batch-select-input:focus {
+  border-color: var(--accent-color);
+}
+
+.batch-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-secondary);
+  cursor: pointer;
+}
+
+.batch-btn-icon:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.batch-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* フィルター行 */
+.batch-filter-row {
+  display: flex;
+  gap: 8px;
+}
+
+.batch-ext-filter {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.batch-ext-select {
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 11px;
+  outline: none;
+}
+
+.batch-search-wrap {
+  position: relative;
+  flex: 1.2;
+  display: flex;
+  align-items: center;
+}
+
+.batch-icon-search {
+  position: absolute;
+  left: 6px;
+  color: var(--text-secondary);
+  pointer-events: none;
+}
+
+.batch-search-input {
+  width: 100%;
+  padding: 4px 6px 4px 24px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 11px;
+  outline: none;
+}
+
+.batch-search-input:focus {
+  border-color: var(--accent-color);
+}
+
+/* 全選択ヘッダー */
+.batch-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-bottom: 2px;
+}
+
+.batch-check-all-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 11px;
+  cursor: pointer;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+.batch-check-all-btn:hover {
+  background: var(--bg-hover);
+  color: var(--text-primary);
+}
+
+.batch-checkbox-checked {
+  color: var(--accent-color);
+}
+
+.batch-checkbox-unchecked {
+  color: var(--text-secondary);
+}
+
+/* ファイル一覧リスト */
+.batch-file-list {
+  flex: 1;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+}
+
+.batch-file-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: background 0.1s ease;
+  user-select: none;
+}
+
+.batch-file-item:last-child {
+  border-bottom: none;
+}
+
+.batch-file-item:hover {
+  background: var(--bg-hover);
+}
+
+.batch-file-item.unselected {
+  opacity: 0.6;
+}
+
+.batch-file-checkbox {
+  display: flex;
+  align-items: center;
+}
+
+.batch-file-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.batch-file-name {
+  display: block;
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.batch-ext-badge {
+  font-size: 10px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+/* アクション領域 */
+.batch-action-wrapper {
+  flex: 1 1 50%;
+  overflow-y: auto;
+  padding: 12px 14px;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-action-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.batch-action-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.batch-action-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.batch-action-desc {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* プリセット行 */
+.batch-preset-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.batch-preset-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.batch-btn-preset {
+  padding: 3px 8px;
+  border-radius: 3px;
+  border: 1px solid var(--border-color);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.1s ease;
+}
+
+.batch-btn-preset:hover {
+  background: var(--accent-color);
+  color: #fff;
+  border-color: var(--accent-color);
+}
+
+/* 変換設定フォーム */
+.batch-config-form {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-secondary);
+  padding: 8px 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border-color);
+}
+
+.batch-config-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.batch-config-label {
+  font-size: 11px;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.batch-input-with-dot {
+  display: flex;
+  align-items: center;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 2px 6px;
+}
+
+.batch-dot {
+  color: var(--text-secondary);
+  font-weight: 600;
+  margin-right: 2px;
+}
+
+.batch-text-input {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font-size: 12px;
+  width: 100%;
+  outline: none;
+}
+
+.batch-arrow-icon {
+  color: var(--accent-color);
+  flex-shrink: 0;
+  margin-top: 14px;
+}
+
+/* プレビュー表示 */
+.batch-preview-section {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.batch-preview-header {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.batch-preview-list {
+  max-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  background: var(--bg-secondary);
+  padding: 4px;
+}
+
+.batch-preview-empty {
+  padding: 12px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+
+.batch-preview-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 6px;
+  font-size: 11px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.batch-preview-item:last-child {
+  border-bottom: none;
+}
+
+.batch-preview-orig {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--text-secondary);
+}
+
+.batch-preview-arrow {
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.batch-preview-new {
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--accent-color);
+  font-weight: 500;
+}
+
+/* 実行ボタン & プログレス */
+.batch-exec-footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 8px;
+}
+
+.batch-progress-bar-wrap {
+  position: relative;
+  height: 18px;
+  background: var(--bg-secondary);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.batch-progress-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  background: var(--accent-color);
+  opacity: 0.35;
+  transition: width 0.2s ease;
+}
+
+.batch-progress-text {
+  position: relative;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.batch-exec-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 5px;
+  border: none;
+  background: var(--accent-color);
+  color: #fff;
+  font-weight: 600;
+  font-size: 12px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.batch-exec-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.batch-exec-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* プレースホルダー */
+.batch-action-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.batch-placeholder-icon {
+  margin-bottom: 12px;
+  opacity: 0.4;
+}
+
+.batch-action-placeholder h4 {
+  margin: 0 0 8px 0;
+  color: var(--text-primary);
+}
+
+.batch-action-placeholder p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+}
