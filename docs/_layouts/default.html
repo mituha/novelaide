@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% if page.title %}{{ page.title }} | {% endif %}{{ site.title }}</title>
+    <meta name="description" content="{{ page.description | default: site.description }}">
+    <link rel="stylesheet" href="{{ '/assets/css/style.css' | relative_url }}">
+
+    <!-- テーマ初期化スクリプト (チラつき防止) -->
+    <script>
+      (function() {
+        var savedTheme = localStorage.getItem('novelaide_docs_theme');
+        if (savedTheme) {
+          document.documentElement.setAttribute('data-theme', savedTheme);
+        } else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        } else {
+          document.documentElement.setAttribute('data-theme', 'light');
+        }
+      })();
+    </script>
+  </head>
+  <body>
+    <header class="page-header" role="banner">
+      <!-- テーマ切り替えトグルボタン -->
+      <button id="themeToggleBtn" class="theme-toggle-btn" type="button" aria-label="テーマ切り替え">
+        <span id="themeToggleIcon">🌙</span>
+        <span id="themeToggleText">ダーク</span>
+      </button>
+
+      <h1 class="project-name">{{ site.title }}</h1>
+      <h2 class="project-tagline">{{ site.description }}</h2>
+
+      <!-- 共通ナビゲーションバー -->
+      <nav class="site-nav" aria-label="ドキュメントナビゲーション">
+        <a href="{{ '/' | relative_url }}" class="site-nav-link">🏠 ポータルトップ</a>
+        <a href="{{ '/manual/' | relative_url }}" class="site-nav-link">📖 ユーザーマニュアル</a>
+        <a href="{{ '/dev/' | relative_url }}" class="site-nav-link">🛠️ 開発仕様書</a>
+        <a href="{{ '/notes/' | relative_url }}" class="site-nav-link">📝 メイキング連載</a>
+        <a href="https://github.com/mituha/novelaide/releases/latest" class="site-nav-link" target="_blank" rel="noopener">🚀 最新版ダウンロード</a>
+      </nav>
+    </header>
+
+    <main id="content" class="main-content" role="main">
+      {{ content }}
+
+      <footer class="site-footer" style="margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border-color); font-size: 13px; color: var(--text-color); opacity: 0.8;">
+        <div style="display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px;">
+          <div>novelaide - 小説執筆用デスクトップIDE</div>
+          <div><a href="https://github.com/mituha/novelaide" target="_blank" rel="noopener">GitHub リポジトリ</a></div>
+        </div>
+      </footer>
+    </main>
+
+    <!-- テーマ切り替えイベントスクリプト -->
+    <script>
+      (function() {
+        var btn = document.getElementById('themeToggleBtn');
+        var icon = document.getElementById('themeToggleIcon');
+        var text = document.getElementById('themeToggleText');
+
+        function updateButton(theme) {
+          if (theme === 'dark') {
+            icon.textContent = '☀️';
+            text.textContent = 'ライト';
+          } else {
+            icon.textContent = '🌙';
+            text.textContent = 'ダーク';
+          }
+        }
+
+        var current = document.documentElement.getAttribute('data-theme') || 'dark';
+        updateButton(current);
+
+        btn.addEventListener('click', function() {
+          var now = document.documentElement.getAttribute('data-theme');
+          var next = now === 'dark' ? 'light' : 'dark';
+          document.documentElement.setAttribute('data-theme', next);
+          localStorage.setItem('novelaide_docs_theme', next);
+          updateButton(next);
+        });
+      })();
+    </script>
+  </body>
+</html>
