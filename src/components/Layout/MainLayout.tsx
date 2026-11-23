@@ -366,6 +366,7 @@ export const MainLayout: React.FC<MainLayoutProps> = ({ onOpenLauncher }) => {
           )
         }
         isRightPaneVisible={!!rightActivePanelId}
+        onOpenLauncher={onOpenLauncher}
       />
     </div>
   );

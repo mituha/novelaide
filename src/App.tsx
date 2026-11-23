@@ -12,30 +12,37 @@ import { ProjectProvider, useProject } from "./contexts/ProjectContext";
 import { GitProvider } from "./contexts/GitContext";
 import { DocumentProvider } from "./contexts/DocumentContext";
 import { MainLayout } from "./components/Layout/MainLayout";
-import { ProjectLauncherPage } from "./pages/ProjectLauncherPage";
+import { ProjectLauncherModal } from "./components/Launcher/ProjectLauncherModal";
 import { bootLog } from "./utils/bootLogger";
 import "./styles/theme.css";
 import "./App.css";
 
 function AppContent() {
   const { projectPath } = useProject();
-  // プロジェクトが開かれていない場合はランチャーを表示
-  const [showLauncher, setShowLauncher] = useState<boolean>(!projectPath);
+  // プロジェクトが開かれていない場合は最初からランチャーを表示
+  const [isLauncherOpen, setIsLauncherOpen] = useState<boolean>(!projectPath);
 
   useEffect(() => {
-    bootLog(`AppContent mounted. Target view: ${showLauncher ? "ProjectLauncher" : "MainLayout"}`, { projectPath });
-  }, [showLauncher, projectPath]);
+    bootLog(`AppContent state updated:`, { isLauncherOpen, projectPath });
+  }, [isLauncherOpen, projectPath]);
 
-  if (showLauncher) {
-    return (
-      <ProjectLauncherPage
-        onNavigateToEditor={() => setShowLauncher(false)}
-      />
-    );
-  }
+  // プロジェクト未選択時は常にモーダルを開く
+  const isModalVisible = isLauncherOpen || !projectPath;
 
   return (
-    <MainLayout onOpenLauncher={() => setShowLauncher(true)} />
+    <>
+      {projectPath && (
+        <MainLayout onOpenLauncher={() => setIsLauncherOpen(true)} />
+      )}
+      <ProjectLauncherModal
+        isOpen={isModalVisible}
+        onClose={() => {
+          if (projectPath) {
+            setIsLauncherOpen(false);
+          }
+        }}
+      />
+    </>
   );
 }
 
