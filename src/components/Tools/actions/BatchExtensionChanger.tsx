@@ -16,7 +16,7 @@ export const BatchExtensionChanger: React.FC<BatchExtensionChangerProps> = ({
   onExecutionComplete,
 }) => {
   const { updateDocumentPath, openDocuments, saveDocument } = useDocument();
-  const { showToast } = useNotification();
+  const { showToast, confirmDialog } = useNotification();
 
   const [fromExt, setFromExt] = useState<string>('md');
   const [toExt, setToExt] = useState<string>('txt');
@@ -74,8 +74,15 @@ export const BatchExtensionChanger: React.FC<BatchExtensionChangerProps> = ({
       return;
     }
 
-    const confirmMsg = `選択された ${previewItems.length} 件のファイルを一括で .${cleanFrom} から .${cleanTo} に変更します。\n実行してもよろしいですか？`;
-    if (!window.confirm(confirmMsg)) {
+    const confirmed = await confirmDialog({
+      title: '一括拡張子変更の確認',
+      message: `選択された ${previewItems.length} 件のファイルを一括で .${cleanFrom} から .${cleanTo} に変更します。\n実行してもよろしいですか？`,
+      kind: 'warning',
+      okLabel: '変更を実行',
+      cancelLabel: 'キャンセル',
+    });
+
+    if (!confirmed) {
       return;
     }
 
@@ -139,7 +146,7 @@ export const BatchExtensionChanger: React.FC<BatchExtensionChangerProps> = ({
     }
 
     onExecutionComplete();
-  }, [previewItems, fromExt, toExt, openDocuments, saveDocument, updateDocumentPath, showToast, onExecutionComplete]);
+  }, [previewItems, fromExt, toExt, openDocuments, saveDocument, updateDocumentPath, showToast, confirmDialog, onExecutionComplete]);
 
   return (
     <div className="batch-action-container">
