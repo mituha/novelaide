@@ -187,9 +187,13 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (currentProjectPath && activeLeftItem && activeLeftItem.documentType === 'novel') {
       const activeLeftDoc = openDocuments.find((d) => d.path === activeLeftItem.path);
+      // 【防壁】別プロジェクトのドキュメントが残存している間は新プロジェクトの履歴として保存しない
+      if (activeLeftDoc?.projectPath && !fileService.isSamePath(activeLeftDoc.projectPath, currentProjectPath)) {
+        return;
+      }
       recentDocumentStorage.save(currentProjectPath, {
+        relativePath: activeLeftDoc?.relativePath,
         path: activeLeftItem.path,
-        relativePath: activeLeftDoc?.relativePath || activeLeftItem.path,
         fileTitle: activeLeftItem.fileTitle || activeLeftItem.baseName,
       });
     }
@@ -300,11 +304,14 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           docToSave.views.some((v) => v.viewId === 'editor.left') ||
           activePathByPane['editor.left'] === targetPath;
         if (currentProjectPath && docToSave.documentType === 'novel' && isLeftRelated) {
-          recentDocumentStorage.save(currentProjectPath, {
-            path: docToSave.path,
-            relativePath: docToSave.relativePath || docToSave.path,
-            fileTitle: docToSave.fileTitle || docToSave.baseName,
-          });
+          // 【防壁】現在プロジェクトに属している場合のみ履歴保存
+          if (!docToSave.projectPath || fileService.isSamePath(docToSave.projectPath, currentProjectPath)) {
+            recentDocumentStorage.save(currentProjectPath, {
+              relativePath: docToSave.relativePath,
+              path: docToSave.path,
+              fileTitle: docToSave.fileTitle || docToSave.baseName,
+            });
+          }
         }
       } catch (err) {
         console.error('[DocumentContext] Save Error:', err);
@@ -1229,11 +1236,11 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           const lastNovel = recentDocumentStorage.get(currentProjectPath);
           if (
             lastNovel &&
-            (fileService.isSamePath(lastNovel.path, oldPath) || lastNovel.relativePath === oldPath)
+            (fileService.isSamePath(lastNovel.relativePath, oldPath) ||
+              (lastNovel.path && fileService.isSamePath(lastNovel.path, oldPath)))
           ) {
             const base = newPath.split(/[\\/]/).pop() || newFileName;
             recentDocumentStorage.save(currentProjectPath, {
-              path: newPath,
               relativePath: lastNovel.relativePath
                 ? lastNovel.relativePath.replace(/[^\\/]+$/, base)
                 : base,
@@ -1378,16 +1385,22 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     if (openDocumentsRef.current.length === 0) {
       autoRestoredProjectRef.current = currentProjectPath;
       const lastNovel = recentDocumentStorage.get(currentProjectPath);
-      if (!lastNovel?.path) return;
+      const relPath = lastNovel?.relativePath || lastNovel?.path;
+      if (!relPath) return;
 
       const restoreDoc = async () => {
         try {
-          const stat = await fileService.getDocumentStat(lastNovel.path);
+          // 相対パスを基準に現在のプロジェクト配下の絶対パスを構築
+          const absPath = fileService.isAbsolute(relPath)
+            ? relPath
+            : fileService.joinPath(currentProjectPath, relPath);
+
+          const stat = await fileService.getDocumentStat(absPath);
           if (stat && stat.exists) {
-            console.log('[DocumentContext] Auto-restoring last novel document into left pane:', lastNovel.path);
-            await openDocument(lastNovel.path, { paneId: 'editor.left' });
+            console.log('[DocumentContext] Auto-restoring last novel document into left pane:', absPath);
+            await openDocument(absPath, { paneId: 'editor.left' });
           } else {
-            console.warn('[DocumentContext] Last novel document not found, clearing:', lastNovel.path);
+            console.warn('[DocumentContext] Last novel document not found, clearing:', absPath);
             recentDocumentStorage.remove(currentProjectPath);
           }
         } catch (e) {

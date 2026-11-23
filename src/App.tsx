@@ -34,7 +34,7 @@ function AppContent() {
   return (
     <>
       {projectPath && (
-        <MainLayout onOpenLauncher={() => setIsLauncherOpen(true)} />
+        <MainLayout key={projectPath} onOpenLauncher={() => setIsLauncherOpen(true)} />
       )}
       <ProjectLauncherModal
         isOpen={isModalVisible}

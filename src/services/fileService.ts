@@ -23,6 +23,30 @@ export function isSamePath(p1: string, p2: string): boolean {
   return normalizePath(p1).toLowerCase() === normalizePath(p2).toLowerCase();
 }
 
+/**
+ * パスが絶対パスかどうか判定
+ */
+export function isAbsolute(p: string): boolean {
+  if (!p) return false;
+  // Windows: C:\, \\, or Unix: /
+  return /^[a-zA-Z]:[\\/]|^[\\/]{2}|^\//.test(p);
+}
+
+/**
+ * 基準ディレクトリからの相対パスを取得
+ */
+export function getRelativePath(basePath: string, targetPath: string): string {
+  if (!basePath || !targetPath) return targetPath;
+  const normBase = normalizePath(basePath).replace(/[\/\\]+$/, '');
+  const normTarget = normalizePath(targetPath);
+  if (normTarget.toLowerCase().startsWith(normBase.toLowerCase())) {
+    let rel = normTarget.slice(normBase.length);
+    rel = rel.replace(/^[\/\\]+/, '');
+    return rel;
+  }
+  return normTarget;
+}
+
 // ブラウザ環境やプレビュー撮影用のモックデータ
 const MOCK_ENTRIES: DirEntry[] = [
   {
@@ -190,6 +214,8 @@ export const fileService = {
   normalizePath,
   isSubPath,
   isSamePath,
+  isAbsolute,
+  getRelativePath,
 
   // プロジェクトディレクトリの設定
   async setProjectDirectory(path: string | null): Promise<void> {

@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect, useCallback, useRef, Re
 import type { ProjectItem } from "restar-app";
 import { getVersion } from "@tauri-apps/api/app";
 import { getCurrentWindow } from "@tauri-apps/api/window";
+import { isSamePath } from "../services/fileService";
 import { bootLog } from "../utils/bootLogger";
 
 interface ProjectContextType {
@@ -129,7 +130,7 @@ export const ProjectProvider: React.FC<{ children: ReactNode }> = ({ children })
   const openProject = useCallback(
     async (path: string, customName?: string) => {
       bootLog("openProject called:", { path, customName, currentProjectPath: projectPath });
-      if (projectPath && projectPath !== path) {
+      if (projectPath && !isSamePath(projectPath, path)) {
         await closeProject();
       }
       const parts = path.split(/[\\/]/).filter(Boolean);
