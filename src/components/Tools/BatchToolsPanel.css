@@ -101,6 +101,70 @@
   gap: 4px;
 }
 
+.batch-folder-drop-zone {
+  position: relative;
+  border: 1px dashed transparent;
+  border-radius: 6px;
+  padding: 4px;
+  margin: -4px;
+  transition: all 0.2s ease;
+}
+
+.batch-folder-drop-zone.drag-over {
+  border-color: var(--accent-color, #3b82f6);
+  background-color: rgba(59, 130, 246, 0.08);
+}
+
+.batch-selector-label-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.batch-dnd-hint {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--text-tertiary, #888);
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  padding: 1px 5px;
+  border-radius: 3px;
+  border: 1px dashed var(--border-color);
+  user-select: none;
+}
+
+.batch-drop-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-primary, #1e1e1e);
+  border: 2px dashed var(--accent-color, #3b82f6);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent-color, #3b82f6);
+  z-index: 10;
+  pointer-events: none;
+}
+
+.batch-drop-overlay-icon {
+  animation: batchBounce 0.7s infinite alternate ease-in-out;
+}
+
+@keyframes batchBounce {
+  0% {
+    transform: translateY(0);
+  }
+  100% {
+    transform: translateY(-4px);
+  }
+}
+
 .batch-selector-label {
   display: flex;
   align-items: center;

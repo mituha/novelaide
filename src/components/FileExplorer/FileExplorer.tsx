@@ -65,6 +65,14 @@ export const FileExplorer: React.FC<FileExplorerProps> = ({
     e.stopPropagation();
     setDraggedItem({ path: item.path, isDir: item.isDirectory });
     e.dataTransfer.setData('text/plain', item.path);
+    e.dataTransfer.setData(
+      'application/x-novelaide-entry',
+      JSON.stringify({
+        path: item.path,
+        isDirectory: item.isDirectory,
+        name: item.name,
+      })
+    );
     e.dataTransfer.effectAllowed = 'copyMove';
   };
 

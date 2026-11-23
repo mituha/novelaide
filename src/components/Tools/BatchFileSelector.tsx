@@ -1,8 +1,16 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import { Folder, Filter, CheckSquare, Square, Search, RefreshCw } from 'lucide-react';
+import { Folder, Filter, CheckSquare, Square, Search, RefreshCw, FolderInput } from 'lucide-react';
 import { fileService } from '../../services/fileService';
 import { DirEntry } from '../../types/document';
 import { BatchFileItem } from '../../types/batchTool';
+import { useNotification } from '../../contexts/NotificationContext';
+
+function getParentDir(p: string): string {
+  const norm = p.replace(/\\/g, '/');
+  const lastSlash = norm.lastIndexOf('/');
+  if (lastSlash === -1) return p;
+  return p.substring(0, lastSlash);
+}
 
 interface BatchFileSelectorProps {
   projectPath: string;
@@ -25,6 +33,9 @@ export const BatchFileSelector: React.FC<BatchFileSelectorProps> = ({
   const [selectedExtension, setSelectedExtension] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [selectedMap, setSelectedMap] = useState<Record<string, boolean>>({});
+  const [isDragOver, setIsDragOver] = useState(false);
+
+  const { showToast } = useNotification();
 
   // プロジェクト内のディレクトリおよび全エントリのスキャン
   const scanProjectEntries = useCallback(async () => {
@@ -181,17 +192,124 @@ export const BatchFileSelector: React.FC<BatchFileSelectorProps> = ({
     [filteredFiles]
   );
 
+  // --- ドラッグ＆ドロップによるフォルダー指定 ---
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    e.dataTransfer.dropEffect = 'copy';
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+      setIsDragOver(false);
+    }
+  }, []);
+
+  const handleDrop = useCallback(
+    async (e: React.DragEvent) => {
+      e.preventDefault();
+      e.stopPropagation();
+      setIsDragOver(false);
+
+      if (!projectPath) return;
+
+      let droppedPath = '';
+      let isDir: boolean | null = null;
+
+      // 1. アプリ内エクスプローラーからのメタデータ (JSON)
+      const entryData = e.dataTransfer.getData('application/x-novelaide-entry');
+      if (entryData) {
+        try {
+          const parsed = JSON.parse(entryData);
+          if (parsed && typeof parsed.path === 'string') {
+            droppedPath = parsed.path;
+            isDir = !!parsed.isDirectory;
+          }
+        } catch {}
+      }
+
+      // 2. text/plain フォールバック
+      if (!droppedPath) {
+        const textData = e.dataTransfer.getData('text/plain');
+        if (textData) {
+          droppedPath = textData.trim();
+        }
+      }
+
+      // 3. OSエクスプローラーからのファイル/フォルダードロップ
+      if (!droppedPath && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        const file = e.dataTransfer.files[0] as any;
+        if (file && file.path) {
+          droppedPath = file.path;
+        }
+      }
+
+      if (!droppedPath) return;
+
+      // パスの正規化・プロジェクト配下チェック
+      const normProject = projectPath.replace(/\\/g, '/').toLowerCase();
+      const normDropped = droppedPath.replace(/\\/g, '/').toLowerCase();
+
+      const isSameAsProject = normDropped === normProject;
+      const isUnderProject =
+        normDropped.startsWith(normProject.endsWith('/') ? normProject : `${normProject}/`);
+
+      if (!isSameAsProject && !isUnderProject) {
+        showToast({
+          type: 'warning',
+          message: '現在の作品プロジェクト内のフォルダーのみ指定可能です',
+        });
+        return;
+      }
+
+      // フォルダー判定（ファイルなら親フォルダーを導出）
+      let targetFolderPath = droppedPath;
+      if (isDir === false) {
+        targetFolderPath = getParentDir(droppedPath);
+      } else if (isDir === null) {
+        // OSドロップ等の場合、拡張子があるか判定
+        const lastSlash = droppedPath.replace(/\\/g, '/').lastIndexOf('/');
+        const basename = lastSlash !== -1 ? droppedPath.substring(lastSlash + 1) : droppedPath;
+        if (basename.includes('.') && !basename.startsWith('.')) {
+          targetFolderPath = getParentDir(droppedPath);
+        }
+      }
+
+      onTargetDirChange(targetFolderPath);
+
+      const relPath = fileService.getRelativePath(projectPath, targetFolderPath);
+      showToast({
+        type: 'success',
+        message: `対象フォルダーを設定しました: ${relPath || '（プロジェクトルート全体）'}`,
+      });
+    },
+    [projectPath, onTargetDirChange, showToast]
+  );
+
   const selectedCount = itemsWithSelection.filter((f) => f.selected).length;
   const isAllSelected = filteredFiles.length > 0 && selectedCount === filteredFiles.length;
 
   return (
     <div className="batch-file-selector">
       {/* 1. フォルダー選択 */}
-      <div className="batch-selector-row">
-        <label className="batch-selector-label">
-          <Folder size={14} className="batch-icon" />
-          <span>対象フォルダー:</span>
-        </label>
+      <div
+        className={`batch-selector-row batch-folder-drop-zone ${isDragOver ? 'drag-over' : ''}`}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
+        <div className="batch-selector-label-row">
+          <label className="batch-selector-label">
+            <Folder size={14} className="batch-icon" />
+            <span>対象フォルダー:</span>
+          </label>
+          <span className="batch-dnd-hint" title="左のエクスプローラーからフォルダーをドラッグ＆ドロップして指定できます">
+            (D&D可)
+          </span>
+        </div>
         <div className="batch-folder-select-wrap">
           <select
             className="batch-select-input"
@@ -213,6 +331,12 @@ export const BatchFileSelector: React.FC<BatchFileSelectorProps> = ({
             <RefreshCw size={13} className={isLoading ? 'batch-spin' : ''} />
           </button>
         </div>
+        {isDragOver && (
+          <div className="batch-drop-overlay">
+            <FolderInput size={20} className="batch-drop-overlay-icon" />
+            <span>ここにフォルダーをドロップして選択</span>
+          </div>
+        )}
       </div>
 
       {/* 2. 拡張子 & 検索フィルター */}
