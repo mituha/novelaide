@@ -70,10 +70,9 @@ flowchart LR
   - `actions/upload-pages-artifact@v3`
   - `actions/deploy-pages@v4`
 
-### 3.4 Liquid構文衝突（`&#123;&#123; ... &#125;&#125;`）の自動エスケープ機構
-Jekyll はコードブロック内であっても二重波括弧（`&#123;&#123;`）やタグ開始（`&#123;%`）を Liquid テンプレート変数/タグとして解釈しようとするため、React のインラインスタイル（`style=&#123;&#123; color: "..." &#125;&#125;`）や GitHub Actions 構文（`$&#123;&#123; secrets... &#125;&#125;`）を含む技術文書で Liquid パースエラーが発生します。
-
-これを防止するため、ワークフローのデプロイ直前ステップで、公開用一時ディレクトリ `public_site/` 内の全 `.md` ファイルに対して自動的に Frontmatter を保護しつつ、本文中の `&#123;&#123;` や `&#123;%` を HTML エンティティ（`&#38;#123;&#38;#123;` / `&#38;#123;%`）に変換する前処理スクリプト（Node.js）を実行します。これにより、ローカルの原稿を汚すことなく、ブラウザ表示上はそのまま `{` や `{{` として綺麗にレンダリングされ、かつ Jekyll ビルド時の Liquid 構文エラーを完全に根絶しています。
+### 3.4 Mermaid ダイアグラムの自動描画仕様
+GitHub Pages の標準ビルド環境（Jekyll / Cayman）では、Markdown 内の Mermaid コードブロック（` ```mermaid `）が標準でレンダリングされないため、レイアウトテンプレート（`docs/_layouts/default.html`）に Mermaid.js CDN（v10）を組み込んでいます。
+Kramdown が出力する `<pre><code class="language-mermaid">` を動的に `<div class="mermaid">` に置換して SVG ダイアグラムとして描画し、閲覧者のダーク／ライトテーマ設定や手動切替トグルに連動してダイアグラムの配色（`dark` / `default`）が自動追従します。
 
 ---
 

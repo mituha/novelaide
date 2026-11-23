@@ -124,7 +124,7 @@ export interface DocumentState {
 - `desktop.rs` の `read_document` および `write_document` において、`document_type == NovelaidDocumentType::Code` の場合は Frontmatter の抽出・付加を行わず、純粋な生テキストとして保存・読込を行い、ファイル破損を防止します。
 
 ### 4.5 UI・エディター表示制御
-- **アイコン表示**: `DocumentIcon` において `code` は `<FileCode style={{ color: "#f59e0b" }} />` を表示。
+- **アイコン表示**: `DocumentIcon` において `code` はオレンジ色の `FileCode` アイコン（オレンジ `#f59e0b`）を表示。
 - **タブ操作制御**: `code` ドキュメントではモード切替ボタン（`[Preview]` 等）を表示せず、エディター専用タブとしてクリーンに表示。
 - **校正除外**: 小説専用の形態素解析・ルビ校正マーカーは `code` ドキュメントでは動作させない。
 

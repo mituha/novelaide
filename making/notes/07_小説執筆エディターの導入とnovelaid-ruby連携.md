@@ -40,7 +40,7 @@
 そこで、**小説執筆に特化したチューニング** を施しました。
 
 ```typescript
-options={{
+const editorOptions: monaco.editor.IStandaloneEditorConstructionOptions = {
   wordWrap: 'on',                                      // 右端で自然に折り返し
   minimap: { enabled: false },                         // ミニマップを非表示にして視覚ノイズを削減
   fontSize: 16,                                        // 目が疲れにくい文字サイズ
@@ -52,7 +52,7 @@ options={{
     ambiguousCharacters: false,                        // 句読点や全角記号の誤警告をオフ
     invisibleCharacters: false,
   },
-}}
+};
 ```
 
 ---

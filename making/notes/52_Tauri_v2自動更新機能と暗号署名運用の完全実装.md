@@ -116,6 +116,7 @@ sequenceDiagram
 
 タグを作成してプッシュするだけで、GitHub Actions（`.github/workflows/release.yml`）が自動で走り、インストーラーのビルド・署名・アセット添付・本公開（`releaseDraft: false`）までが一気通貫で完了します。
 
+{% raw %}
 ```yaml
       - name: Build Tauri app and create GitHub Release
         uses: tauri-apps/tauri-action@v0
@@ -129,6 +130,7 @@ sequenceDiagram
           releaseDraft: false
           prerelease: false
 ```
+{% endraw %}
 
 `tauri-action` は secrets の秘密鍵を検知すると、通常のインストーラーに加えて Updater 用の `novelaide_<version>_x64-setup.nsis.zip`、その署名ファイル `.sig`、そしてマニフェスト `latest.json` を自動生成して Release に公開してくれます。
 

@@ -124,12 +124,19 @@ export const ProjectLauncherModal: React.FC<ProjectLauncherModalProps> = ({
   if (!isOpen) return null;
 
   const isModalMode = !!projectPath;
+  const launcherLabels = {
+    openFolder: "既存の作品フォルダーを開く",
+    createProject: "新しい作品を作成する",
+    backButtonTitle: "執筆エディターに戻る (Esc)",
+    // ...
+  };
+
   const content = (
     <LibProjectLauncher
       title="novelaide"
       subtitle="作品フォルダー（執筆プロジェクト）を選択してください"
       version={appVersion ? `v${appVersion}` : undefined}
-      logoIcon={<Feather size={48} style={{ color: "var(--accent-color)" }} />}
+      logoIcon={<Feather size={48} className="launcher-logo" />}
       recentProjects={recentProjects}
       onOpenProject={handleOpenProject}
       onPickDirectory={handlePickDirectory}
@@ -137,12 +144,7 @@ export const ProjectLauncherModal: React.FC<ProjectLauncherModalProps> = ({
       onRemoveRecent={removeRecentProject}
       isBackEnabled={isModalMode}
       onBack={onClose}
-      labels={{
-        openFolder: "既存の作品フォルダーを開く",
-        createProject: "新しい作品を作成する",
-        backButtonTitle: "執筆エディターに戻る (Esc)",
-        // ...
-      }}
+      labels={launcherLabels}
     />
   );
 

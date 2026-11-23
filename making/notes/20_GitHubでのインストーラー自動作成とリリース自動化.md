@@ -72,6 +72,7 @@ flowchart TD
 ### ② 自動リリース：`release.yml`
 `v*`（例: `v0.18.11`）という形式のタグがプッシュされたときに起動します。
 
+{% raw %}
 ```yaml
 name: Release
 
@@ -122,6 +123,7 @@ jobs:
           releaseDraft: true
           prerelease: false
 ```
+{% endraw %}
 
 Tauri公式が提供している **`tauri-apps/tauri-action@v0`** を利用することで、Windows用NSISインストーラー（`.exe`）や `.msi` パッケージのコンパイルから、GitHub Releaseの作成、バイナリの添付までを完全に全自動化できます。
 
